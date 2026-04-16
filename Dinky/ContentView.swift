@@ -1,12 +1,14 @@
 import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
+import UserNotifications
 
 @MainActor
 final class ContentViewModel: ObservableObject {
     @Published var items: [ImageItem] = []
     @Published var isProcessing = false
     @Published var phase: DropZonePhase = .idle
+    private var compressionStartTime: Date = .now
 
     var selectedFormat: CompressionFormat
     let prefs: DinkyPreferences
@@ -29,12 +31,18 @@ final class ContentViewModel: ObservableObject {
         phase = .idle
     }
 
+    func remove(_ item: ImageItem) {
+        items.removeAll { $0.id == item.id }
+        if items.isEmpty { phase = .idle }
+    }
+
     // MARK: - Compress
 
     func compress() {
         guard !isProcessing else { return }
         isProcessing = true
         phase = .processing
+        compressionStartTime = .now
 
         let pending = items.filter { if case .pending = $0.status { return true }; return false }
         let goals   = CompressionGoals(
@@ -57,6 +65,19 @@ final class ContentViewModel: ObservableObject {
                 self.isProcessing = false
                 self.phase = .done
                 if self.prefs.playSoundEffects { self.playCompletionSound() }
+
+                let elapsed = Date.now.timeIntervalSince(self.compressionStartTime)
+                let doneItems = self.items.compactMap { item -> URL? in
+                    if case .done(let url, _, _) = item.status { return url } else { return nil }
+                }
+
+                if self.prefs.openFolderWhenDone, let first = doneItems.first {
+                    NSWorkspace.shared.open(first.deletingLastPathComponent())
+                }
+
+                if self.prefs.notifyWhenDone {
+                    self.sendNotification(count: doneItems.count, seconds: elapsed)
+                }
             }
         }
     }
@@ -70,7 +91,8 @@ final class ContentViewModel: ObservableObject {
                 format: selectedFormat,
                 goals: goals,
                 stripMetadata: prefs.stripMetadata,
-                outputURL: outputURL
+                outputURL: outputURL,
+                moveToTrash: prefs.moveOriginalsToTrash
             )
             let savings = result.originalSize > 0
                 ? Double(result.originalSize - result.outputSize) / Double(result.originalSize) : 0
@@ -102,6 +124,29 @@ final class ContentViewModel: ObservableObject {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: source.path),
               let date = attrs[.modificationDate] as? Date else { return }
         try? FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: dest.path)
+    }
+
+    private func sendNotification(count: Int, seconds: Double) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let body: String
+            switch (count, seconds) {
+            case (0, _):          body = "Done. Nothing got smaller though."
+            case (1, ..<3):       body = "1 image, considerably dinky-er."
+            case (1, _):          body = "1 image. Took a sec, worth it."
+            case (2...5, ..<5):   body = "\(count) images. Done before you blinked."
+            case (2...5, _):      body = "\(count) images, all shrunk down."
+            case (6...20, ..<10): body = "\(count) images compressed. The internet will thank you."
+            case (6...20, _):     body = "\(count) images. Your pages just got faster."
+            default:              body = "\(count) images. That's a lot of rectangles — all smaller now."
+            }
+            let content = UNMutableNotificationContent()
+            content.title = "Dinky"
+            content.body = body
+            content.sound = .default
+            let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(req)
+        }
     }
 
     private func playCompletionSound() {
@@ -146,6 +191,7 @@ struct ContentView: View {
     @State private var sidebarVisible = false
     @State private var isDropTargeted  = false
     @State private var idleLoop        = 0
+    @State private var selectedIDs: Set<UUID> = []
 
     init(prefs: DinkyPreferences) {
         _vm = StateObject(wrappedValue: ContentViewModel(prefs: prefs))
@@ -212,16 +258,37 @@ struct ContentView: View {
     // MARK: - Results list
 
     private var resultsList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(vm.items) { item in
-                    ResultsRowView(item: item)
-                    if item.id != vm.items.last?.id {
-                        Divider().padding(.horizontal, 14)
+        List(vm.items, id: \.id, selection: $selectedIDs) { item in
+            ResultsRowView(item: item)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.visible)
+                .listRowSeparatorTint(.primary.opacity(0.08))
+                .onTapGesture(count: 2) {
+                    let url = item.outputURL ?? item.sourceURL
+                    NSWorkspace.shared.open(url)
+                }
+                .onDrag {
+                    let url = item.outputURL ?? item.sourceURL
+                    return NSItemProvider(contentsOf: url) ?? NSItemProvider()
+                }
+                .contextMenu {
+                    Button {
+                        vm.remove(item)
+                    } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        vm.clear()
+                    } label: {
+                        Label("Clear All", systemImage: "trash.fill")
                     }
                 }
-            }
-            .padding(.vertical, 6)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .onChange(of: vm.isEmpty) { _, isEmpty in
+            if isEmpty { selectedIDs = [] }
         }
     }
 
@@ -239,7 +306,7 @@ struct ContentView: View {
             if !vm.isEmpty {
                 HStack {
                     Spacer()
-                    Button("Clear") { vm.clear() }
+                    Button("Clear All") { vm.clear() }
                         .buttonStyle(.plain)
                         .font(.caption)
                         .foregroundStyle(.secondary)

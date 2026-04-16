@@ -157,6 +157,11 @@ private struct IdleAnimation: View {
     @State private var entryCorner  : Corner  = .bottomRight
     @State private var step         : Int     = 0
 
+    // Captured at loop start so theme never changes mid-animation or on re-render
+    @State private var activeTheme1 : Int     = 0
+    @State private var activeTheme2 : Int     = 2
+    @State private var activeTheme3 : Int     = 4
+
     private let themes: [(Color, Color)] = [
         (Color(red: 0.28, green: 0.56, blue: 1.00), Color(red: 0.52, green: 0.28, blue: 0.96)),
         (Color(red: 0.96, green: 0.42, blue: 0.28), Color(red: 0.98, green: 0.74, blue: 0.18)),
@@ -165,9 +170,6 @@ private struct IdleAnimation: View {
         (Color(red: 0.44, green: 0.28, blue: 0.96), Color(red: 0.22, green: 0.68, blue: 0.98)),
     ]
 
-    private var theme1Index : Int { step % 5 }
-    private var theme2Index : Int { (step + 2) % 5 }
-    private var theme3Index : Int { (step + 4) % 5 }
     private var cardCount   : Int { step % 2 == 0 ? 2 : 1 }
     private var animStyle   : Int { step % 3 }
 
@@ -175,19 +177,19 @@ private struct IdleAnimation: View {
         GeometryReader { geo in
             ZStack {
                 // card3 — wide landscape (back layer, third trip only)
-                photoCard(themeIndex: theme3Index, width: 68, height: 40)
+                photoCard(themeIndex: activeTheme3, width: 68, height: 40)
                     .offset(card3Offset)
                     .rotationEffect(.degrees(card3Angle))
                     .opacity(card3Opacity)
 
                 // card2 — landscape (wider)
-                photoCard(themeIndex: theme2Index, width: 64, height: 42)
+                photoCard(themeIndex: activeTheme2, width: 64, height: 42)
                     .offset(card2Offset)
                     .rotationEffect(.degrees(card2Angle))
                     .opacity(card2Opacity)
 
                 // card1 — portrait (taller)
-                photoCard(themeIndex: theme1Index, width: 42, height: 56)
+                photoCard(themeIndex: activeTheme1, width: 42, height: 56)
                     .offset(card1Offset)
                     .rotationEffect(.degrees(card1Angle))
                     .opacity(card1Opacity)
@@ -260,28 +262,30 @@ private struct IdleAnimation: View {
         guard let win, let screen = win.screen ?? NSScreen.main else { return .bottomRight }
         let wc = CGPoint(x: win.frame.midX, y: win.frame.midY)
         let sc = CGPoint(x: screen.frame.midX, y: screen.frame.midY)
-        switch (wc.x >= sc.x, wc.y >= sc.y) {
-        case (true,  true):  return .bottomLeft
-        case (false, true):  return .bottomRight
-        case (true,  false): return .topLeft
-        case (false, false): return .topRight
-        }
+        // Always enter from the bottom — only left/right varies by window position
+        return wc.x >= sc.x ? .bottomLeft : .bottomRight
     }
 
     // MARK: - Loop
 
     private func runLoop() async {
         await sleep(200)
-        for _ in 0..<3 {
+        for i in 0..<3 {
             guard !Task.isCancelled else { return }
+            // Lock in themes before the animation starts — they won't change until the next loop
+            activeTheme1 = step % 5
+            activeTheme2 = (step + 2) % 5
+            activeTheme3 = (step + 4) % 5
             switch animStyle {
             case 0: await playDragAndDrop()
             case 1: await playSwoop()
             default: await playTwoTrips()
             }
-            step += 1
             onLoop()
-            await sleep(400)
+            if i < 2 {
+                step += 1
+                await sleep(400)
+            }
         }
         finished = true
     }

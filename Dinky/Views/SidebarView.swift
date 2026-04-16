@@ -63,7 +63,10 @@ struct SidebarView: View {
 
                         helper("Common for web (1920), social (1280), and email (640).")
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                        removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                    ))
                 }
             }
 
@@ -96,19 +99,110 @@ struct SidebarView: View {
 
                         helper("Email typically caps at 1 MB. CMS and social platforms vary from 2–10 MB.")
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                        removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                    ))
                 }
             }
 
-            // ── Metadata ──────────────────────────────────────────
-            sectionGroup(icon: "tag.slash", title: "Metadata") {
+            // ── Destination ───────────────────────────────────────
+            sectionGroup(icon: "folder", title: "Destination") {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: prefs.saveLocation == .sameFolder ? "largecircle.fill.circle" : "circle")
+                            .font(.system(size: 11))
+                            .foregroundStyle(prefs.saveLocation == .sameFolder ? Color.accentColor : .secondary)
+                        Text("Same folder")
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { prefs.saveLocation = .sameFolder }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: prefs.saveLocation == .custom ? "largecircle.fill.circle" : "circle")
+                            .font(.system(size: 11))
+                            .foregroundStyle(prefs.saveLocation == .custom ? Color.accentColor : .secondary)
+                        if prefs.saveLocation == .custom && !prefs.customFolderDisplayPath.isEmpty {
+                            Text(URL(fileURLWithPath: prefs.customFolderDisplayPath).lastPathComponent)
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        } else {
+                            Text("Choose folder…")
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { pickCustomFolder() }
+                }
+                helper("Where compressed files are saved.")
+            }
+
+            // ── Performance ───────────────────────────────────────
+            sectionGroup(icon: "cpu", title: "Performance") {
+                let levels: [(String, Int)] = [
+                    ("Fast", 1),
+                    ("Fastest", ProcessInfo.processInfo.activeProcessorCount)
+                ]
+                let nearest = levels.min(by: {
+                    abs($0.1 - prefs.concurrentTasks) < abs($1.1 - prefs.concurrentTasks)
+                })?.1 ?? prefs.concurrentTasks
+
+                chipGrid(presets: levels, current: nearest) { prefs.concurrentTasks = $0 }
+
+                helper("Fast = one at a time. Fastest = all cores, no waiting.")
+            }
+
+            // ── Notifications ─────────────────────────────────────
+            sectionGroup(icon: "bell", title: "Notifications") {
+                Toggle("Notify when done", isOn: Binding(
+                    get: { prefs.notifyWhenDone },
+                    set: { prefs.notifyWhenDone = $0 }
+                ))
+                .font(.caption)
+
+                helper("Shows a notification when your batch finishes.")
+            }
+
+            // ── Advanced ──────────────────────────────────────────
+            sectionGroup(icon: "slider.horizontal.3", title: "Advanced") {
+                Toggle("Open folder when done", isOn: Binding(
+                    get: { prefs.openFolderWhenDone },
+                    set: { prefs.openFolderWhenDone = $0 }
+                ))
+                .font(.caption)
+
+                Toggle("Sanitize filenames", isOn: Binding(
+                    get: { prefs.sanitizeFilenames },
+                    set: { prefs.sanitizeFilenames = $0 }
+                ))
+                .font(.caption)
+
+                if prefs.sanitizeFilenames {
+                    helper("Lowercases, replaces spaces with hyphens, and trims to 75 characters.")
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                            removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                        ))
+                }
+
                 Toggle("Strip metadata", isOn: Binding(
                     get: { prefs.stripMetadata },
                     set: { prefs.stripMetadata = $0 }
                 ))
                 .font(.caption)
 
-                helper("Removes GPS, camera info, and copyright tags. Reduces file size slightly.")
+                Toggle("Move originals to trash", isOn: Binding(
+                    get: { prefs.moveOriginalsToTrash },
+                    set: { prefs.moveOriginalsToTrash = $0 }
+                ))
+                .font(.caption)
+
+                helper("Moving to trash is permanent once emptied.")
             }
         }
         .padding(12)
@@ -117,6 +211,24 @@ struct SidebarView: View {
         .glassEffect(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .animation(.easeInOut(duration: 0.2), value: prefs.maxWidthEnabled)
         .animation(.easeInOut(duration: 0.2), value: prefs.maxFileSizeEnabled)
+        .animation(.easeInOut(duration: 0.2), value: prefs.sanitizeFilenames)
+    }
+
+    // MARK: - Folder picker
+
+    private func pickCustomFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        if panel.runModal() == .OK, let url = panel.url {
+            prefs.customFolderDisplayPath = url.path
+            if let bookmark = try? url.bookmarkData(options: .withSecurityScope) {
+                prefs.customFolderBookmark = bookmark
+            }
+            prefs.saveLocation = .custom
+        }
     }
 
     // MARK: - Chip grid (wraps automatically)
@@ -130,8 +242,7 @@ struct SidebarView: View {
         return LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
             ForEach(presets, id: \.1) { label, value in
                 let active = current == value
-                Button(label) { onSelect(value) }
-                    .buttonStyle(.plain)
+                Text(label)
                     .font(.system(size: 11, weight: active ? .semibold : .regular))
                     .foregroundStyle(active ? .white : .secondary)
                     .padding(.horizontal, 6)
@@ -146,6 +257,8 @@ struct SidebarView: View {
                                         startPoint: .leading, endPoint: .trailing))
                                   : AnyShapeStyle(Color.primary.opacity(0.08)))
                     )
+                    .contentShape(Rectangle())
+                    .onTapGesture { onSelect(value) }
             }
         }
     }
@@ -184,5 +297,6 @@ struct SidebarView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(.primary.opacity(0.05))
         )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

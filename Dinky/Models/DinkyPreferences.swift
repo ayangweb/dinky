@@ -67,9 +67,15 @@ final class DinkyPreferences: ObservableObject {
     // MARK: Compression behavior
     @AppStorage("stripMetadata")        var stripMetadata: Bool = true
     @AppStorage("preserveTimestamps")   var preserveTimestamps: Bool = true
+    @AppStorage("moveOriginalsToTrash") var moveOriginalsToTrash: Bool = false
     @AppStorage("skipAlreadyOptimized") var skipAlreadyOptimized: Bool = true
     @AppStorage("concurrentTasks")      var concurrentTasks: Int = max(1, min(8, ProcessInfo.processInfo.activeProcessorCount))
     @AppStorage("playSoundEffects")     var playSoundEffects: Bool = true
+
+    // MARK: Finish
+    @AppStorage("openFolderWhenDone")   var openFolderWhenDone: Bool = false
+    @AppStorage("notifyWhenDone")       var notifyWhenDone: Bool = false
+    @AppStorage("sanitizeFilenames")    var sanitizeFilenames: Bool = false
 
     // MARK: URL helpers
 
@@ -93,11 +99,15 @@ final class DinkyPreferences: ObservableObject {
     func outputURL(for source: URL, format: CompressionFormat) -> URL {
         let dir  = destinationDirectory(for: source)
         let stem = source.deletingPathExtension().lastPathComponent
-        let out: String
+        var out: String
         switch filenameHandling {
         case .appendSuffix:  out = stem + "-dinky"
         case .replaceOrigin: out = stem
         case .customSuffix:  out = stem + (customSuffix.isEmpty ? "-dinky" : customSuffix)
+        }
+        if sanitizeFilenames {
+            out = out.lowercased().replacingOccurrences(of: " ", with: "-")
+            if out.count > 75 { out = String(out.prefix(75)) }
         }
         return dir.appendingPathComponent(out).appendingPathExtension(format.outputExtension)
     }

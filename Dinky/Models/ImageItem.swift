@@ -44,6 +44,11 @@ final class ImageItem: ObservableObject, Identifiable {
         return Double(orig - out) / Double(orig) * 100
     }
 
+    var outputURL: URL? {
+        if case .done(let url, _, _) = status { return url }
+        return nil
+    }
+
     var statusLabel: String {
         switch status {
         case .pending:               return "Waiting"

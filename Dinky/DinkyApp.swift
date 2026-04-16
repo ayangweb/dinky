@@ -16,7 +16,7 @@ struct DinkyApp: App {
         }
         .windowStyle(.titleBar)
         .windowResizability(.contentMinSize)
-        .defaultSize(width: 640, height: 520)
+        .defaultSize(width: 440, height: 440)
         .defaultWindowPlacement { _, context in
             let display = context.defaultDisplay
             let center  = CGPoint(x: display.visibleRect.midX, y: display.visibleRect.midY)

@@ -6,9 +6,7 @@ struct ResultsRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.sourceURL.path))
-                .resizable()
-                .frame(width: 24, height: 24)
+            FileTypeIcon(ext: item.sourceURL.pathExtension)
 
             Text(item.filename)
                 .lineLimit(1)
@@ -65,15 +63,19 @@ struct ResultsRowView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
-            .frame(width: 90, alignment: .trailing)
 
-        case .done:
-            let pct = item.savedPercent
-            if pct >= 5 {
-                savingsChip(String(format: "−%.1f%%", pct))
-            } else {
-                chip(String(format: "−%.1f%%", pct), color: .orange.opacity(0.85), fg: .white)
+        case .done(let outputURL, _, _):
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+            } label: {
+                Text("Show in Finder")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
             }
+            .buttonStyle(.plain)
 
         case .skipped:
             chip("Skipped", color: .secondary.opacity(0.35), fg: .primary)
@@ -93,7 +95,6 @@ struct ResultsRowView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.red.opacity(0.75)))
-                .frame(width: 90, alignment: .trailing)
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
@@ -109,30 +110,42 @@ struct ResultsRowView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(color))
-            .frame(width: 90, alignment: .trailing)
     }
 
-    private func savingsChip(_ label: String) -> some View {
-        Text(label)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Color(red: 0.25, green: 0.55, blue: 1.0),
-                                 Color(red: 0.45, green: 0.30, blue: 0.95)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ))
-            )
-            .frame(width: 90, alignment: .trailing)
+private func bytes(_ n: Int64) -> String {
+        String(format: "%.2f MB", Double(n) / 1_048_576)
+    }
+}
+
+// MARK: - File type icon
+
+private struct FileTypeIcon: View {
+    let ext: String
+
+    private var label: String { ext.uppercased() }
+
+    private var color: Color {
+        switch ext.lowercased() {
+        case "jpg", "jpeg": return Color(red: 0.96, green: 0.42, blue: 0.28) // orange — theme 2
+        case "png":         return Color(red: 0.28, green: 0.56, blue: 1.00) // blue   — theme 1
+        case "tiff":        return Color(red: 0.18, green: 0.78, blue: 0.52) // green  — theme 3
+        case "bmp":         return Color(red: 0.96, green: 0.30, blue: 0.54) // pink   — theme 4
+        case "webp", "avif": return Color.secondary
+        default:             return Color.secondary
+        }
     }
 
-    private func bytes(_ n: Int64) -> String {
-        let kb = Double(n) / 1024
-        return kb < 1024 ? String(format: "%.1f KB", kb) : String(format: "%.2f MB", kb / 1024)
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(color.opacity(0.15))
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .strokeBorder(color.opacity(0.30), lineWidth: 0.5)
+            Text(label)
+                .font(.system(size: label.count > 3 ? 6 : 7, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+        }
+        .frame(width: 28, height: 24)
     }
 }
 

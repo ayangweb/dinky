@@ -48,7 +48,8 @@ actor CompressionService {
         format: CompressionFormat,
         goals: CompressionGoals,
         stripMetadata: Bool,
-        outputURL: URL
+        outputURL: URL,
+        moveToTrash: Bool = false
     ) async throws -> CompressionResult {
         let originalSize = fileSize(source)
 
@@ -76,6 +77,10 @@ actor CompressionService {
 
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             throw CompressionError.outputMissing
+        }
+
+        if moveToTrash {
+            try? FileManager.default.trashItem(at: source, resultingItemURL: nil)
         }
 
         return CompressionResult(outputURL: outputURL,
