@@ -55,7 +55,7 @@ Dinky takes a different approach: it converts to WebP, AVIF, or lossless PNG. Th
 
 ## How it works
 
-Built entirely in Swift and SwiftUI, targeting macOS 14 Sonoma and later. On macOS 26 Tahoe you get the full liquid glass UI; on Sonoma and Sequoia it uses the frosted material fallback. No Electron, no web views, no third-party UI frameworks, no SPM dependencies. The whole app is 4.7 MB, which still feels appropriately dinky.
+Built entirely in Swift and SwiftUI, targeting macOS 15 Sequoia and later. On macOS 26 Tahoe you get the full liquid glass UI; on Sequoia it uses the frosted material fallback. No Electron, no web views, no third-party UI frameworks, no SPM dependencies. The whole app is 4.7 MB, which still feels appropriately dinky.
 
 Compression runs through a native `actor`-based service that shells out to platform image tools, keeping the main thread free. Multiple files compress concurrently up to the core count of the machine. Output quality is tuned automatically to hit the target file size if one is set.
 
@@ -65,7 +65,7 @@ The app registers as an "Open with" handler and exposes a Finder Quick Action so
 
 ## Built with
 
-- SwiftUI (macOS 14+, liquid glass on macOS 26)
+- SwiftUI (macOS 15+, liquid glass on macOS 26)
 - AppKit for window and event integration
 - `actor` concurrency model for compression
 - `@AppStorage` / `UserDefaults` for preferences

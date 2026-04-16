@@ -16,7 +16,7 @@
 
 ## Technical details
 
-- macOS 14 Sonoma or later (liquid glass UI on macOS 26 Tahoe; frosted material fallback on Sonoma/Sequoia)
+- macOS 15 Sequoia or later (liquid glass UI on macOS 26 Tahoe; frosted material fallback on Sequoia)
 - SwiftUI + AppKit, zero SPM dependencies
 - 4.7 MB installed
 - Compression engines bundled: cwebp (Google), avifenc (AOM), oxipng (Rust/MIT)
