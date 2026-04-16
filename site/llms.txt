@@ -1,0 +1,44 @@
+# Dinky
+
+> A tiny macOS image compression app. Converts JPGs and PNGs to WebP, AVIF, or lossless PNG. Drag and drop, get smaller files back. Free, open source, and entirely local — images never leave your machine.
+
+## What it does
+
+- Converts JPG, PNG, WebP, AVIF, TIFF, BMP → WebP, AVIF, or lossless PNG
+- Drag and drop or file picker; batch compression with live results
+- Max width resizing (common web presets or custom value)
+- Max file size targeting via binary search on quality
+- Smart quality: detects photos vs screenshots via Vision framework + EXIF, adjusts quality per content type
+- Finder Quick Actions — compress without opening the app
+- Manual mode: drop files, then right-click each one to pick format individually
+- Performance modes: Fast (serial) or Fastest (all cores)
+- Update checker: polls GitHub Releases on launch, shows banner if newer version exists
+
+## Technical details
+
+- macOS 26 (Tahoe) only
+- SwiftUI + AppKit, zero SPM dependencies
+- 4.7 MB installed
+- Compression engines bundled: cwebp (Google), avifenc (AOM), oxipng (Rust/MIT)
+- No cloud, no accounts, no telemetry (site uses Fathom analytics, app has none)
+- Open source: MIT license
+
+## Comparison
+
+- vs **ImageOptim**: ImageOptim is lossless-only — it squeezes a JPEG and returns a JPEG. Dinky converts formats, where the real savings are (30–80% vs same-format squeeze).
+- vs **TinyPNG**: TinyPNG uploads images to their servers. Dinky is 100% local.
+- vs **Squoosh**: Browser-based, one image at a time. Dinky is native, batch, offline.
+- vs **Optimage**: Similar feature set but Optimage costs $69 and weighs 62 MB. Dinky is free and 4.7 MB.
+
+## Links
+
+- Website: https://dinkyimg.app
+- GitHub: https://github.com/heyderekj/dinky
+- Latest release: https://github.com/heyderekj/dinky/releases/latest
+- Download v1.2.0: https://github.com/heyderekj/dinky/releases/download/v1.2.0/Dinky-1.2.0.dmg
+
+## Author
+
+Derek Castelli — freelance web designer (Webflow, Figma, Cursor)
+- Website: https://heyderekj.com
+- GitHub: https://github.com/heyderekj

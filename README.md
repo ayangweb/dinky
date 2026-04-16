@@ -84,9 +84,9 @@ Dinky is a native front-end for these open-source CLI tools, which do the actual
 
 Download the DMG and drag Dinky to Applications.
 
-Since the app isn't notarized, macOS will block it on first launch. To get past this, go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**. That's a one-time step — it opens normally after that.
+Since the app isn't notarized, macOS may block it on first launch. To open it anyway, try launching it once, then go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
 
-Or run this in Terminal:
+Or skip that entirely and run this in Terminal:
 ```bash
 xattr -dr com.apple.quarantine /Applications/Dinky.app
 ```

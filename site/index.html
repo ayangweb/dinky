@@ -6,6 +6,7 @@
   <title>Dinky makes images smaller.</title>
   <meta name="description" content="A tiny macOS app that converts JPGs and PNGs to WebP, AVIF, or lossless PNG. Drag and drop, get smaller files back. 4.7 MB. Free and open source." />
 
+  <link rel="canonical" href="https://dinkyimg.app" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="app-icon.webp" />
 
@@ -19,6 +20,23 @@
   <meta name="twitter:title" content="Dinky makes images smaller." />
   <meta name="twitter:description" content="A tiny macOS app that converts JPGs and PNGs to WebP, AVIF, or lossless PNG. 4.7 MB. Free and open source." />
   <meta name="twitter:image" content="https://dinkyimg.app/screenshots/screenshot-drop-zone.webp" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Dinky",
+    "operatingSystem": "macOS",
+    "applicationCategory": "UtilitiesApplication",
+    "description": "A tiny macOS app that converts JPGs and PNGs to WebP, AVIF, or lossless PNG. Drag and drop, get smaller files back.",
+    "url": "https://dinkyimg.app",
+    "downloadUrl": "https://github.com/heyderekj/dinky/releases/download/v1.2.0/Dinky-1.2.0.dmg",
+    "softwareVersion": "1.2.0",
+    "fileSize": "4.7 MB",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "Derek Castelli", "url": "https://heyderekj.com" }
+  }
+  </script>
 
   <!-- Fathom - beautiful, simple website analytics -->
   <script src="https://cdn.usefathom.com/script.js" data-site="KGNDSOKI" defer></script>
@@ -210,6 +228,208 @@
       line-height: 1.5;
     }
 
+    .install-link {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      font-family: inherit;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+    .install-link:hover { color: var(--text); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+      position: relative;
+    }
+    .modal h2 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: #f1f1f3;
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 16px;
+      line-height: 1;
+    }
+    .modal-close:hover { background: #e4e4e6; color: var(--text); }
+    .install-steps {
+      list-style: none;
+      counter-reset: steps;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .install-steps li {
+      counter-increment: steps;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+    .install-steps li::before {
+      content: counter(steps);
+      min-width: 22px;
+      height: 22px;
+      background: var(--brand);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .install-steps li kbd {
+      font-family: inherit;
+      font-size: 13px;
+      background: #f1f1f3;
+      border-radius: 4px;
+      padding: 1px 5px;
+      white-space: nowrap;
+    }
+    .modal-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+    .modal-divider::before, .modal-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--divider);
+    }
+    .code-block {
+      background: #1c1c1e;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .code-block code {
+      font-family: "SF Mono", "Fira Mono", "Menlo", monospace;
+      font-size: 12.5px;
+      color: #e5e5ea;
+      word-break: break-all;
+    }
+    .copy-btn {
+      background: rgba(255,255,255,0.12);
+      border: none;
+      border-radius: 6px;
+      color: #aeaeb2;
+      cursor: pointer;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+    .copy-btn.copied { color: #30d158; }
+
+    /* FAQ */
+    .faq {
+      width: 100%;
+      max-width: 680px;
+      margin-top: 80px;
+    }
+    .faq > h2 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .faq-item {
+      border-bottom: 1px solid var(--divider);
+    }
+    .faq-item:first-of-type { border-top: 1px solid var(--divider); }
+    .faq-q {
+      width: 100%;
+      background: none;
+      border: none;
+      text-align: left;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      padding: 16px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      letter-spacing: -0.01em;
+    }
+    .faq-q:hover { color: var(--brand); }
+    .faq-chevron {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      color: var(--text-secondary);
+      transition: transform 0.2s ease;
+    }
+    .faq-item.open .faq-chevron { transform: rotate(180deg); }
+    .faq-a {
+      display: none;
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      padding-bottom: 16px;
+      max-width: 600px;
+    }
+    .faq-item.open .faq-a { display: block; }
+    .faq-a a { color: var(--brand); text-decoration: none; }
+    .faq-a a:hover { text-decoration: underline; }
+
     footer {
       margin-top: 80px;
       font-size: 13px;
@@ -295,7 +515,27 @@
       </a>
     </div>
     <p class="version">4.7 MB · v1.2.0 · Requires macOS 26 Tahoe</p>
+    <button class="install-link" onclick="document.getElementById('install-modal').classList.add('open')">How to install →</button>
   </section>
+
+  <!-- Install modal -->
+  <div class="modal-overlay" id="install-modal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal">
+      <button class="modal-close" onclick="document.getElementById('install-modal').classList.remove('open')" aria-label="Close">✕</button>
+      <h2>How to install</h2>
+      <ol class="install-steps">
+        <li>Download the <strong>.dmg</strong> from the button above and open it.</li>
+        <li>Drag <strong>Dinky</strong> into your <strong>Applications</strong> folder.</li>
+        <li>Try to launch Dinky — macOS may block it on first run.</li>
+        <li>Go to <kbd>System Settings</kbd> → <kbd>Privacy &amp; Security</kbd>, scroll down, and click <strong>Open Anyway</strong>.</li>
+      </ol>
+      <div class="modal-divider">or skip steps 3–4 with Terminal</div>
+      <div class="code-block">
+        <code id="xattr-cmd">xattr -dr com.apple.quarantine /Applications/Dinky.app</code>
+        <button class="copy-btn" onclick="copyCmd(this)">Copy</button>
+      </div>
+    </div>
+  </div>
 
   <section class="screenshots">
     <img src="screenshots/screenshot-drop-zone.webp" alt="Dinky drop zone idle state" />
@@ -423,8 +663,99 @@
     </div>
   </section>
 
+  <section class="faq">
+    <h2>FAQ</h2>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Does Dinky send my images anywhere?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">Nope. Everything runs locally on your Mac. Your images never leave your machine — no servers, no accounts, no uploads.</p>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        How is it different from ImageOptim?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">ImageOptim keeps your files in the same format — it squeezes a JPEG and hands it back as a JPEG. Dinky converts to WebP or AVIF, which is where the real savings are: typically 30–80% smaller than a JPEG at the same visual quality. If you need lossless PNG, Dinky runs <a href="https://github.com/shssoichiro/oxipng" target="_blank">oxipng</a> — same idea as ImageOptim, but as one option inside a broader tool.</p>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        How is it different from TinyPNG or Squoosh?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">TinyPNG uploads your images to their servers to compress them. Squoosh is a browser tool — great, but one image at a time with no batch support. Dinky is local, runs natively on your Mac, and handles as many files as you can throw at it concurrently.</p>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        How is it different from Optimage?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">Optimage is the closest comparison — it does lossy conversion and costs $69. Dinky is free, open source, and 4.7 MB versus Optimage's 62 MB. Optimage has more format output options; Dinky focuses on WebP, AVIF, and lossless PNG — the three formats that matter most for the web.</p>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        What macOS version does it require?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">Dinky requires macOS 26 Tahoe. It's built with the latest SwiftUI APIs (including the glass material and new effects from Tahoe), so earlier versions aren't supported.</p>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Why isn't it on the Mac App Store?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">Not yet — App Store distribution requires sandboxing that would limit how Dinky shells out to its compression engines. Direct download keeps things simple and free. The notarization warning on first launch is a one-time thing; after that it opens normally.</p>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Is it actually free?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">Yes. Free to download, free to use, <a href="https://github.com/heyderekj/dinky" target="_blank">open source on GitHub</a> under MIT. No trial, no watermarks, no "pro" tier.</p>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        What input formats does Dinky support?
+        <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <p class="faq-a">JPG, PNG, WebP, AVIF, TIFF, and BMP. Output is WebP, AVIF, or lossless PNG depending on what you pick in the sidebar.</p>
+    </div>
+
+  </section>
+
   <footer>
     © 2026 Testament Made, LLC
   </footer>
+
+  <script>
+    function toggleFaq(btn) {
+      const item = btn.closest('.faq-item');
+      const wasOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(el => el.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    }
+
+    function copyCmd(btn) {
+      const text = document.getElementById('xattr-cmd').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      });
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.getElementById('install-modal').classList.remove('open');
+    });
+  </script>
 </body>
 </html>
