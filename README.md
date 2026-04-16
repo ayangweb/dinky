@@ -8,6 +8,22 @@ Supports JPG, PNG, WebP, and AVIF. Outputs WebP or AVIF depending on your prefer
 
 [Derek Castelli](https://www.heyderekj.com) is a full-time freelance web designer working primarily in Webflow and Figma. Image compression is a constant part of the job — every site build involves optimizing photos for fast load times, and doing that by hand in a browser or through a bloated app gets old fast. Dinky came out of that frustration.
 
+## Features
+
+- **Drag and drop** — drop images straight onto the window, or use the file picker
+- **Format conversion** — outputs WebP or AVIF, where the real savings happen
+- **Max width** — resize on the way out with common web presets or a custom value
+- **Max file size** — binary-searches the quality level to hit an exact KB/MB target
+- **Batch compression** — multiple files compress concurrently, live results as they finish
+- **Show in Finder** — jump straight to any compressed file from the results list
+- **Finder-like selection** — click, cmd+click, shift+click, double-click to open, drag to anywhere
+- **Destination** — save next to the original or pick a custom folder
+- **Performance** — Stroll (one at a time) or Sprint (all cores)
+- **Notifications** — get a tap when a batch finishes, with messaging that varies by count and time
+- **Advanced** — strip metadata, sanitize filenames for web, open output folder automatically, move originals to trash
+- **Quirky idle animation** — three choreographed card-drop variants that loop then hold until you come back
+- 4.1 MB. Appropriately dinky.
+
 ## Why it exists
 
 Optimage crashed. Instead of finding a replacement, I figured it was a good excuse to build my own — this was my first macOS app.
