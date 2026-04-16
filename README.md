@@ -6,7 +6,7 @@ Supports JPG, PNG, WebP, and AVIF. Outputs WebP, AVIF, or lossless PNG depending
 
 ## About the developer
 
-[Derek Castelli](https://www.heyderekj.com) is a full-time freelance web designer working primarily in Webflow and Figma. Image compression is a constant part of the job — every site build involves optimizing photos for fast load times, and doing that by hand in a browser or through a bloated app gets old fast. Dinky came out of that frustration.
+Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web designer working primarily in Webflow and Figma (and now more in Cursor and Claude). Image compression is a constant part of the job — every site build involves optimizing photos for fast load times, and doing that by hand in a browser or through a bloated app gets old fast. Dinky came out of that frustration.
 
 ## Features
 
