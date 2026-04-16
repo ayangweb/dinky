@@ -4,6 +4,10 @@ A small macOS utility that compresses images. Drop files in, get smaller ones ba
 
 Supports JPG, PNG, WebP, and AVIF. Outputs WebP or AVIF depending on your preference. Strips metadata, respects max dimensions and file size targets, and saves next to the original by default.
 
+## About the developer
+
+[Derek Castelli](https://www.heyderekj.com) is a full-time freelance web designer working primarily in Webflow and Figma. Image compression is a constant part of the job — every site build involves optimizing photos for fast load times, and doing that by hand in a browser or through a bloated app gets old fast. Dinky came out of that frustration.
+
 ## Why it exists
 
 Optimage crashed. Instead of finding a replacement, I figured it was a good excuse to build my own — this was my first macOS app.
@@ -18,7 +22,7 @@ Dinky takes a different approach: it converts to WebP or AVIF. That format chang
 
 ## How it works
 
-Built entirely in Swift and SwiftUI for macOS 26 (Tahoe). No Electron, no web views, no third-party UI frameworks.
+Built entirely in Swift and SwiftUI for macOS 26 (Tahoe). No Electron, no web views, no third-party UI frameworks. The whole app is 4.1 MB, which feels appropriate for something called Dinky.
 
 Compression runs through a native `actor`-based service that shells out to platform image tools, keeping the main thread free. Multiple files compress concurrently up to the core count of the machine. Output quality is tuned automatically to hit the target file size if one is set.
 
