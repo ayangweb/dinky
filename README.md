@@ -55,7 +55,7 @@ Dinky takes a different approach: it converts to WebP, AVIF, or lossless PNG. Th
 
 ## How it works
 
-Built entirely in Swift and SwiftUI, targeting macOS 15 Sequoia and later. On macOS 26 Tahoe you get the full liquid glass UI; on Sequoia it uses the frosted material fallback. No Electron, no web views, no third-party UI frameworks, no SPM dependencies. The whole app is ~5 MB, which still feels appropriately dinky.
+Built entirely in Swift and SwiftUI, targeting macOS 15 Sequoia and later. On macOS 26 Tahoe you get the full liquid glass UI; on Sequoia it uses the frosted material fallback. No Electron, no web views, no third-party UI frameworks, no SPM dependencies. The whole app is ~5 MB, appropriately dinky.
 
 Compression runs through a native `actor`-based service that shells out to platform image tools, keeping the main thread free. Multiple files compress concurrently up to the core count of the machine. Output quality is tuned automatically to hit the target file size if one is set.
 
@@ -70,7 +70,7 @@ The app registers as an "Open with" handler and exposes a Finder Quick Action so
 - `actor` concurrency model for compression
 - `@AppStorage` / `UserDefaults` for preferences
 - `NSServices` for Finder integration
-- Claude for most of the code
+- Claude Sonnet 4.6 and a bit of Opus 4.7
 
 ## Compression engines
 
@@ -84,7 +84,7 @@ Dinky is a native front-end for these open-source CLI tools, which do the actual
 
 Download the DMG and drag Dinky to Applications.
 
-Since the app isn't notarized, macOS may block it on first launch. To open it anyway, try launching it once, then go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
+Since the app isn't notarized, macOS may (will probably) block it on first launch. To open it anyway, try launching it once, then go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
 
 Or skip that entirely and run this in Terminal:
 ```bash
