@@ -244,7 +244,7 @@ private struct IdleAnimation: View {
                     .interpolation(.high)
                     .frame(width: 60, height: 50)
                     .offset(cursorOffset)
-                    .offset(y: cursorLifted ? -11 : 0)
+                    .offset(x: 18, y: cursorLifted ? -11 : 0)
             }
             // Fill the full ZStack area so offsets are relative to the true centre
             .frame(maxWidth: .infinity, maxHeight: .infinity)
