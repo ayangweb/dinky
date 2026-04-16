@@ -10,38 +10,61 @@ struct UpdateBanner: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "arrow.down.circle.fill")
-                .foregroundStyle(Color.accentColor)
-                .font(.system(size: 14, weight: .semibold))
+            // Icon — spinner while working, arrow otherwise
+            Group {
+                switch updater.installState {
+                case .downloading, .installing:
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 14, height: 14)
+                default:
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .font(.system(size: 14, weight: .semibold))
+                }
+            }
 
-            HStack(spacing: 0) {
-                Text("Dinky ")
-                    .foregroundStyle(.secondary)
-                Text("v\(updater.availableVersion ?? "")")
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
-                Text(" is available")
-                    .foregroundStyle(.secondary)
+            // Status text
+            Group {
+                switch updater.installState {
+                case .idle:
+                    HStack(spacing: 0) {
+                        Text("Dinky ").foregroundStyle(.secondary)
+                        Text("v\(updater.availableVersion ?? "")").fontWeight(.semibold)
+                        Text(" is available").foregroundStyle(.secondary)
+                    }
+                case .downloading(let progress):
+                    Text(progress > 0
+                         ? "Downloading… \(Int(progress * 100))%"
+                         : "Downloading…")
+                        .foregroundStyle(.secondary)
+                case .installing:
+                    Text("Installing…").foregroundStyle(.secondary)
+                case .failed(let msg):
+                    Text("Update failed: \(msg)")
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             .font(.caption)
 
             Spacer(minLength: 8)
 
-            if let release = updater.releaseURL {
-                Button("What's new") {
-                    NSWorkspace.shared.open(release)
+            // Action buttons — only shown when idle or failed
+            if case .idle = updater.installState {
+                if let release = updater.releaseURL {
+                    Button("What's new") { NSWorkspace.shared.open(release) }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .underline()
                 }
-                .buttonStyle(.plain)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .underline()
-            }
 
-            if let dmg = updater.downloadURL {
                 Button {
-                    NSWorkspace.shared.open(dmg)
+                    Task { await updater.downloadAndInstall() }
                 } label: {
-                    Text("Download")
+                    Text("Install Update")
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -50,20 +73,33 @@ struct UpdateBanner: View {
                 .controlSize(.small)
             }
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    prefs.dismissedUpdateVersion = updater.availableVersion ?? ""
-                    updater.dismissCurrent()
+            if case .failed = updater.installState {
+                Button("Retry") {
+                    Task { await updater.downloadAndInstall() }
                 }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(4)
-                    .contentShape(Rectangle())
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .font(.caption.weight(.semibold))
             }
-            .buttonStyle(.plain)
-            .help("Dismiss")
+
+            // Dismiss — hidden while install is in progress
+            if case .downloading = updater.installState { } else if case .installing = updater.installState { } else {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        updater.installState = .idle
+                        prefs.dismissedUpdateVersion = updater.availableVersion ?? ""
+                        updater.dismissCurrent()
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Dismiss")
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)

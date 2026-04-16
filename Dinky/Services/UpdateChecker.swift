@@ -12,6 +12,14 @@ final class UpdateChecker: ObservableObject {
     @Published var releaseURL: URL? = nil            // e.g. https://github.com/.../releases/tag/v1.1.0
     @Published var downloadURL: URL? = nil           // direct DMG link
     @Published var isChecking: Bool = false
+    @Published var installState: InstallState = .idle
+
+    enum InstallState: Equatable {
+        case idle
+        case downloading(progress: Double)
+        case installing
+        case failed(String)
+    }
 
     // MARK: - Configuration
     private let apiURL = URL(string: "https://api.github.com/repos/heyderekj/dinky/releases/latest")!
@@ -89,6 +97,103 @@ final class UpdateChecker: ObservableObject {
             // decide whether to show UI for manual checks.
             return .failed
         }
+    }
+
+    // MARK: - In-app install
+
+    /// Downloads the DMG via URLSession (no quarantine added), mounts it,
+    /// copies Dinky.app over itself, then relaunches from the new binary.
+    func downloadAndInstall() async {
+        guard let dmgURL = downloadURL else { return }
+        installState = .downloading(progress: 0)
+
+        do {
+            // ── 1. Download ───────────────────────────────────────────
+            let tempDMG = FileManager.default.temporaryDirectory
+                .appendingPathComponent("Dinky-update.dmg")
+
+            let (asyncBytes, response) = try await URLSession.shared.bytes(from: dmgURL)
+            let total = (response as? HTTPURLResponse)?
+                .value(forHTTPHeaderField: "Content-Length")
+                .flatMap(Int64.init) ?? 0
+
+            var received: Int64 = 0
+            var buffer = Data()
+            if total > 0 { buffer.reserveCapacity(Int(total)) }
+
+            for try await byte in asyncBytes {
+                buffer.append(byte)
+                received += 1
+                if total > 0 {
+                    installState = .downloading(progress: Double(received) / Double(total))
+                }
+            }
+            try buffer.write(to: tempDMG)
+
+            // ── 2. Mount ──────────────────────────────────────────────
+            installState = .installing
+            let mountOut = try await shell("/usr/bin/hdiutil",
+                                           ["attach", tempDMG.path,
+                                            "-nobrowse", "-noautoopen", "-readonly"])
+
+            // hdiutil prints lines like: /dev/diskX  <type>  /Volumes/Name
+            guard let mountPoint = mountOut
+                .components(separatedBy: "\n")
+                .first(where: { $0.contains("/Volumes/") })?
+                .components(separatedBy: "\t")
+                .last?
+                .trimmingCharacters(in: .whitespaces),
+                  !mountPoint.isEmpty
+            else { throw UpdateError.mountFailed }
+
+            // ── 3. Copy app over itself ───────────────────────────────
+            let source = URL(fileURLWithPath: mountPoint).appendingPathComponent("Dinky.app")
+            let dest   = Bundle.main.bundleURL  // replace the running app in-place
+
+            // Use shell cp -R so we don't accidentally add quarantine via FM
+            try await shell("/bin/cp", ["-Rf", source.path, dest.deletingLastPathComponent().path])
+
+            // ── 4. Detach ─────────────────────────────────────────────
+            try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
+            try? FileManager.default.removeItem(at: tempDMG)
+
+            // ── 5. Relaunch ───────────────────────────────────────────
+            // Small delay so this process can finish tearing down cleanly.
+            let appPath = dest.path
+            Process.launchedProcess(launchPath: "/bin/sh",
+                                    arguments: ["-c", "sleep 0.6 && open '\(appPath)'"])
+            NSApp.terminate(nil)
+
+        } catch {
+            installState = .failed(error.localizedDescription)
+        }
+    }
+
+    private enum UpdateError: LocalizedError {
+        case mountFailed
+        var errorDescription: String? { "Couldn't mount the update disk image." }
+    }
+
+    @discardableResult
+    private func shell(_ path: String, _ args: [String]) async throws -> String {
+        try await Task.detached(priority: .utility) {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: path)
+            p.arguments = args
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            p.standardError  = pipe
+            try p.run()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else {
+                let msg = String(data: pipe.fileHandleForReading.readDataToEndOfFile(),
+                                 encoding: .utf8) ?? "exit \(p.terminationStatus)"
+                throw NSError(domain: "DinkyUpdater", code: Int(p.terminationStatus),
+                              userInfo: [NSLocalizedDescriptionKey: msg])
+            }
+            return String(data: pipe.fileHandleForReading.readDataToEndOfFile(),
+                          encoding: .utf8) ?? ""
+        }.value
     }
 
     /// Dismiss the current banner for this version. Persists so it won't reappear
