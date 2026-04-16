@@ -70,7 +70,6 @@ Dinky is a native front-end for these open-source CLI tools, which do the actual
 
 - [cwebp](https://developers.google.com/speed/webp) — Google's WebP encoder (BSD)
 - [avifenc](https://github.com/AOMediaCodec/libavif) — Alliance for Open Media's AVIF encoder (BSD)
-- [cjpeg](https://github.com/mozilla/mozjpeg) — Mozilla's MozJPEG (MPL/BSD)
 - [oxipng](https://github.com/shssoichiro/oxipng) — lossless PNG optimizer in Rust (MIT)
 
 ## Install
