@@ -2,7 +2,7 @@
 
 A small macOS utility that compresses images. Drop files in, get smaller ones back.
 
-Supports JPG, PNG, WebP, and AVIF. Outputs WebP or AVIF depending on your preference. Strips metadata, respects max dimensions and file size targets, and saves next to the original by default.
+Supports JPG, PNG, WebP, and AVIF. Outputs WebP, AVIF, or lossless PNG depending on your preference. Strips metadata, respects max dimensions and file size targets, and saves next to the original by default.
 
 ## About the developer
 
@@ -20,7 +20,7 @@ Supports JPG, PNG, WebP, and AVIF. Outputs WebP or AVIF depending on your prefer
 - **PNG lossless** — run oxipng on PNGs when you need to keep the format (transparency, UI assets, etc.)
 - **Manual mode** — drop files first, then right-click each one to choose WebP, AVIF, or PNG individually
 - **Destination** — save next to the original or pick a custom folder
-- **Performance** — Stroll (one at a time) or Sprint (all cores)
+- **Performance** — Fast (one at a time) or Fastest (all cores)
 - **Notifications** — get a tap when a batch finishes, with messaging that varies by count and time
 - **Advanced** — strip metadata, sanitize filenames for web, open output folder automatically, move originals to trash
 - **Quirky idle animation** — three choreographed card-drop variants that loop then hold until you come back
@@ -28,7 +28,7 @@ Supports JPG, PNG, WebP, and AVIF. Outputs WebP or AVIF depending on your prefer
 
 ### What others don't do
 
-- **Actually changes the format** — ImageOptim squeezes your JPEG and hands it back as a JPEG. Dinky converts to WebP or AVIF, which is where 30–80% of the real savings live. Optimage does this too, but costs money and weighs 62 MB.
+- **Actually changes the format** — ImageOptim squeezes your JPEG and hands it back as a JPEG. Dinky converts to WebP, AVIF, or lossless PNG, which is where 30–80% of the real savings live. Optimage does this too, but costs money and weighs 62 MB.
 - **Results you can act on** — most compression apps give you a done screen you can't do anything with. Dinky's results list works like Finder: select files, drag them somewhere else, double-click to open, right-click to remove individual items.
 - **Notifications with a personality** — other apps either don't notify at all or send a generic "Done." Dinky's notification changes based on how many files you compressed and how long it took. Small things, but they add up.
 - **Free, open source, and tiny** — Optimage is $69. ImageOptim is free but lossless only. Dinky is free, open source, converts formats, and at 4.3 MB fits in a fraction of the space either of them takes up.
@@ -43,7 +43,7 @@ I liked [Squoosh](https://github.com/GoogleChromeLabs/squoosh) but didn't want t
 
 ImageOptim is lossless only — it makes your JPEG or PNG smaller without changing the format. Optimage does lossy and lossless but also mostly keeps you in the source format. Both are good at what they do.
 
-Dinky takes a different approach: it converts to WebP or AVIF. That format change is where most of the real savings come from — often 30–80% smaller than a JPEG or PNG at the same visual quality. If you're putting images on the web or into a CMS and you're still working with JPEGs and PNGs, converting the format matters more than squeezing the existing one.
+Dinky takes a different approach: it converts to WebP, AVIF, or lossless PNG. The format change is where most of the real savings come from — often 30–80% smaller than a JPEG or PNG at the same visual quality. And when you need to keep the PNG format (transparency, UI assets, icons), oxipng squeezes it losslessly without touching a pixel. If you're putting images on the web or into a CMS and you're still working with JPEGs and PNGs, converting the format matters more than squeezing the existing one.
 
 ## How it works
 
