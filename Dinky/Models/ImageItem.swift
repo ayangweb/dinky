@@ -21,6 +21,7 @@ enum CompressionStatus {
 final class ImageItem: ObservableObject, Identifiable {
     let id = UUID()
     let sourceURL: URL
+    var formatOverride: CompressionFormat? = nil
 
     @Published var status: CompressionStatus = .pending
 

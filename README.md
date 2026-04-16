@@ -11,12 +11,14 @@ Supports JPG, PNG, WebP, and AVIF. Outputs WebP or AVIF depending on your prefer
 ## Features
 
 - **Drag and drop** — drop images straight onto the window, or use the file picker
-- **Format conversion** — outputs WebP or AVIF, where the real savings happen
+- **Format conversion** — outputs WebP, AVIF, or lossless PNG depending on your preference
 - **Max width** — resize on the way out with common web presets or a custom value
 - **Max file size** — binary-searches the quality level to hit an exact KB/MB target
 - **Batch compression** — multiple files compress concurrently, live results as they finish
 - **Show in Finder** — jump straight to any compressed file from the results list
 - **Finder-like selection** — click, cmd+click, shift+click, double-click to open, drag to anywhere
+- **PNG lossless** — run oxipng on PNGs when you need to keep the format (transparency, UI assets, etc.)
+- **Manual mode** — drop files first, then right-click each one to choose WebP, AVIF, or PNG individually
 - **Destination** — save next to the original or pick a custom folder
 - **Performance** — Stroll (one at a time) or Sprint (all cores)
 - **Notifications** — get a tap when a batch finishes, with messaging that varies by count and time

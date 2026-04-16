@@ -63,8 +63,11 @@ actor CompressionService {
         let isTempWork = workURL != source
         defer { if isTempWork { try? FileManager.default.removeItem(at: workURL) } }
 
-        // Step 2: compress — either to a file-size target or at the default quality
-        if let targetKB = goals.maxFileSizeKB {
+        // Step 2: compress — lossless formats skip quality targeting
+        if format == .png {
+            try await compressAtQuality(source: workURL, quality: 0,
+                                        format: format, strip: stripMetadata, output: outputURL)
+        } else if let targetKB = goals.maxFileSizeKB {
             try await compressToTargetSize(
                 source: workURL, targetBytes: Int64(targetKB) * 1024,
                 format: format, strip: stripMetadata, output: outputURL
@@ -155,6 +158,7 @@ actor CompressionService {
         switch format {
         case .webp: try await runCwebp(source: source, quality: quality, strip: strip, output: output)
         case .avif: try await runAvifenc(source: source, quality: quality, strip: strip, output: output)
+        case .png:  try await runOxipng(source: source, strip: strip, output: output)
         }
     }
 
@@ -171,6 +175,16 @@ actor CompressionService {
         var args = ["--qcolor", String(quality), "--qalpha", String(min(quality + 10, 100))]
         if strip { args += ["--ignore-exif", "--ignore-xmp"] }
         args += [source.path, output.path]
+        try await run(binary, args: args)
+    }
+
+    private func runOxipng(source: URL, strip: Bool, output: URL) async throws {
+        let binary = try binaryURL("oxipng")
+        // Copy source to output first — oxipng optimizes in-place with --out
+        try FileManager.default.copyItem(at: source, to: output)
+        var args = ["--opt", "4"]
+        if strip { args += ["--strip", "all"] }
+        args += ["--out", output.path, output.path]
         try await run(binary, args: args)
     }
 

@@ -52,4 +52,5 @@ enum S {
     // Format names
     static let webp = "WebP"
     static let avif = "AVIF"
+    static let png  = "PNG"
 }

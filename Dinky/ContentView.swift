@@ -23,6 +23,13 @@ final class ContentViewModel: ObservableObject {
     func addAndCompress(_ urls: [URL]) {
         let new = urls.map { ImageItem(sourceURL: $0) }
         items.append(contentsOf: new)
+        if !prefs.manualMode { compress() }
+    }
+
+    func compressItems(_ targets: [ImageItem], format: CompressionFormat) {
+        for item in targets {
+            item.formatOverride = format
+        }
         compress()
     }
 
@@ -83,12 +90,20 @@ final class ContentViewModel: ObservableObject {
     }
 
     private func compressItem(_ item: ImageItem, goals: CompressionGoals) async {
+        let format = item.formatOverride ?? selectedFormat
+
+        // PNG lossless only accepts PNG inputs — suggest alternatives for other formats
+        if format == .png && item.sourceURL.pathExtension.lowercased() != "png" {
+            await MainActor.run { item.status = .failed(PNGInputError()) }
+            return
+        }
+
         await MainActor.run { item.status = .processing }
-        let outputURL = prefs.outputURL(for: item.sourceURL, format: selectedFormat)
+        let outputURL = prefs.outputURL(for: item.sourceURL, format: format)
         do {
             let result = try await CompressionService.shared.compress(
                 source: item.sourceURL,
-                format: selectedFormat,
+                format: format,
                 goals: goals,
                 stripMetadata: prefs.stripMetadata,
                 outputURL: outputURL,
@@ -183,6 +198,12 @@ private actor AsyncSemaphore {
     }
 }
 
+struct PNGInputError: LocalizedError {
+    var errorDescription: String? {
+        "PNG lossless only works on PNG files. Try WebP or AVIF for this one."
+    }
+}
+
 // MARK: - Root view
 
 struct ContentView: View {
@@ -272,6 +293,21 @@ struct ContentView: View {
                     return NSItemProvider(contentsOf: url) ?? NSItemProvider()
                 }
                 .contextMenu {
+                    if case .pending = item.status {
+                        let targets = selectedIDs.contains(item.id)
+                            ? vm.items.filter { selectedIDs.contains($0.id) }
+                            : [item]
+                        Button { vm.compressItems(targets, format: .webp) } label: {
+                            Label("Compress as WebP", systemImage: "photo")
+                        }
+                        Button { vm.compressItems(targets, format: .avif) } label: {
+                            Label("Compress as AVIF", systemImage: "photo")
+                        }
+                        Button { vm.compressItems(targets, format: .png) } label: {
+                            Label("Compress as PNG", systemImage: "photo")
+                        }
+                        Divider()
+                    }
                     Button {
                         vm.remove(item)
                     } label: {

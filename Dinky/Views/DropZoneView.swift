@@ -10,6 +10,10 @@ struct DropZoneView: View {
     let onOpenPanel: () -> Void
     var onLoop: () -> Void = {}
 
+    @EnvironmentObject var prefs: DinkyPreferences
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    private var shouldReduceMotion: Bool { prefs.reduceMotion || systemReduceMotion }
+
     @State private var doneFlash      = false
     @State private var ringScale      : CGFloat = 1.0
     @State private var ringOpacity    : Double  = 0.5
@@ -26,8 +30,13 @@ struct DropZoneView: View {
 
             // Idle animation floats on top
             if phase == .idle {
-                IdleAnimation(onLoop: onLoop)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if shouldReduceMotion {
+                    StaticCardStack()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    IdleAnimation(onLoop: onLoop)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -135,6 +144,43 @@ struct DropZoneView: View {
 }
 
 // MARK: - Idle drag animation
+
+// MARK: - Static card stack (reduce motion)
+
+private struct StaticCardStack: View {
+    private let themes: [(Color, Color)] = [
+        (Color(red: 0.28, green: 0.56, blue: 1.00), Color(red: 0.52, green: 0.28, blue: 0.96)),
+        (Color(red: 0.96, green: 0.42, blue: 0.28), Color(red: 0.98, green: 0.74, blue: 0.18)),
+        (Color(red: 0.18, green: 0.78, blue: 0.52), Color(red: 0.14, green: 0.62, blue: 0.88)),
+    ]
+
+    private func card(_ themeIndex: Int, width: CGFloat, height: CGFloat) -> some View {
+        let (c1, c2) = themes[themeIndex]
+        return RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(LinearGradient(colors: [c1, c2], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .frame(width: width, height: height)
+            .shadow(color: c1.opacity(0.35), radius: 6, x: 0, y: 3)
+    }
+
+    var body: some View {
+        ZStack {
+            // wide landscape — back
+            card(2, width: 68, height: 40)
+                .offset(x: 20, y: -72)
+                .rotationEffect(.degrees(7))
+            // landscape — middle
+            card(1, width: 64, height: 42)
+                .offset(x: 0, y: -82)
+                .rotationEffect(.degrees(2))
+            // portrait — front
+            card(0, width: 42, height: 56)
+                .offset(x: -20, y: -74)
+                .rotationEffect(.degrees(-6))
+        }
+    }
+}
+
+// MARK: - Animated idle
 
 private struct IdleAnimation: View {
 

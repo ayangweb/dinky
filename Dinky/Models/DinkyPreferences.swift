@@ -76,6 +76,8 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("openFolderWhenDone")   var openFolderWhenDone: Bool = false
     @AppStorage("notifyWhenDone")       var notifyWhenDone: Bool = false
     @AppStorage("sanitizeFilenames")    var sanitizeFilenames: Bool = false
+    @AppStorage("manualMode")           var manualMode: Bool = false
+    @AppStorage("reduceMotion")         var reduceMotion: Bool = false
 
     // MARK: URL helpers
 

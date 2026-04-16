@@ -8,14 +8,12 @@ struct PreferencesView: View {
         TabView {
             OutputTab()
                 .tabItem { Label("Output", systemImage: "folder") }
-            CompressionTab()
-                .tabItem { Label("Compression", systemImage: "slider.horizontal.3") }
+                .environmentObject(prefs)
             BehaviorTab()
                 .tabItem { Label("Behavior", systemImage: "gearshape") }
+                .environmentObject(prefs)
         }
-        .environmentObject(prefs)
-        .padding()
-        .frame(width: 460, height: 320)
+        .frame(width: 420, height: 280)
     }
 }
 
@@ -25,59 +23,61 @@ private struct OutputTab: View {
     @EnvironmentObject var prefs: DinkyPreferences
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                group("Save Location") {
-                    Picker("", selection: Binding(
-                        get: { prefs.saveLocation },
-                        set: { prefs.saveLocation = $0 }
-                    )) {
-                        ForEach(SaveLocation.allCases) { loc in
-                            Text(loc.displayName).tag(loc)
-                        }
-                    }
-                    .pickerStyle(.radioGroup)
-                    .labelsHidden()
-
-                    if prefs.saveLocation == .custom {
-                        HStack {
-                            Text(prefs.customFolderDisplayPath.isEmpty
-                                 ? "No folder selected" : prefs.customFolderDisplayPath)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1).truncationMode(.middle)
-                            Spacer()
-                            Button("Choose…") { pickCustomFolder() }
-                        }
-                    }
+        Form {
+            Section("Save Location") {
+                Picker("Where to save", selection: Binding(
+                    get: { prefs.saveLocation },
+                    set: { prefs.saveLocation = $0 }
+                )) {
+                    Text("Same folder as original").tag(SaveLocation.sameFolder)
+                    Text("Downloads folder").tag(SaveLocation.downloads)
+                    Text("Custom folder…").tag(SaveLocation.custom)
                 }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
 
-                group("Filename Handling") {
-                    Picker("", selection: Binding(
-                        get: { prefs.filenameHandling },
-                        set: { prefs.filenameHandling = $0 }
-                    )) {
-                        ForEach(FilenameHandling.allCases) { h in
-                            Text(h.displayName).tag(h)
-                        }
-                    }
-                    .pickerStyle(.radioGroup)
-                    .labelsHidden()
-
-                    if prefs.filenameHandling == .customSuffix {
-                        HStack {
-                            Text("Suffix:")
-                            TextField("-dinky", text: Binding(
-                                get: { prefs.customSuffix },
-                                set: { prefs.customSuffix = $0 }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 120)
-                        }
+                if prefs.saveLocation == .custom {
+                    HStack {
+                        Text(prefs.customFolderDisplayPath.isEmpty
+                             ? "No folder selected" : prefs.customFolderDisplayPath)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { pickCustomFolder() }
+                            .buttonStyle(.bordered)
                     }
                 }
             }
-            .padding()
+
+            Section("Filename") {
+                Picker("Output name", selection: Binding(
+                    get: { prefs.filenameHandling },
+                    set: { prefs.filenameHandling = $0 }
+                )) {
+                    Text("Append \"-dinky\" suffix").tag(FilenameHandling.appendSuffix)
+                    Text("Replace original").tag(FilenameHandling.replaceOrigin)
+                    Text("Custom suffix").tag(FilenameHandling.customSuffix)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+
+                if prefs.filenameHandling == .customSuffix {
+                    HStack {
+                        Text("Suffix")
+                            .foregroundStyle(.secondary)
+                        TextField("-dinky", text: Binding(
+                            get: { prefs.customSuffix },
+                            set: { prefs.customSuffix = $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 120)
+                    }
+                }
+            }
         }
+        .formStyle(.grouped)
+        .padding(.top, 8)
     }
 
     private func pickCustomFolder() {
@@ -91,30 +91,7 @@ private struct OutputTab: View {
             if let bookmark = try? url.bookmarkData(options: .withSecurityScope) {
                 prefs.customFolderBookmark = bookmark
             }
-        }
-    }
-}
-
-// MARK: - Compression tab
-
-private struct CompressionTab: View {
-    @EnvironmentObject var prefs: DinkyPreferences
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                group("Metadata") {
-                    Toggle("Strip metadata (Exif, GPS, XMP)", isOn: Binding(
-                        get: { prefs.stripMetadata },
-                        set: { prefs.stripMetadata = $0 }
-                    ))
-                    Toggle("Preserve file timestamps", isOn: Binding(
-                        get: { prefs.preserveTimestamps },
-                        set: { prefs.preserveTimestamps = $0 }
-                    ))
-                }
-            }
-            .padding()
+            prefs.saveLocation = .custom
         }
     }
 }
@@ -125,40 +102,40 @@ private struct BehaviorTab: View {
     @EnvironmentObject var prefs: DinkyPreferences
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                group("Processing") {
-                    Toggle("Skip already-optimized files (< 2% savings)", isOn: Binding(
-                        get: { prefs.skipAlreadyOptimized },
-                        set: { prefs.skipAlreadyOptimized = $0 }
-                    ))
-                    Stepper(
-                        "Concurrent tasks: \(prefs.concurrentTasks)",
-                        value: Binding(
-                            get: { prefs.concurrentTasks },
-                            set: { prefs.concurrentTasks = $0 }
-                        ),
-                        in: 1...8
-                    )
-                }
-                group("Feedback") {
-                    Toggle("Play sound effects", isOn: Binding(
-                        get: { prefs.playSoundEffects },
-                        set: { prefs.playSoundEffects = $0 }
-                    ))
-                }
+        Form {
+            Section("Compression") {
+                Toggle("Skip already-optimized files", isOn: Binding(
+                    get: { prefs.skipAlreadyOptimized },
+                    set: { prefs.skipAlreadyOptimized = $0 }
+                ))
+                Text("Skips files where savings would be less than 2%.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Preserve original timestamps", isOn: Binding(
+                    get: { prefs.preserveTimestamps },
+                    set: { prefs.preserveTimestamps = $0 }
+                ))
             }
-            .padding()
+
+            Section("Sound") {
+                Toggle("Play sound when done", isOn: Binding(
+                    get: { prefs.playSoundEffects },
+                    set: { prefs.playSoundEffects = $0 }
+                ))
+            }
+
+            Section("Accessibility") {
+                Toggle("Reduce motion", isOn: Binding(
+                    get: { prefs.reduceMotion },
+                    set: { prefs.reduceMotion = $0 }
+                ))
+                Text("Replaces the drop zone animation with a still arrangement of cards.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-    }
-}
-
-// MARK: - Shared section header helper
-
-private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-        Text(title)
-            .font(.headline)
-        content()
+        .formStyle(.grouped)
+        .padding(.top, 8)
     }
 }

@@ -31,7 +31,7 @@ struct SidebarView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
 
-                helper("WebP works everywhere. AVIF is smaller but slower to encode.")
+                helper("WebP works everywhere. AVIF is smaller but slower. PNG is lossless.")
             }
 
             // ── Max Width ────────────────────────────────────────
@@ -202,6 +202,20 @@ struct SidebarView: View {
                 ))
                 .font(.caption)
 
+                Toggle("Manual mode", isOn: Binding(
+                    get: { prefs.manualMode },
+                    set: { prefs.manualMode = $0 }
+                ))
+                .font(.caption)
+
+                if prefs.manualMode {
+                    helper("Files won't compress on drop — right-click to choose format per file.")
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                            removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                        ))
+                }
+
                 helper("Moving to trash is permanent once emptied.")
             }
         }
@@ -212,6 +226,7 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.maxWidthEnabled)
         .animation(.easeInOut(duration: 0.2), value: prefs.maxFileSizeEnabled)
         .animation(.easeInOut(duration: 0.2), value: prefs.sanitizeFilenames)
+        .animation(.easeInOut(duration: 0.2), value: prefs.manualMode)
     }
 
     // MARK: - Folder picker
