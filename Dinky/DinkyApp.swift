@@ -43,7 +43,7 @@ struct DinkyApp: App {
                 .keyboardShortcut("o", modifiers: .command)
 
                 Button("Compress from Clipboard") {
-                    NotificationCenter.default.post(name: .dinkyPasteClipboard, object: nil)
+                    NSApp.sendAction(Selector(("compressFromClipboard:")), to: nil, from: nil)
                 }
                 .keyboardShortcut("v", modifiers: [.command, .shift])
             }

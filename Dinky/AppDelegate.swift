@@ -11,6 +11,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.post(name: .dinkyOpenFiles, object: images)
     }
 
+    // MARK: - Compress from Clipboard menu command
+
+    @objc func compressFromClipboard(_ sender: Any?) {
+        NotificationCenter.default.post(name: .dinkyPasteClipboard, object: nil)
+    }
+
     // MARK: - Right-click → Services → Compress with Dinky
 
     @objc func compressWithDinky(
