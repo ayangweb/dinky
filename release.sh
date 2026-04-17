@@ -43,6 +43,7 @@ sed -i '' "s/\"softwareVersion\": \"$PREV_VERSION\"/\"softwareVersion\": \"$VERS
 
 echo "→ Updating site/llms.txt…"
 sed -i '' "s/v$PREV_VERSION/v$VERSION/g" site/llms.txt
+sed -i '' "s/Dinky-$PREV_VERSION\.dmg/Dinky-$VERSION.dmg/g" site/llms.txt
 
 # ── 3. Build ──────────────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ ditto -c -k --sequesterRsrc --keepParent \
 # ── 5. Commit, tag, push, release ────────────────────────────────────────────
 
 echo "→ Committing…"
-git add Dinky.xcodeproj/project.pbxproj site/index.html site/llms.txt
+git add Dinky.xcodeproj/project.pbxproj site/index.html site/llms.txt README.md
 git commit -m "Bump to v$VERSION"
 git push origin main
 
