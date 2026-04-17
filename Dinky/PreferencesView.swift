@@ -299,9 +299,10 @@ private struct PresetsTab: View {
                                     .font(.system(size: 12, weight: .semibold))
                             }
                         }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .contentShape(Rectangle())
                 }
             }
             HStack(spacing: 12) {
