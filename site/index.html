@@ -188,6 +188,20 @@
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
     }
 
+    .screenshots-pair {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .screenshots-pair img {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    }
+
     .screenshot-pip {
       position: relative;
     }
@@ -588,7 +602,10 @@
     </div>
     <img src="screenshots/screenshot-results.webp" alt="Dinky results list showing compressed files" />
     <img src="screenshots/screenshot-before-after.webp" alt="Dinky before and after preview" />
-    <img src="screenshots/screenshot-sidebar-presets.webp" alt="Dinky sidebar with presets and format picker" />
+    <div class="screenshots-pair">
+      <img src="screenshots/screenshot-sidebar-presets.webp" alt="Dinky sidebar with presets and format picker" />
+      <img src="screenshots/screenshot-preset-selected.webp" alt="Dinky preset selected with settings summary" />
+    </div>
   </section>
   <p class="meta-note">Every screenshot on this page was compressed with Dinky. Obviously.</p>
 
