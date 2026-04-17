@@ -261,14 +261,14 @@ private struct PresetsTab: View {
     @EnvironmentObject var prefs: DinkyPreferences
     @State private var selectedID: UUID? = nil
 
-    private var selectedIndex: Int? {
-        prefs.savedPresets.firstIndex { $0.id == selectedID }
+    private var selectedPreset: CompressionPreset? {
+        prefs.savedPresets.first { $0.id == selectedID }
     }
 
     var body: some View {
         Form {
             presetListSection
-            if let idx = selectedIndex { presetDetailSections(idx) }
+            if let preset = selectedPreset { presetDetailSections(preset) }
         }
         .formStyle(.grouped)
         .animation(.easeInOut(duration: 0.2), value: selectedID)
@@ -319,63 +319,63 @@ private struct PresetsTab: View {
     }
 
     @ViewBuilder
-    private func presetDetailSections(_ idx: Int) -> some View {
+    private func presetDetailSections(_ snapshot: CompressionPreset) -> some View {
         Section("Name") {
-            TextField("Preset name", text: binding(\.name, at: idx))
+            TextField("Preset name", text: binding(\.name, snapshot: snapshot))
         }
         Section("Format") {
-            Picker("Format", selection: binding(\.format, at: idx)) {
+            Picker("Format", selection: binding(\.format, snapshot: snapshot)) {
                 Text("WebP").tag(CompressionFormat.webp)
                 Text("AVIF").tag(CompressionFormat.avif)
                 Text("PNG").tag(CompressionFormat.png)
             }
             .pickerStyle(.segmented)
-            Toggle("Smart quality", isOn: binding(\.smartQuality, at: idx))
-            Toggle("Auto-format", isOn: binding(\.autoFormat, at: idx))
+            Toggle("Smart quality", isOn: binding(\.smartQuality, snapshot: snapshot))
+            Toggle("Auto-format", isOn: binding(\.autoFormat, snapshot: snapshot))
         }
         Section("Limits") {
             HStack {
-                Toggle("Max width", isOn: binding(\.maxWidthEnabled, at: idx))
+                Toggle("Max width", isOn: binding(\.maxWidthEnabled, snapshot: snapshot))
                 Spacer()
-                if prefs.savedPresets[idx].maxWidthEnabled {
-                    TextField("", value: binding(\.maxWidth, at: idx), format: .number).frame(width: 70)
+                if snapshot.maxWidthEnabled {
+                    TextField("", value: binding(\.maxWidth, snapshot: snapshot), format: .number).frame(width: 70)
                     Text("px").foregroundStyle(.secondary)
                 }
             }
             HStack {
-                Toggle("Max file size", isOn: binding(\.maxFileSizeEnabled, at: idx))
+                Toggle("Max file size", isOn: binding(\.maxFileSizeEnabled, snapshot: snapshot))
                 Spacer()
-                if prefs.savedPresets[idx].maxFileSizeEnabled {
-                    TextField("", value: binding(\.maxFileSizeKB, at: idx), format: .number).frame(width: 70)
+                if snapshot.maxFileSizeEnabled {
+                    TextField("", value: binding(\.maxFileSizeKB, snapshot: snapshot), format: .number).frame(width: 70)
                     Text("KB").foregroundStyle(.secondary)
                 }
             }
         }
         Section("Destination") {
-            Picker("Save to", selection: binding(\.saveLocationRaw, at: idx)) {
+            Picker("Save to", selection: binding(\.saveLocationRaw, snapshot: snapshot)) {
                 Text("Same folder as original").tag("sameFolder")
                 Text("Downloads folder").tag("downloads")
                 Text("Custom folder (set in Output)").tag("custom")
             }
-            Picker("Filename", selection: binding(\.filenameHandlingRaw, at: idx)) {
+            Picker("Filename", selection: binding(\.filenameHandlingRaw, snapshot: snapshot)) {
                 Text("Append \"-dinky\" suffix").tag("appendSuffix")
                 Text("Replace original").tag("replaceOrigin")
                 Text("Custom suffix").tag("customSuffix")
             }
-            if prefs.savedPresets[idx].filenameHandlingRaw == "customSuffix" {
+            if snapshot.filenameHandlingRaw == "customSuffix" {
                 HStack {
                     Text("Suffix").foregroundStyle(.secondary)
-                    TextField("-dinky", text: binding(\.customSuffix, at: idx))
+                    TextField("-dinky", text: binding(\.customSuffix, snapshot: snapshot))
                 }
             }
         }
         Section("Advanced") {
-            Toggle("Strip metadata", isOn: binding(\.stripMetadata, at: idx))
-            Toggle("Sanitize filenames", isOn: binding(\.sanitizeFilenames, at: idx))
-            Toggle("Open folder when done", isOn: binding(\.openFolderWhenDone, at: idx))
+            Toggle("Strip metadata", isOn: binding(\.stripMetadata, snapshot: snapshot))
+            Toggle("Sanitize filenames", isOn: binding(\.sanitizeFilenames, snapshot: snapshot))
+            Toggle("Open folder when done", isOn: binding(\.openFolderWhenDone, snapshot: snapshot))
         }
         Section("Notifications") {
-            Toggle("Notify when done", isOn: binding(\.notifyWhenDone, at: idx))
+            Toggle("Notify when done", isOn: binding(\.notifyWhenDone, snapshot: snapshot))
         }
     }
 
@@ -397,10 +397,15 @@ private struct PresetsTab: View {
         }
     }
 
-    private func binding<T>(_ keyPath: WritableKeyPath<CompressionPreset, T>, at idx: Int) -> Binding<T> {
+    // Looks up the live preset by UUID for the getter; falls back to snapshot
+    // during SwiftUI's teardown pass so the getter never reads a stale index.
+    private func binding<T>(_ keyPath: WritableKeyPath<CompressionPreset, T>, snapshot: CompressionPreset) -> Binding<T> {
         Binding(
-            get: { prefs.savedPresets[idx][keyPath: keyPath] },
+            get: {
+                (prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot)[keyPath: keyPath]
+            },
             set: {
+                guard let idx = prefs.savedPresets.firstIndex(where: { $0.id == snapshot.id }) else { return }
                 var presets = prefs.savedPresets
                 presets[idx][keyPath: keyPath] = $0
                 prefs.savedPresets = presets
