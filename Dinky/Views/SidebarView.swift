@@ -50,14 +50,41 @@ struct SidebarView: View {
 
                 // ── Format ──────────────────────────────────────────
                 sectionGroup(icon: "photo", title: "Format") {
-                    Picker("", selection: $selectedFormat) {
-                        ForEach(CompressionFormat.allCases) { fmt in
-                            Text(fmt.displayName).tag(fmt)
+                    let formatOptions: [(String, CompressionFormat?)] = [
+                        ("WebP", .webp), ("AVIF", .avif), ("PNG", .png), ("Auto", nil)
+                    ]
+                    let columns = [GridItem(.adaptive(minimum: 52), spacing: 4)]
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
+                        ForEach(formatOptions, id: \.0) { label, fmt in
+                            let active: Bool = fmt == nil
+                                ? prefs.autoFormat
+                                : !prefs.autoFormat && selectedFormat == fmt
+                            Text(label)
+                                .font(.system(size: 11, weight: active ? .semibold : .regular))
+                                .foregroundStyle(active ? .white : .secondary)
+                                .padding(.horizontal, 6).padding(.vertical, 3)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(active
+                                              ? AnyShapeStyle(LinearGradient(
+                                                    colors: [Color(red: 0.25, green: 0.55, blue: 1.0),
+                                                             Color(red: 0.45, green: 0.30, blue: 0.95)],
+                                                    startPoint: .leading, endPoint: .trailing))
+                                              : AnyShapeStyle(Color.primary.opacity(0.08)))
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if let f = fmt {
+                                        prefs.autoFormat = false
+                                        selectedFormat = f
+                                    } else {
+                                        prefs.autoFormat = true
+                                    }
+                                }
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    helper("WebP works everywhere. AVIF is smaller but slower. PNG is lossless.")
+                    helper("Auto picks AVIF for photos, WebP for everything else.")
                 }
 
                 // ── Max Width ────────────────────────────────────────
@@ -141,18 +168,8 @@ struct SidebarView: View {
                                 removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
                             ))
                     }
-                    Toggle("Auto-format", isOn: Binding(
-                        get: { prefs.autoFormat }, set: { prefs.autoFormat = $0 }
-                    )).font(.caption)
-                    if prefs.autoFormat {
-                        helper("Picks AVIF for photos, WebP for everything else. Overrides the format picker above.")
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
-                                removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
-                            ))
-                    }
-                    Toggle("Open folder when done", isOn: Binding(
-                        get: { prefs.openFolderWhenDone }, set: { prefs.openFolderWhenDone = $0 }
+                    Toggle("Strip metadata", isOn: Binding(
+                        get: { prefs.stripMetadata }, set: { prefs.stripMetadata = $0 }
                     )).font(.caption)
                     Toggle("Sanitize filenames", isOn: Binding(
                         get: { prefs.sanitizeFilenames }, set: { prefs.sanitizeFilenames = $0 }
@@ -164,8 +181,8 @@ struct SidebarView: View {
                                 removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
                             ))
                     }
-                    Toggle("Strip metadata", isOn: Binding(
-                        get: { prefs.stripMetadata }, set: { prefs.stripMetadata = $0 }
+                    Toggle("Open folder when done", isOn: Binding(
+                        get: { prefs.openFolderWhenDone }, set: { prefs.openFolderWhenDone = $0 }
                     )).font(.caption)
                 }
             }
@@ -184,6 +201,7 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.smartQuality)
         .animation(.easeInOut(duration: 0.2), value: prefs.autoFormat)
         .animation(.easeInOut(duration: 0.2), value: presetActive)
+        .animation(.easeInOut(duration: 0.2), value: prefs.stripMetadata)
     }
 
     // MARK: - Preset summary
