@@ -22,6 +22,16 @@ struct CompressionPreset: Codable, Identifiable {
     var openFolderWhenDone: Bool
     // Notifications
     var notifyWhenDone: Bool
+    // Watch folder (per-preset)
+    var watchFolderEnabled: Bool
+    var watchFolderModeRaw: String   // "destination" | "unique"
+    var watchFolderPath: String
+    var watchFolderBookmark: Data
+    // Custom output folder (per-preset, used when saveLocationRaw == "custom")
+    var presetCustomFolderPath: String
+    var presetCustomFolderBookmark: Data
+    // Content type hint
+    var contentTypeHintRaw: String
 
     let createdAt: Date
 
@@ -29,7 +39,7 @@ struct CompressionPreset: Codable, Identifiable {
         self.id = UUID()
         self.name = name
         self.format = format
-        self.smartQuality = prefs.smartQuality
+        self.smartQuality = true
         self.autoFormat = prefs.autoFormat
         self.maxWidthEnabled = prefs.maxWidthEnabled
         self.maxWidth = prefs.maxWidth
@@ -42,6 +52,13 @@ struct CompressionPreset: Codable, Identifiable {
         self.sanitizeFilenames = prefs.sanitizeFilenames
         self.openFolderWhenDone = prefs.openFolderWhenDone
         self.notifyWhenDone = prefs.notifyWhenDone
+        self.watchFolderEnabled = prefs.folderWatchEnabled
+        self.watchFolderModeRaw = "destination"
+        self.watchFolderPath = prefs.watchedFolderPath
+        self.watchFolderBookmark = prefs.watchedFolderBookmark
+        self.presetCustomFolderPath = prefs.customFolderDisplayPath
+        self.presetCustomFolderBookmark = prefs.customFolderBookmark
+        self.contentTypeHintRaw = prefs.contentTypeHintRaw
         self.createdAt = .now
     }
 
@@ -61,10 +78,17 @@ struct CompressionPreset: Codable, Identifiable {
         saveLocationRaw = try c.decodeIfPresent(String.self, forKey: .saveLocationRaw) ?? "sameFolder"
         filenameHandlingRaw = try c.decodeIfPresent(String.self, forKey: .filenameHandlingRaw) ?? "appendSuffix"
         customSuffix = try c.decodeIfPresent(String.self, forKey: .customSuffix) ?? "-dinky"
-        stripMetadata = try c.decodeIfPresent(Bool.self, forKey: .stripMetadata) ?? true
+        stripMetadata = try c.decodeIfPresent(Bool.self, forKey: .stripMetadata) ?? false
         sanitizeFilenames = try c.decodeIfPresent(Bool.self, forKey: .sanitizeFilenames) ?? false
         openFolderWhenDone = try c.decodeIfPresent(Bool.self, forKey: .openFolderWhenDone) ?? false
         notifyWhenDone = try c.decodeIfPresent(Bool.self, forKey: .notifyWhenDone) ?? false
+        watchFolderEnabled = try c.decodeIfPresent(Bool.self, forKey: .watchFolderEnabled) ?? false
+        watchFolderModeRaw = try c.decodeIfPresent(String.self, forKey: .watchFolderModeRaw) ?? "destination"
+        watchFolderPath = try c.decodeIfPresent(String.self, forKey: .watchFolderPath) ?? ""
+        watchFolderBookmark = try c.decodeIfPresent(Data.self, forKey: .watchFolderBookmark) ?? Data()
+        presetCustomFolderPath = try c.decodeIfPresent(String.self, forKey: .presetCustomFolderPath) ?? ""
+        presetCustomFolderBookmark = try c.decodeIfPresent(Data.self, forKey: .presetCustomFolderBookmark) ?? Data()
+        contentTypeHintRaw = try c.decodeIfPresent(String.self, forKey: .contentTypeHintRaw) ?? "auto"
     }
 
     func apply(to prefs: DinkyPreferences, selectedFormat: inout CompressionFormat) {
@@ -82,5 +106,34 @@ struct CompressionPreset: Codable, Identifiable {
         prefs.sanitizeFilenames = sanitizeFilenames
         prefs.openFolderWhenDone = openFolderWhenDone
         prefs.notifyWhenDone = notifyWhenDone
+        prefs.folderWatchEnabled = watchFolderEnabled
+        if watchFolderModeRaw == "destination" {
+            // Resolve destination folder for watch
+            let destPath: String = {
+                switch saveLocationRaw {
+                case "downloads":
+                    return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.path ?? ""
+                case "presetCustom":
+                    return presetCustomFolderPath
+                case "custom":
+                    return prefs.customFolderDisplayPath
+                default:
+                    return ""  // "sameFolder" can't be pre-resolved
+                }
+            }()
+            prefs.watchedFolderPath = destPath
+            prefs.watchedFolderBookmark = Data()
+        } else {
+            prefs.watchedFolderPath = watchFolderPath
+            prefs.watchedFolderBookmark = watchFolderBookmark
+        }
+        // "presetCustom" = preset has its own unique folder; override the global custom folder.
+        // "custom" = use whatever is already set as the global custom folder — don't touch it.
+        if saveLocationRaw == "presetCustom" {
+            prefs.saveLocationRaw = "custom"
+            prefs.customFolderBookmark = presetCustomFolderBookmark
+            prefs.customFolderDisplayPath = presetCustomFolderPath
+        }
+        prefs.contentTypeHintRaw = contentTypeHintRaw
     }
 }

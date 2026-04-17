@@ -153,7 +153,8 @@ final class ContentViewModel: ObservableObject {
                 stripMetadata: prefs.stripMetadata,
                 outputURL: outputURL,
                 moveToTrash: prefs.moveOriginalsToTrash,
-                smartQuality: prefs.smartQuality
+                smartQuality: prefs.smartQuality,
+                contentTypeHint: prefs.contentTypeHintRaw
             )
             let savings = result.originalSize > 0
                 ? Double(result.originalSize - result.outputSize) / Double(result.originalSize) : 0
@@ -346,16 +347,15 @@ struct ContentView: View {
                 presentManualUpdateResult(result, updater: updater)
             }
         }
-        .task {
-            // Defer the first check so the window settles before any network I/O.
-            if prefs.checkForUpdatesOnLaunch {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                await updater.check(skipThrottle: true)
-            }
-        }
         .onAppear {
+            prefs.activePresetID = ""
             prefs.maxWidthEnabled = false
             prefs.maxFileSizeEnabled = false
+            prefs.stripMetadata = false
+            prefs.sanitizeFilenames = false
+            prefs.openFolderWhenDone = false
+            prefs.smartQuality = true
+            prefs.contentTypeHintRaw = "auto"
             updateFolderWatcher()
         }
         .onChange(of: prefs.folderWatchEnabled) { _, _ in updateFolderWatcher() }

@@ -14,6 +14,9 @@ struct PreferencesView: View {
             OutputTab()
                 .tabItem { Label("Output", systemImage: "folder") }
                 .environmentObject(prefs)
+            WatchFoldersTab()
+                .tabItem { Label("Watch Folders", systemImage: "eye") }
+                .environmentObject(prefs)
             PresetsTab()
                 .tabItem { Label("Presets", systemImage: "slider.horizontal.3") }
                 .environmentObject(prefs)
@@ -53,14 +56,6 @@ private struct GeneralTab: View {
 
             // 2. How compression works
             Section {
-                Toggle("Smart quality", isOn: Binding(
-                    get: { prefs.smartQuality },
-                    set: { prefs.smartQuality = $0 }
-                ))
-                Text("Detects photos vs. screenshots and adjusts quality so text stays crisp and photos squeeze harder.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
                 Toggle("Skip already-optimized files", isOn: Binding(
                     get: { prefs.skipAlreadyOptimized },
                     set: { prefs.skipAlreadyOptimized = $0 }
@@ -91,20 +86,7 @@ private struct GeneralTab: View {
                 Text("Notifications")
             }
 
-            // 4. App modes
-            Section {
-                Toggle("Menu bar mode", isOn: Binding(
-                    get: { prefs.menuBarMode },
-                    set: { prefs.menuBarMode = $0 }
-                ))
-                Text("Adds a Dinky icon to the menu bar. Drop images onto it to compress without opening the main window.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("Menu Bar")
-            }
-
-            // 5. Accessibility
+            // 4. Accessibility
             Section {
                 Toggle("Reduce motion", isOn: Binding(
                     get: { prefs.reduceMotion },
@@ -117,18 +99,6 @@ private struct GeneralTab: View {
                 Text("Accessibility")
             }
 
-            // 6. Updates
-            Section {
-                Toggle("Check for updates automatically", isOn: Binding(
-                    get: { prefs.checkForUpdatesOnLaunch },
-                    set: { prefs.checkForUpdatesOnLaunch = $0 }
-                ))
-                Text("Dinky will quietly check GitHub for a new release when you launch the app.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("Updates")
-            }
         }
         .formStyle(.grouped)
         .padding(.top, 8)
@@ -289,7 +259,7 @@ private struct PresetsTab: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(preset.name).foregroundStyle(.primary)
-                                Text(preset.format.displayName)
+                                Text(preset.autoFormat ? "Auto" : preset.format.displayName)
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -326,14 +296,92 @@ private struct PresetsTab: View {
             TextField("Preset name", text: binding(\.name, snapshot: snapshot))
         }
         Section("Format") {
-            Picker("Format", selection: binding(\.format, snapshot: snapshot)) {
-                Text("WebP").tag(CompressionFormat.webp)
-                Text("AVIF").tag(CompressionFormat.avif)
-                Text("PNG").tag(CompressionFormat.png)
+            let formatOptions: [(String, CompressionFormat?, String)] = [
+                ("Auto", nil,   "Picks AVIF for photos, WebP for everything else."),
+                ("WebP", .webp, "Works everywhere. Great all-around compression."),
+                ("AVIF", .avif, "Smallest files. Slower to encode."),
+                ("PNG",  .png,  "Lossless. Best for screenshots and graphics."),
+            ]
+            let livePreset = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+            let activeFormatDesc = formatOptions.first(where: { opt in
+                opt.1 == nil ? livePreset.autoFormat : (!livePreset.autoFormat && livePreset.format == opt.1)
+            })?.2 ?? ""
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 4) {
+                ForEach(formatOptions, id: \.0) { label, fmt, _ in
+                    let active: Bool = fmt == nil
+                        ? livePreset.autoFormat
+                        : !livePreset.autoFormat && livePreset.format == fmt
+                    Text(label)
+                        .font(.system(size: 11, weight: active ? .semibold : .regular))
+                        .foregroundStyle(active ? .white : .secondary)
+                        .padding(.vertical, 5)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(active
+                                      ? AnyShapeStyle(LinearGradient(
+                                            colors: [Color(red: 0.25, green: 0.55, blue: 1.0),
+                                                     Color(red: 0.45, green: 0.30, blue: 0.95)],
+                                            startPoint: .leading, endPoint: .trailing))
+                                      : AnyShapeStyle(Color.primary.opacity(0.08)))
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let f = fmt {
+                                set(\.autoFormat, to: false, for: snapshot)
+                                set(\.format, to: f, for: snapshot)
+                            } else {
+                                set(\.autoFormat, to: true, for: snapshot)
+                            }
+                        }
+                }
             }
-            .pickerStyle(.segmented)
+            Text(activeFormatDesc)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        Section("Quality") {
+            let liveForQuality = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+            let contentOptions: [(String, String, String)] = [
+                ("Photo", "photo", "Squeezes harder. Best for camera shots and real-world images."),
+                ("UI",    "ui",    "Stays crisp. Best for screenshots, mockups, and text."),
+                ("Mixed", "mixed", "Balanced. Good for images that blend photo and UI."),
+            ]
             Toggle("Smart quality", isOn: binding(\.smartQuality, snapshot: snapshot))
-            Toggle("Auto-format", isOn: binding(\.autoFormat, snapshot: snapshot))
+            if liveForQuality.smartQuality {
+                Text("Detects content type per image automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                let activeDesc = contentOptions.first(where: { liveForQuality.contentTypeHintRaw == $0.1 })?.2 ?? ""
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3), spacing: 4) {
+                    ForEach(contentOptions, id: \.1) { label, raw, _ in
+                        let active = liveForQuality.contentTypeHintRaw == raw
+                        Text(label)
+                            .font(.system(size: 11, weight: active ? .semibold : .regular))
+                            .foregroundStyle(active ? .white : .secondary)
+                            .padding(.vertical, 5)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .fill(active
+                                          ? AnyShapeStyle(LinearGradient(
+                                                colors: [Color(red: 0.25, green: 0.55, blue: 1.0),
+                                                         Color(red: 0.45, green: 0.30, blue: 0.95)],
+                                                startPoint: .leading, endPoint: .trailing))
+                                          : AnyShapeStyle(Color.primary.opacity(0.08)))
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture { set(\.contentTypeHintRaw, to: raw, for: snapshot) }
+                    }
+                }
+                if !activeDesc.isEmpty {
+                    Text(activeDesc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         Section("Max Width") {
             Toggle("Limit width", isOn: binding(\.maxWidthEnabled, snapshot: snapshot))
@@ -370,10 +418,27 @@ private struct PresetsTab: View {
             }
         }
         Section("Destination") {
+            let liveForDest = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
             Picker("Save to", selection: binding(\.saveLocationRaw, snapshot: snapshot)) {
                 Text("Same folder as original").tag("sameFolder")
                 Text("Downloads folder").tag("downloads")
-                Text("Custom folder (set in Output)").tag("custom")
+                if !prefs.customFolderDisplayPath.isEmpty {
+                    Text(URL(fileURLWithPath: prefs.customFolderDisplayPath).lastPathComponent).tag("custom")
+                }
+                Text("Unique folder…").tag("presetCustom")
+            }
+            if liveForDest.saveLocationRaw == "presetCustom" {
+                HStack {
+                    Text(liveForDest.presetCustomFolderPath.isEmpty
+                         ? "No folder selected"
+                         : URL(fileURLWithPath: liveForDest.presetCustomFolderPath).lastPathComponent)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button("Choose…") { pickPresetCustomFolder(for: snapshot) }
+                        .buttonStyle(.bordered)
+                }
             }
             Picker("Filename", selection: binding(\.filenameHandlingRaw, snapshot: snapshot)) {
                 Text("Append \"-dinky\" suffix").tag("appendSuffix")
@@ -387,13 +452,51 @@ private struct PresetsTab: View {
                 }
             }
         }
+        Section("Watch Folder") {
+            let liveForWatch = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+            Toggle("Watch this folder", isOn: binding(\.watchFolderEnabled, snapshot: snapshot))
+            if liveForWatch.watchFolderEnabled {
+                Picker("Folder", selection: binding(\.watchFolderModeRaw, snapshot: snapshot)) {
+                    Text("Same as destination").tag("destination")
+                    Text("Unique folder…").tag("unique")
+                }
+                if liveForWatch.watchFolderModeRaw == "unique" {
+                    HStack {
+                        Text(liveForWatch.watchFolderPath.isEmpty
+                             ? "No folder selected"
+                             : URL(fileURLWithPath: liveForWatch.watchFolderPath).lastPathComponent)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { pickWatchFolder(for: snapshot) }
+                            .buttonStyle(.bordered)
+                    }
+                }
+                Text("New images added to this folder are automatically compressed using this preset.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
         Section("Advanced") {
             Toggle("Strip metadata", isOn: binding(\.stripMetadata, snapshot: snapshot))
+            Text("Removes EXIF, GPS, camera info, and color profiles. Reduces file size slightly.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Toggle("Sanitize filenames", isOn: binding(\.sanitizeFilenames, snapshot: snapshot))
+            Text("Replaces spaces and special characters to improve cross-platform compatibility.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Toggle("Open folder when done", isOn: binding(\.openFolderWhenDone, snapshot: snapshot))
+            Text("Opens the output folder in Finder after each compression batch.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         Section("Notifications") {
             Toggle("Notify when done", isOn: binding(\.notifyWhenDone, snapshot: snapshot))
+            Text("Sends a macOS notification when a compression batch finishes.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -409,9 +512,38 @@ private struct PresetsTab: View {
     private func deleteSelected() {
         guard let id = selectedID else { return }
         selectedID = nil
+        if prefs.activePresetID == id.uuidString { prefs.activePresetID = "" }
         prefs.savedPresets = prefs.savedPresets.filter { $0.id != id }
         if let next = prefs.savedPresets.last {
             withAnimation { selectedID = next.id }
+        }
+    }
+
+    private func pickWatchFolder(for snapshot: CompressionPreset) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Watch"
+        if panel.runModal() == .OK, let url = panel.url {
+            set(\.watchFolderPath, to: url.path, for: snapshot)
+            if let bookmark = try? url.bookmarkData(options: .withSecurityScope) {
+                set(\.watchFolderBookmark, to: bookmark, for: snapshot)
+            }
+        }
+    }
+
+    private func pickPresetCustomFolder(for snapshot: CompressionPreset) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        if panel.runModal() == .OK, let url = panel.url {
+            set(\.presetCustomFolderPath, to: url.path, for: snapshot)
+            if let bookmark = try? url.bookmarkData(options: .withSecurityScope) {
+                set(\.presetCustomFolderBookmark, to: bookmark, for: snapshot)
+            }
         }
     }
 
@@ -469,6 +601,172 @@ private struct PresetsTab: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture { onSelect(value) }
+            }
+        }
+    }
+}
+
+// MARK: - Watch Folders
+
+private struct WatchFoldersTab: View {
+    @EnvironmentObject var prefs: DinkyPreferences
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Watch a folder", isOn: Binding(
+                    get: { prefs.folderWatchEnabled },
+                    set: { prefs.folderWatchEnabled = $0 }
+                ))
+                if prefs.folderWatchEnabled {
+                    HStack {
+                        Text(prefs.watchedFolderPath.isEmpty
+                             ? "No folder selected"
+                             : URL(fileURLWithPath: prefs.watchedFolderPath).lastPathComponent)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { pickGlobalWatchFolder() }
+                            .buttonStyle(.bordered)
+                    }
+                    Text("New images dropped here are compressed with your current settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Global")
+            }
+
+            Section {
+                if prefs.savedPresets.isEmpty {
+                    Text("No presets yet. Add one in the Presets tab.")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 4)
+                } else {
+                    ForEach(prefs.savedPresets) { preset in
+                        WatchFolderPresetRow(preset: preset)
+                            .environmentObject(prefs)
+                    }
+                }
+            } header: {
+                Text("Presets")
+            }
+        }
+        .formStyle(.grouped)
+        .padding(.top, 8)
+    }
+
+    private func pickGlobalWatchFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Watch"
+        if panel.runModal() == .OK, let url = panel.url {
+            prefs.watchedFolderPath = url.path
+            if let bookmark = try? url.bookmarkData(options: .withSecurityScope) {
+                prefs.watchedFolderBookmark = bookmark
+            }
+        }
+    }
+}
+
+private struct WatchFolderPresetRow: View {
+    @EnvironmentObject var prefs: DinkyPreferences
+    let preset: CompressionPreset
+
+    private var live: CompressionPreset {
+        prefs.savedPresets.first(where: { $0.id == preset.id }) ?? preset
+    }
+
+    var body: some View {
+        Toggle(live.name, isOn: enabledBinding)
+
+        if live.watchFolderEnabled {
+            Picker("Folder", selection: modeBinding) {
+                Text("Same as destination").tag("destination")
+                Text("Unique folder…").tag("unique")
+            }
+            .padding(.leading, 20)
+
+            if live.watchFolderModeRaw == "destination" {
+                HStack {
+                    Text("Resolves to")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(resolvedDestinationLabel)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .padding(.leading, 20)
+            } else {
+                HStack {
+                    Text(live.watchFolderPath.isEmpty
+                         ? "No folder selected"
+                         : URL(fileURLWithPath: live.watchFolderPath).lastPathComponent)
+                        .foregroundStyle(live.watchFolderPath.isEmpty ? .tertiary : .secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button("Choose…") { pickWatchFolder() }
+                        .buttonStyle(.bordered)
+                }
+                .padding(.leading, 20)
+            }
+        }
+    }
+
+    private var resolvedDestinationLabel: String {
+        switch live.saveLocationRaw {
+        case "downloads":
+            return "Downloads"
+        case "custom":
+            return prefs.customFolderDisplayPath.isEmpty
+                ? "Custom folder (not set)"
+                : URL(fileURLWithPath: prefs.customFolderDisplayPath).lastPathComponent
+        case "presetCustom":
+            return live.presetCustomFolderPath.isEmpty
+                ? "Unique output folder (not set)"
+                : URL(fileURLWithPath: live.presetCustomFolderPath).lastPathComponent
+        default:
+            return "Varies — same folder as each source file"
+        }
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { live.watchFolderEnabled },
+            set: { write(\.watchFolderEnabled, $0) }
+        )
+    }
+
+    private var modeBinding: Binding<String> {
+        Binding(
+            get: { live.watchFolderModeRaw },
+            set: { write(\.watchFolderModeRaw, $0) }
+        )
+    }
+
+    private func write<T>(_ kp: WritableKeyPath<CompressionPreset, T>, _ value: T) {
+        guard let idx = prefs.savedPresets.firstIndex(where: { $0.id == preset.id }) else { return }
+        var list = prefs.savedPresets
+        list[idx][keyPath: kp] = value
+        prefs.savedPresets = list
+    }
+
+    private func pickWatchFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Watch"
+        if panel.runModal() == .OK, let url = panel.url {
+            write(\.watchFolderPath, url.path)
+            if let bookmark = try? url.bookmarkData(options: .withSecurityScope) {
+                write(\.watchFolderBookmark, bookmark)
             }
         }
     }

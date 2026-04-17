@@ -27,7 +27,7 @@ struct SidebarView: View {
                             prefs.activePresetID = ""
                         }
                         ForEach(prefs.savedPresets) { preset in
-                            presetRow(id: preset.id.uuidString, name: preset.name, subtitle: preset.format.displayName,
+                            presetRow(id: preset.id.uuidString, name: preset.name, subtitle: preset.autoFormat ? "Auto" : preset.format.displayName,
                                       isActive: prefs.activePresetID == preset.id.uuidString) {
                                 var fmt = selectedFormat
                                 preset.apply(to: prefs, selectedFormat: &fmt)
@@ -154,6 +154,59 @@ struct SidebarView: View {
                     }
                 }
 
+                // ── Quality ───────────────────────────────────────────
+                sectionGroup(icon: "wand.and.stars", title: "Quality") {
+                    let contentOptions: [(String, String, String)] = [
+                        ("Photo", "photo", "Squeezes harder. Best for camera shots and real-world images."),
+                        ("UI",    "ui",    "Stays crisp. Best for screenshots, mockups, and text."),
+                        ("Mixed", "mixed", "Balanced. Good for images that blend photo and UI."),
+                    ]
+                    Toggle("Smart quality", isOn: Binding(
+                        get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
+                    )).font(.caption)
+                    if prefs.smartQuality {
+                        helper("Detects content type per image automatically.")
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                                removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                            ))
+                    } else {
+                        let activeDesc = contentOptions.first(where: { prefs.contentTypeHintRaw == $0.1 })?.2 ?? ""
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3), spacing: 4) {
+                            ForEach(contentOptions, id: \.1) { label, raw, _ in
+                                let active = prefs.contentTypeHintRaw == raw
+                                Text(label)
+                                    .font(.system(size: 11, weight: active ? .semibold : .regular))
+                                    .foregroundStyle(active ? .white : .secondary)
+                                    .padding(.vertical, 4)
+                                    .frame(maxWidth: .infinity)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                            .fill(active
+                                                  ? AnyShapeStyle(LinearGradient(
+                                                        colors: [Color(red: 0.25, green: 0.55, blue: 1.0),
+                                                                 Color(red: 0.45, green: 0.30, blue: 0.95)],
+                                                        startPoint: .leading, endPoint: .trailing))
+                                                  : AnyShapeStyle(Color.primary.opacity(0.08)))
+                                    )
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { prefs.contentTypeHintRaw = raw }
+                            }
+                        }
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                            removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                        ))
+                        if !activeDesc.isEmpty {
+                            Text(activeDesc)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .animation(.easeInOut(duration: 0.15), value: activeDesc)
+                        }
+                    }
+                }
+
                 // ── Performance ───────────────────────────────────────
                 sectionGroup(icon: "cpu", title: "Performance") {
                     let levels: [(String, Int)] = [
@@ -169,16 +222,6 @@ struct SidebarView: View {
 
                 // ── Advanced ──────────────────────────────────────────
                 sectionGroup(icon: "slider.horizontal.3", title: "Advanced") {
-                    Toggle("Smart quality", isOn: Binding(
-                        get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
-                    )).font(.caption)
-                    if prefs.smartQuality {
-                        helper("Auto-picks quality per image. Screenshots stay crisp. Photos squeeze harder.")
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
-                                removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
-                            ))
-                    }
                     Toggle("Strip metadata", isOn: Binding(
                         get: { prefs.stripMetadata }, set: { prefs.stripMetadata = $0 }
                     )).font(.caption)
@@ -210,6 +253,7 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.sanitizeFilenames)
         .animation(.easeInOut(duration: 0.2), value: prefs.manualMode)
         .animation(.easeInOut(duration: 0.2), value: prefs.smartQuality)
+        .animation(.easeInOut(duration: 0.2), value: prefs.contentTypeHintRaw)
         .animation(.easeInOut(duration: 0.2), value: prefs.autoFormat)
         .animation(.easeInOut(duration: 0.2), value: presetActive)
         .animation(.easeInOut(duration: 0.2), value: prefs.stripMetadata)
@@ -221,9 +265,16 @@ struct SidebarView: View {
     private func presetSummary(_ preset: CompressionPreset) -> some View {
         let saveLabel: String = {
             switch preset.saveLocationRaw {
-            case "downloads": return "Downloads folder"
-            case "custom":    return "Custom folder"
-            default:          return "Same folder"
+            case "downloads":    return "Downloads folder"
+            case "custom":
+                return prefs.customFolderDisplayPath.isEmpty
+                    ? "Custom folder"
+                    : URL(fileURLWithPath: prefs.customFolderDisplayPath).lastPathComponent
+            case "presetCustom":
+                return preset.presetCustomFolderPath.isEmpty
+                    ? "Unique folder"
+                    : URL(fileURLWithPath: preset.presetCustomFolderPath).lastPathComponent
+            default:             return "Same folder"
             }
         }()
         let filenameLabel: String = {
@@ -238,9 +289,8 @@ struct SidebarView: View {
             Divider().padding(.top, 6).padding(.bottom, 12)
 
             VStack(alignment: .leading, spacing: 12) {
-                summaryRow("photo", preset.format.displayName)
+                summaryRow("photo", preset.autoFormat ? "Auto" : preset.format.displayName)
                 if preset.smartQuality  { summaryRow("wand.and.stars", "Smart quality") }
-                if preset.autoFormat    { summaryRow("sparkles", "Auto-format") }
                 if preset.maxWidthEnabled {
                     summaryRow("arrow.left.and.right", "Max \(preset.maxWidth) px")
                 } else {

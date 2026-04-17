@@ -68,7 +68,8 @@ actor CompressionService {
         stripMetadata: Bool,
         outputURL: URL,
         moveToTrash: Bool = false,
-        smartQuality: Bool = false
+        smartQuality: Bool = false,
+        contentTypeHint: String = "auto"
     ) async throws -> CompressionResult {
         let originalSize = fileSize(source)
 
@@ -84,7 +85,16 @@ actor CompressionService {
 
         // Step 2: classify for Smart Quality. Always classify the original —
         // resizing doesn't meaningfully change content type and keeps EXIF intact.
-        let detected: ContentType? = smartQuality ? ContentClassifier.classify(source) : nil
+        // smartQuality ON = auto-detect per image. OFF = use explicit hint, or nil (no adjustment).
+        let detected: ContentType? = {
+            if smartQuality { return ContentClassifier.classify(source) }
+            switch contentTypeHint {
+            case "photo": return .photo
+            case "ui":    return .ui
+            case "mixed": return .mixed
+            default:      return nil
+            }
+        }()
 
         // Step 3: compress — lossless formats skip quality targeting
         if format == .png {

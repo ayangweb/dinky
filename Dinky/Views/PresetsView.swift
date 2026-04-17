@@ -43,7 +43,7 @@ struct PresetsView: View {
                     Text(preset.name)
                         .font(.system(size: 11, weight: .medium))
                         .lineLimit(1)
-                    Text(preset.format.displayName)
+                    Text(preset.autoFormat ? "Auto" : preset.format.displayName)
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)
                 }
@@ -106,6 +106,7 @@ struct PresetsView: View {
     }
 
     private func deletePreset(_ preset: CompressionPreset) {
+        if prefs.activePresetID == preset.id.uuidString { prefs.activePresetID = "" }
         prefs.savedPresets = prefs.savedPresets.filter { $0.id != preset.id }
     }
 }

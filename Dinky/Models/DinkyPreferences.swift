@@ -65,7 +65,7 @@ final class DinkyPreferences: ObservableObject {
     }
 
     // MARK: Compression behavior
-    @AppStorage("stripMetadata")        var stripMetadata: Bool = true
+    @AppStorage("stripMetadata")        var stripMetadata: Bool = false
     @AppStorage("preserveTimestamps")   var preserveTimestamps: Bool = true
     @AppStorage("moveOriginalsToTrash") var moveOriginalsToTrash: Bool = false
     @AppStorage("skipAlreadyOptimized") var skipAlreadyOptimized: Bool = true
@@ -86,6 +86,7 @@ final class DinkyPreferences: ObservableObject {
     // MARK: Smart quality
     @AppStorage("smartQuality")         var smartQuality: Bool = true
     @AppStorage("autoFormat")           var autoFormat: Bool = true
+    @AppStorage("contentTypeHint")      var contentTypeHintRaw: String = "auto"
 
     // MARK: Lifetime stats
     @AppStorage("lifetimeSavedBytesRaw") var lifetimeSavedBytesRaw: Double = 0
@@ -110,7 +111,6 @@ final class DinkyPreferences: ObservableObject {
     }
 
     // MARK: Updates
-    @AppStorage("checkForUpdatesOnLaunch") var checkForUpdatesOnLaunch: Bool = true
     @AppStorage("lastUpdateCheck")         var lastUpdateCheck: Double = 0
     @AppStorage("dismissedUpdateVersion")  var dismissedUpdateVersion: String = ""
 

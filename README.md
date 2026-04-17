@@ -16,26 +16,25 @@ Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web 
 
 ## Features
 
-- **Drag and drop** — drop images onto the window, the Dock icon, or the menu bar popover
+- **Drag and drop** — drop images onto the window, the Dock icon, or the file picker
 - **Clipboard compress** — paste a copied image straight into Dinky with ⌘⇧V
 - **Format conversion** — Auto, WebP, AVIF, or lossless PNG; Auto picks the right format per image
-- **Compression presets** — save named presets with format, limits, destination, and filename settings; apply in one click
+- **Compression presets** — save named presets with format, quality, limits, destination, watch folder, and filename settings; apply in one click
 - **Before & after preview** — side-by-side or slider view to compare original and compressed
-- **Menu bar mode** — compact popover from the menu bar, no main window needed
-- **Watch folder** — point Dinky at a folder and new images added are compressed automatically
+- **Watch folder** — point Dinky at a folder and new images added are compressed automatically; global or per-preset with its own folder
 - **Max width** — resize on the way out with common web presets or a custom value
 - **Max file size** — binary-searches the quality level to hit an exact MB target
 - **Batch compression** — multiple files compress concurrently, live results as they finish
 - **Manual mode** — drop files first, then right-click each one to choose format individually
 - **Show in Finder** — jump straight to any compressed file from the results list
 - **PNG lossless** — run oxipng on PNGs when you need to keep transparency or format fidelity
-- **Destination** — save next to the original, to Downloads, or pick a custom folder
+- **Destination** — save next to the original, to Downloads, or pick a custom folder; presets can have their own unique output folder
 - **Performance** — Fast (one at a time) or Fastest (all cores)
 - **Notifications** — get a tap when a batch finishes, with messaging that varies by count and time
-- **Smart quality** — detects photo vs. screenshot per image and picks quality accordingly, so text stays crisp and photos squeeze harder
+- **Smart quality** — auto-detects photo vs. screenshot per image and picks quality accordingly; or force Photo, UI, or Mixed per preset
 - **Session history** — review past compression sessions with file counts and total bytes saved
 - **Apple Shortcuts** — compress images from automations via a native Shortcuts action
-- **Update-aware** — checks GitHub for new releases on every launch so you don't have to
+- **Easy updating** — one click checks for a new release, installs, and relaunches; no browser, no re-drag
 - **Advanced** — strip metadata, sanitize filenames for web, open output folder automatically, move originals to trash
 - **Quirky idle animation** — three choreographed card-drop variants that loop then hold until you come back
 - ~14 MB. Dinky style.
@@ -97,4 +96,4 @@ Or skip that entirely and run this in Terminal:
 xattr -dr com.apple.quarantine /Applications/Dinky.app
 ```
 
-Once installed, Dinky updates itself — no browser, no re-drag, no quarantine step. A banner appears when a new version is out; click **Install Update** and the app downloads, installs, and relaunches on its own.
+Updating Dinky is one click — no browser, no re-drag, no quarantine step. A banner appears when a new version is out; click **Install Update** and the app downloads, installs, and relaunches on its own.
