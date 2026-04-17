@@ -78,9 +78,36 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("sanitizeFilenames")    var sanitizeFilenames: Bool = false
     @AppStorage("manualMode")           var manualMode: Bool = false
     @AppStorage("reduceMotion")         var reduceMotion: Bool = false
+    @AppStorage("menuBarMode")          var menuBarMode: Bool = false
+    @AppStorage("folderWatchEnabled")   var folderWatchEnabled: Bool = false
+    @AppStorage("watchedFolderPath")    var watchedFolderPath: String = ""
+    @AppStorage("watchedFolderBookmark") var watchedFolderBookmark: Data = Data()
 
     // MARK: Smart quality
     @AppStorage("smartQuality")         var smartQuality: Bool = true
+    @AppStorage("autoFormat")           var autoFormat: Bool = false
+
+    // MARK: Lifetime stats
+    @AppStorage("lifetimeSavedBytesRaw") var lifetimeSavedBytesRaw: Double = 0
+    var lifetimeSavedBytes: Int64 {
+        get { Int64(lifetimeSavedBytesRaw) }
+        set { lifetimeSavedBytesRaw = Double(newValue) }
+    }
+
+    // MARK: Presets
+    @AppStorage("activePresetID") var activePresetID: String = ""
+    @AppStorage("savedPresetsData") var savedPresetsData: Data = Data()
+    var savedPresets: [CompressionPreset] {
+        get { (try? JSONDecoder().decode([CompressionPreset].self, from: savedPresetsData)) ?? [] }
+        set { savedPresetsData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
+
+    // MARK: Session history
+    @AppStorage("sessionHistoryData") var sessionHistoryData: Data = Data()
+    var sessionHistory: [SessionRecord] {
+        get { (try? JSONDecoder().decode([SessionRecord].self, from: sessionHistoryData)) ?? [] }
+        set { sessionHistoryData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
 
     // MARK: Updates
     @AppStorage("checkForUpdatesOnLaunch") var checkForUpdatesOnLaunch: Bool = true

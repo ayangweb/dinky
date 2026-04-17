@@ -14,8 +14,11 @@ struct PreferencesView: View {
             OutputTab()
                 .tabItem { Label("Output", systemImage: "folder") }
                 .environmentObject(prefs)
+            PresetsTab()
+                .tabItem { Label("Presets", systemImage: "slider.horizontal.3") }
+                .environmentObject(prefs)
         }
-        .frame(width: 460, height: 360)
+        .frame(width: 480, height: 460)
     }
 }
 
@@ -27,6 +30,28 @@ private struct GeneralTab: View {
 
     var body: some View {
         Form {
+            // 1. How the app behaves at its core
+            Section {
+                Toggle("Manual mode", isOn: Binding(
+                    get: { prefs.manualMode },
+                    set: { prefs.manualMode = $0 }
+                ))
+                Text("Files won't compress on drop — right-click to choose format per file.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Move originals to trash after compressing", isOn: Binding(
+                    get: { prefs.moveOriginalsToTrash },
+                    set: { prefs.moveOriginalsToTrash = $0 }
+                ))
+                Text("Permanent once the trash is emptied.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Behavior")
+            }
+
+            // 2. How compression works
             Section {
                 Toggle("Smart quality", isOn: Binding(
                     get: { prefs.smartQuality },
@@ -52,15 +77,34 @@ private struct GeneralTab: View {
                 Text("Compression")
             }
 
+            // 3. Alerts
             Section {
                 Toggle("Play sound when done", isOn: Binding(
                     get: { prefs.playSoundEffects },
                     set: { prefs.playSoundEffects = $0 }
                 ))
+                Toggle("Notify when done", isOn: Binding(
+                    get: { prefs.notifyWhenDone },
+                    set: { prefs.notifyWhenDone = $0 }
+                ))
             } header: {
                 Text("Notifications")
             }
 
+            // 4. App modes
+            Section {
+                Toggle("Menu bar mode", isOn: Binding(
+                    get: { prefs.menuBarMode },
+                    set: { prefs.menuBarMode = $0 }
+                ))
+                Text("Adds a Dinky icon to the menu bar. Drop images onto it to compress without opening the main window.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Menu Bar")
+            }
+
+            // 5. Accessibility
             Section {
                 Toggle("Reduce motion", isOn: Binding(
                     get: { prefs.reduceMotion },
@@ -73,6 +117,7 @@ private struct GeneralTab: View {
                 Text("Accessibility")
             }
 
+            // 6. Updates
             Section {
                 Toggle("Check for updates automatically", isOn: Binding(
                     get: { prefs.checkForUpdatesOnLaunch },
@@ -152,9 +197,46 @@ private struct OutputTab: View {
             } header: {
                 Text("Filename")
             }
+
+            Section {
+                Toggle("Auto-watch folder", isOn: Binding(
+                    get: { prefs.folderWatchEnabled },
+                    set: { prefs.folderWatchEnabled = $0 }
+                ))
+
+                if prefs.folderWatchEnabled {
+                    HStack {
+                        Text(prefs.watchedFolderPath.isEmpty
+                             ? "No folder selected"
+                             : URL(fileURLWithPath: prefs.watchedFolderPath).lastPathComponent)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { pickWatchFolder() }
+                            .buttonStyle(.bordered)
+                    }
+                    Text("New images added to this folder are automatically compressed.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Watch Folder")
+            }
         }
         .formStyle(.grouped)
         .padding(.top, 8)
+    }
+
+    private func pickWatchFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Watch"
+        if panel.runModal() == .OK, let url = panel.url {
+            prefs.watchedFolderPath = url.path
+        }
     }
 
     private func pickCustomFolder() {
@@ -170,5 +252,156 @@ private struct OutputTab: View {
             }
             prefs.saveLocation = .custom
         }
+    }
+}
+
+// MARK: - Presets
+
+private struct PresetsTab: View {
+    @EnvironmentObject var prefs: DinkyPreferences
+    @State private var selectedID: UUID? = nil
+
+    private var selectedIndex: Int? {
+        prefs.savedPresets.firstIndex { $0.id == selectedID }
+    }
+
+    var body: some View {
+        Form {
+            presetListSection
+            if let idx = selectedIndex { presetDetailSections(idx) }
+        }
+        .formStyle(.grouped)
+        .animation(.easeInOut(duration: 0.2), value: selectedID)
+    }
+
+    private var presetListSection: some View {
+        Section {
+            if prefs.savedPresets.isEmpty {
+                Text("No presets yet. Click Add to create one.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(prefs.savedPresets) { preset in
+                    Button {
+                        withAnimation { selectedID = (selectedID == preset.id) ? nil : preset.id }
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(preset.name).foregroundStyle(.primary)
+                                Text(preset.format.displayName)
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if selectedID == preset.id {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Color.accentColor)
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            HStack(spacing: 12) {
+                Button { addPreset() } label: { Label("Add", systemImage: "plus") }
+                if selectedID != nil {
+                    Button(role: .destructive) { deleteSelected() } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+                Spacer()
+            }
+            .buttonStyle(.borderless)
+        } header: {
+            Text("Presets")
+        }
+    }
+
+    @ViewBuilder
+    private func presetDetailSections(_ idx: Int) -> some View {
+        Section("Name") {
+            TextField("Preset name", text: binding(\.name, at: idx))
+        }
+        Section("Format") {
+            Picker("Format", selection: binding(\.format, at: idx)) {
+                Text("WebP").tag(CompressionFormat.webp)
+                Text("AVIF").tag(CompressionFormat.avif)
+                Text("PNG").tag(CompressionFormat.png)
+            }
+            .pickerStyle(.segmented)
+            Toggle("Smart quality", isOn: binding(\.smartQuality, at: idx))
+            Toggle("Auto-format", isOn: binding(\.autoFormat, at: idx))
+        }
+        Section("Limits") {
+            HStack {
+                Toggle("Max width", isOn: binding(\.maxWidthEnabled, at: idx))
+                Spacer()
+                if prefs.savedPresets[idx].maxWidthEnabled {
+                    TextField("", value: binding(\.maxWidth, at: idx), format: .number).frame(width: 70)
+                    Text("px").foregroundStyle(.secondary)
+                }
+            }
+            HStack {
+                Toggle("Max file size", isOn: binding(\.maxFileSizeEnabled, at: idx))
+                Spacer()
+                if prefs.savedPresets[idx].maxFileSizeEnabled {
+                    TextField("", value: binding(\.maxFileSizeKB, at: idx), format: .number).frame(width: 70)
+                    Text("KB").foregroundStyle(.secondary)
+                }
+            }
+        }
+        Section("Destination") {
+            Picker("Save to", selection: binding(\.saveLocationRaw, at: idx)) {
+                Text("Same folder as original").tag("sameFolder")
+                Text("Downloads folder").tag("downloads")
+                Text("Custom folder (set in Output)").tag("custom")
+            }
+            Picker("Filename", selection: binding(\.filenameHandlingRaw, at: idx)) {
+                Text("Append \"-dinky\" suffix").tag("appendSuffix")
+                Text("Replace original").tag("replaceOrigin")
+                Text("Custom suffix").tag("customSuffix")
+            }
+            if prefs.savedPresets[idx].filenameHandlingRaw == "customSuffix" {
+                HStack {
+                    Text("Suffix").foregroundStyle(.secondary)
+                    TextField("-dinky", text: binding(\.customSuffix, at: idx))
+                }
+            }
+        }
+        Section("Advanced") {
+            Toggle("Strip metadata", isOn: binding(\.stripMetadata, at: idx))
+            Toggle("Sanitize filenames", isOn: binding(\.sanitizeFilenames, at: idx))
+            Toggle("Open folder when done", isOn: binding(\.openFolderWhenDone, at: idx))
+        }
+        Section("Notifications") {
+            Toggle("Notify when done", isOn: binding(\.notifyWhenDone, at: idx))
+        }
+    }
+
+    private func addPreset() {
+        let count = prefs.savedPresets.count + 1
+        let preset = CompressionPreset(name: "Preset \(count)", from: prefs, format: .webp)
+        var list = prefs.savedPresets
+        list.append(preset)
+        prefs.savedPresets = list
+        withAnimation { selectedID = preset.id }
+    }
+
+    private func deleteSelected() {
+        guard let id = selectedID else { return }
+        prefs.savedPresets = prefs.savedPresets.filter { $0.id != id }
+        selectedID = prefs.savedPresets.last?.id
+    }
+
+    private func binding<T>(_ keyPath: WritableKeyPath<CompressionPreset, T>, at idx: Int) -> Binding<T> {
+        Binding(
+            get: { prefs.savedPresets[idx][keyPath: keyPath] },
+            set: {
+                var presets = prefs.savedPresets
+                presets[idx][keyPath: keyPath] = $0
+                prefs.savedPresets = presets
+            }
+        )
     }
 }

@@ -8,6 +8,7 @@ enum DropZonePhase: Equatable {
 struct DropZoneView: View {
     var phase: DropZonePhase
     let onOpenPanel: () -> Void
+    var onPaste: () -> Void = {}
     var onLoop: () -> Void = {}
 
     @EnvironmentObject var prefs: DinkyPreferences
@@ -118,6 +119,13 @@ struct DropZoneView: View {
                     .font(.title3).foregroundStyle(.primary)
                 Text("or click to browse")
                     .font(.caption).foregroundStyle(.secondary)
+                Button(action: onPaste) {
+                    Text("or paste (⌘⇧V)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
             }
         case .hovering:
             Text("Release to compress")
@@ -147,7 +155,7 @@ struct DropZoneView: View {
 
 // MARK: - Static card stack (reduce motion)
 
-private struct StaticCardStack: View {
+struct StaticCardStack: View {
     private let themes: [(Color, Color)] = [
         (Color(red: 0.28, green: 0.56, blue: 1.00), Color(red: 0.52, green: 0.28, blue: 0.96)),
         (Color(red: 0.96, green: 0.42, blue: 0.28), Color(red: 0.98, green: 0.74, blue: 0.18)),
@@ -182,9 +190,10 @@ private struct StaticCardStack: View {
 
 // MARK: - Animated idle
 
-private struct IdleAnimation: View {
+struct IdleAnimation: View {
 
     var onLoop: () -> Void = {}
+    var landingOffset: CGSize = CGSize(width: 0, height: -80)
 
     @State private var animationID  : UUID    = UUID()
     @State private var finished     : Bool    = false
@@ -505,7 +514,7 @@ private struct IdleAnimation: View {
     // MARK: - Helpers
 
     /// Where the cursor and cards land — above the centred label text
-    private var landing: CGSize { CGSize(width: 0, height: -80) }
+    private var landing: CGSize { landingOffset }
 
     /// Scale travel duration to window size — bigger window = slightly longer drag
     private func travelDuration() -> Double {

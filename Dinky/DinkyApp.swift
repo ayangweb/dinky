@@ -6,15 +6,26 @@ struct DinkyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var prefs = DinkyPreferences()
     @StateObject private var updater = UpdateChecker()
+    @StateObject private var menuBarController = MenuBarController()
+    // ContentViewModel lives here so the menu bar popover shares state with the main window.
+    // prefs is injected via ContentView.init on first render so both share the same instance.
+    @StateObject private var vm = ContentViewModel(prefs: DinkyPreferences())
 
     var body: some Scene {
         WindowGroup {
-            ContentView(prefs: prefs)
+            ContentView(prefs: prefs, vm: vm)
                 .environmentObject(prefs)
                 .environmentObject(updater)
                 .background(.ultraThinMaterial)        // frosted glass fill
                 .background(TransparentWindow())       // makes NSWindow itself see-through
                 .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+                .onChange(of: prefs.menuBarMode) { _, enabled in
+                    if enabled { menuBarController.enable(vm: vm, prefs: prefs) }
+                    else { menuBarController.disable() }
+                }
+                .onAppear {
+                    if prefs.menuBarMode { menuBarController.enable(vm: vm, prefs: prefs) }
+                }
         }
         .windowStyle(.titleBar)
         .windowResizability(.contentMinSize)
@@ -30,6 +41,11 @@ struct DinkyApp: App {
                     NotificationCenter.default.post(name: .dinkyOpenPanel, object: nil)
                 }
                 .keyboardShortcut("o", modifiers: .command)
+
+                Button("Compress from Clipboard") {
+                    NotificationCenter.default.post(name: .dinkyPasteClipboard, object: nil)
+                }
+                .keyboardShortcut("v", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .appInfo) {
                 Button("About Dinky") {
@@ -39,6 +55,9 @@ struct DinkyApp: App {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
                     NotificationCenter.default.post(name: .dinkyCheckUpdates, object: nil)
+                }
+                Button("History…") {
+                    NotificationCenter.default.post(name: .dinkyShowHistory, object: nil)
                 }
             }
         }

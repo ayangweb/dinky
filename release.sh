@@ -67,6 +67,12 @@ create-dmg \
   "Dinky-$VERSION.dmg" \
   "build/Build/Products/Release/Dinky.app"
 
+echo "→ Creating Dinky-$VERSION.zip (for in-app updater)…"
+rm -f "Dinky-$VERSION.zip"
+ditto -c -k --sequesterRsrc --keepParent \
+  "build/Build/Products/Release/Dinky.app" \
+  "Dinky-$VERSION.zip"
+
 # ── 5. Commit, tag, push, release ────────────────────────────────────────────
 
 echo "→ Committing…"
@@ -82,7 +88,8 @@ git push origin "v$VERSION"
 gh release create "v$VERSION" \
   --title "Dinky $VERSION" \
   --notes-file - \
-  "Dinky-$VERSION.dmg" << NOTES
+  "Dinky-$VERSION.dmg" \
+  "Dinky-$VERSION.zip" << NOTES
 ## What's new
 
 <!-- describe what changed -->

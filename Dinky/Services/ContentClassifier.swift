@@ -29,6 +29,14 @@ enum ContentType: String {
         case .mixed: return "mixed"
         }
     }
+
+    var tooltipLabel: String {
+        switch self {
+        case .photo: return "Detected as a photo — compressed more aggressively"
+        case .ui:    return "Detected as a screenshot or UI — quality preserved to keep text crisp"
+        case .mixed: return "Mixed content — balanced compression applied"
+        }
+    }
 }
 
 enum ContentClassifier {

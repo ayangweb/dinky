@@ -2,20 +2,32 @@ import SwiftUI
 
 struct ResultsRowView: View {
     @ObservedObject var item: ImageItem
+    let selectedFormat: CompressionFormat
+    @EnvironmentObject var prefs: DinkyPreferences
     @State private var showingError = false
+    @State private var showingPreview = false
 
     var body: some View {
         HStack(spacing: 12) {
-            FileTypeIcon(ext: item.sourceURL.pathExtension)
-
             HStack(spacing: 6) {
-                Text(item.filename)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
                 if let type = item.detectedContentType {
                     contentTypeChip(type)
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                        .fixedSize()
+                        .help(type.tooltipLabel)
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.filename)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if case .pending = item.status {
+                        Text(prefs.outputURL(for: item.sourceURL, format: item.formatOverride ?? selectedFormat).lastPathComponent)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -30,6 +42,9 @@ struct ResultsRowView: View {
             if case .failed(let error) = item.status {
                 ErrorDetailView(filename: item.filename, error: error)
             }
+        }
+        .sheet(isPresented: $showingPreview) {
+            ImagePreviewSheet(item: item)
         }
     }
 
@@ -63,6 +78,7 @@ struct ResultsRowView: View {
         switch item.status {
         case .pending:
             chip("Queued", color: .secondary.opacity(0.35), fg: .primary)
+                .help("Waiting to compress")
 
         case .processing:
             HStack(spacing: 5) {
@@ -71,25 +87,46 @@ struct ResultsRowView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            .help("Compression in progress")
 
         case .done(let outputURL, _, _):
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([outputURL])
-            } label: {
-                Text("Show in Finder")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+            HStack(spacing: 6) {
+                Button {
+                    showingPreview = true
+                } label: {
+                    Image(systemName: "eye")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+                }
+                .buttonStyle(.plain)
+                .help("Preview before and after")
+
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                } label: {
+                    Text("Show in Finder")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+                }
+                .buttonStyle(.plain)
+                .help("Reveal compressed file in Finder")
             }
-            .buttonStyle(.plain)
 
         case .skipped:
             chip("Skipped", color: .secondary.opacity(0.35), fg: .primary)
+                .help("File was already optimized — savings would be less than 2%")
 
         case .zeroGain:
             chip("No gain", color: .secondary.opacity(0.35), fg: .primary)
+                .help("Compressed version was larger than the original — original kept")
 
         case .failed:
             Button { showingError = true } label: {
@@ -106,6 +143,7 @@ struct ResultsRowView: View {
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
+            .help("Click to see error details")
         }
     }
 
@@ -124,20 +162,13 @@ struct ResultsRowView: View {
     // It's secondary info — colors are soft so the row's primary content still leads.
     @ViewBuilder
     private func contentTypeChip(_ type: ContentType) -> some View {
-        let (bg, fg): (Color, Color) = {
-            switch type {
-            case .photo: return (Color.orange.opacity(0.14), Color.orange)
-            case .ui:    return (Color.blue.opacity(0.14),   Color.blue)
-            case .mixed: return (Color.secondary.opacity(0.18), Color.secondary)
-            }
-        }()
         Text(type.label)
             .font(.system(size: 9, weight: .semibold).lowercaseSmallCaps())
-            .foregroundStyle(fg)
+            .foregroundStyle(Color.secondary)
             .padding(.horizontal, 5)
             .padding(.vertical, 1.5)
             .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(bg)
+                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(0.08))
             )
     }
 

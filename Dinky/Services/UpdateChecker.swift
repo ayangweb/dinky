@@ -84,13 +84,15 @@ final class UpdateChecker: ObservableObject {
                 return .upToDate
             }
 
-            // Find the DMG asset (fallback to first asset if somehow not named .dmg).
-            let dmg = release.assets.first(where: { $0.name.lowercased().hasSuffix(".dmg") })
-                   ?? release.assets.first
+            // Prefer the zip for in-app install (no hdiutil, no Gatekeeper scan).
+            // Fall back to DMG if zip isn't present (older releases).
+            let asset = release.assets.first(where: { $0.name.lowercased().hasSuffix(".zip") })
+                     ?? release.assets.first(where: { $0.name.lowercased().hasSuffix(".dmg") })
+                     ?? release.assets.first
 
             availableVersion = remote
             releaseURL = URL(string: release.html_url)
-            downloadURL = dmg.flatMap { URL(string: $0.browser_download_url) }
+            downloadURL = asset.flatMap { URL(string: $0.browser_download_url) }
             return .updateAvailable(version: remote)
         } catch {
             // Silent failure is intentional for automatic checks. Callers can
@@ -101,72 +103,57 @@ final class UpdateChecker: ObservableObject {
 
     // MARK: - In-app install
 
-    /// Downloads the DMG via URLSession (no quarantine added), mounts it,
+    /// Downloads the zip via URLSession (no quarantine), unzips with ditto,
     /// copies Dinky.app over itself, then relaunches from the new binary.
     func downloadAndInstall() async {
-        guard let dmgURL = downloadURL else { return }
+        guard let assetURL = downloadURL else { return }
         installState = .downloading(progress: 0)
 
         do {
             // ── 1. Download ───────────────────────────────────────────
-            let tempDMG = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Dinky-update.dmg")
+            let fm = FileManager.default
+            let tmp = fm.temporaryDirectory
+            let ext = assetURL.pathExtension.lowercased()
+            let tempFile = tmp.appendingPathComponent("Dinky-update.\(ext)")
 
-            let (asyncBytes, response) = try await URLSession.shared.bytes(from: dmgURL)
-            let total = (response as? HTTPURLResponse)?
-                .value(forHTTPHeaderField: "Content-Length")
-                .flatMap(Int64.init) ?? 0
+            let (downloadedURL, _) = try await URLSession.shared.download(from: assetURL)
+            _ = try? fm.removeItem(at: tempFile)
+            try fm.moveItem(at: downloadedURL, to: tempFile)
 
-            var received: Int64 = 0
-            var lastUIUpdate: Int64 = 0
-            let updateInterval: Int64 = 128 * 1024  // update UI every 128 KB
-            var buffer = Data()
-            if total > 0 { buffer.reserveCapacity(Int(total)) }
-
-            for try await byte in asyncBytes {
-                buffer.append(byte)
-                received += 1
-                if total > 0 && (received - lastUIUpdate) >= updateInterval {
-                    lastUIUpdate = received
-                    installState = .downloading(progress: Double(received) / Double(total))
-                }
-            }
-            // Final progress tick so the bar reaches 100% before switching to installing
-            if total > 0 { installState = .downloading(progress: 1.0) }
-            try buffer.write(to: tempDMG)
-
-            // ── 2. Mount ──────────────────────────────────────────────
+            // ── 2. Install ────────────────────────────────────────────
             installState = .installing
-            let mountOut = try await shell("/usr/bin/hdiutil",
-                                           ["attach", tempDMG.path,
-                                            "-nobrowse", "-noautoopen", "-readonly"])
+            let dest = Bundle.main.bundleURL
 
-            // hdiutil prints lines like: /dev/diskX  <type>  /Volumes/Name
-            guard let mountPoint = mountOut
-                .components(separatedBy: "\n")
-                .first(where: { $0.contains("/Volumes/") })?
-                .components(separatedBy: "\t")
-                .last?
-                .trimmingCharacters(in: .whitespaces),
-                  !mountPoint.isEmpty
-            else { throw UpdateError.mountFailed }
+            if ext == "zip" {
+                // Unzip into a temp dir — no hdiutil, no Gatekeeper disk-image scan.
+                let unzipDir = tmp.appendingPathComponent("Dinky-update-extracted")
+                _ = try? fm.removeItem(at: unzipDir)
+                try await shell("/usr/bin/ditto", ["-xk", tempFile.path, unzipDir.path])
+                let source = unzipDir.appendingPathComponent("Dinky.app")
+                _ = try? fm.removeItem(at: dest)
+                try await shell("/usr/bin/ditto", [source.path, dest.path])
+                try? fm.removeItem(at: unzipDir)
+            } else {
+                // Fallback: DMG path for older releases.
+                let mountOut = try await shell("/usr/bin/hdiutil",
+                                               ["attach", tempFile.path,
+                                                "-nobrowse", "-noautoopen", "-readonly"])
+                guard let mountPoint = mountOut
+                    .components(separatedBy: "\n")
+                    .first(where: { $0.contains("/Volumes/") })?
+                    .components(separatedBy: "\t")
+                    .last?
+                    .trimmingCharacters(in: .whitespaces),
+                      !mountPoint.isEmpty
+                else { throw UpdateError.mountFailed }
+                let source = URL(fileURLWithPath: mountPoint).appendingPathComponent("Dinky.app")
+                _ = try? fm.removeItem(at: dest)
+                try await shell("/usr/bin/ditto", [source.path, dest.path])
+                _ = try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
+            }
+            try? fm.removeItem(at: tempFile)
 
-            // ── 3. Copy app over itself ───────────────────────────────
-            let source = URL(fileURLWithPath: mountPoint).appendingPathComponent("Dinky.app")
-            let dest   = Bundle.main.bundleURL  // replace the running app in-place
-
-            // Remove the old bundle first so ditto gets a clean destination.
-            _ = try? FileManager.default.removeItem(at: dest)
-            // ditto is the correct macOS tool for copying .app bundles —
-            // preserves HFS+ metadata and resource forks, no quarantine added.
-            try await shell("/usr/bin/ditto", [source.path, dest.path])
-
-            // ── 4. Detach ─────────────────────────────────────────────
-            _ = try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
-            try? FileManager.default.removeItem(at: tempDMG)
-
-            // ── 5. Relaunch ───────────────────────────────────────────
-            // Small delay so this process can finish tearing down cleanly.
+            // ── 3. Relaunch ───────────────────────────────────────────
             let appPath = dest.path
             Process.launchedProcess(launchPath: "/bin/sh",
                                     arguments: ["-c", "sleep 0.6 && open '\(appPath)'"])

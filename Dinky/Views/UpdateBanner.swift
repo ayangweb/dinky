@@ -33,10 +33,8 @@ struct UpdateBanner: View {
                         Text("v\(updater.availableVersion ?? "")").fontWeight(.semibold)
                         Text(" is available").foregroundStyle(.secondary)
                     }
-                case .downloading(let progress):
-                    Text(progress > 0
-                         ? "Downloading… \(Int(progress * 100))%"
-                         : "Downloading…")
+                case .downloading:
+                    Text("Downloading…")
                         .foregroundStyle(.secondary)
                 case .installing:
                     Text("Installing…").foregroundStyle(.secondary)

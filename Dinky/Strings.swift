@@ -6,6 +6,8 @@ extension Notification.Name {
     static let dinkyOpenPanel     = Notification.Name("dinkyOpenPanel")
     static let dinkyOpenFiles     = Notification.Name("dinkyOpenFiles")
     static let dinkyCheckUpdates  = Notification.Name("dinkyCheckUpdates")
+    static let dinkyPasteClipboard  = Notification.Name("dinkyPasteClipboard")
+    static let dinkyShowHistory     = Notification.Name("dinkyShowHistory")
 }
 
 enum S {

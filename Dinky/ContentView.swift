@@ -11,7 +11,7 @@ final class ContentViewModel: ObservableObject {
     private var compressionStartTime: Date = .now
 
     var selectedFormat: CompressionFormat
-    let prefs: DinkyPreferences
+    var prefs: DinkyPreferences
 
     init(prefs: DinkyPreferences) {
         self.prefs = prefs
@@ -33,14 +33,36 @@ final class ContentViewModel: ObservableObject {
         compress()
     }
 
+    func recompress(_ item: ImageItem, as format: CompressionFormat) {
+        item.formatOverride = format
+        item.status = .pending
+        compress()
+    }
+
     func clear() {
+        cleanupPasteTemps(for: items)
         items = []
         phase = .idle
     }
 
     func remove(_ item: ImageItem) {
+        cleanupPasteTemps(for: [item])
         items.removeAll { $0.id == item.id }
         if items.isEmpty { phase = .idle }
+    }
+
+    func pasteClipboard() {
+        guard let url = ClipboardImporter.importFromClipboard() else { return }
+        addAndCompress([url])
+    }
+
+    private func cleanupPasteTemps(for targets: [ImageItem]) {
+        let tmp = FileManager.default.temporaryDirectory.path
+        for item in targets {
+            if item.sourceURL.path.hasPrefix(tmp) {
+                try? FileManager.default.removeItem(at: item.sourceURL)
+            }
+        }
     }
 
     // MARK: - Compress
@@ -71,6 +93,24 @@ final class ContentViewModel: ObservableObject {
             await MainActor.run {
                 self.isProcessing = false
                 self.phase = .done
+                let batchSaved = self.items.reduce(Int64(0)) { $0 + $1.savedBytes }
+                self.prefs.lifetimeSavedBytes += batchSaved
+
+                let doneCount = self.items.filter { if case .done = $0.status { return true }; return false }.count
+                if doneCount > 0 {
+                    let formats = Array(Set(self.items.compactMap { item -> String? in
+                        guard case .done = item.status else { return nil }
+                        return (item.formatOverride ?? self.selectedFormat).displayName
+                    })).sorted()
+                    let record = SessionRecord(id: UUID(), timestamp: .now,
+                                              fileCount: doneCount,
+                                              totalBytesSaved: batchSaved,
+                                              formats: formats)
+                    var history = self.prefs.sessionHistory
+                    history.insert(record, at: 0)
+                    self.prefs.sessionHistory = Array(history.prefix(50))
+                }
+
                 if self.prefs.playSoundEffects { self.playCompletionSound() }
 
                 let elapsed = Date.now.timeIntervalSince(self.compressionStartTime)
@@ -90,7 +130,12 @@ final class ContentViewModel: ObservableObject {
     }
 
     private func compressItem(_ item: ImageItem, goals: CompressionGoals) async {
-        let format = item.formatOverride ?? selectedFormat
+        var format = item.formatOverride ?? selectedFormat
+        if prefs.autoFormat && item.formatOverride == nil {
+            let ct = ContentClassifier.classify(item.sourceURL)
+            await MainActor.run { item.detectedContentType = ct }
+            format = ct == .photo ? .avif : .webp
+        }
 
         // PNG lossless only accepts PNG inputs — suggest alternatives for other formats
         if format == .png && item.sourceURL.pathExtension.lowercased() != "png" {
@@ -211,14 +256,18 @@ struct PNGInputError: LocalizedError {
 struct ContentView: View {
     @EnvironmentObject var prefs: DinkyPreferences
     @EnvironmentObject var updater: UpdateChecker
-    @StateObject private var vm: ContentViewModel
+    @ObservedObject var vm: ContentViewModel
+    @StateObject private var folderWatcher = FolderWatcher()
     @State private var sidebarVisible = false
     @State private var isDropTargeted  = false
     @State private var idleLoop        = 0
     @State private var selectedIDs: Set<UUID> = []
+    @State private var showingHistory  = false
 
-    init(prefs: DinkyPreferences) {
-        _vm = StateObject(wrappedValue: ContentViewModel(prefs: prefs))
+    init(prefs: DinkyPreferences, vm: ContentViewModel) {
+        self.vm = vm
+        // Sync vm's prefs reference on init so it reads the shared UserDefaults instance
+        vm.prefs = prefs
     }
 
     // Merge hover state with the vm phase so DropZoneView stays purely visual
@@ -236,7 +285,7 @@ struct ContentView: View {
                         .environmentObject(prefs)
                 }
                 if vm.isEmpty {
-                    DropZoneView(phase: dropPhase, onOpenPanel: openPanel, onLoop: { idleLoop += 1 })
+                    DropZoneView(phase: dropPhase, onOpenPanel: openPanel, onPaste: { vm.pasteClipboard() }, onLoop: { idleLoop += 1 })
                 } else {
                     resultsList
                 }
@@ -282,6 +331,15 @@ struct ContentView: View {
             guard let urls = note.object as? [URL] else { return }
             vm.addAndCompress(urls)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .dinkyPasteClipboard)) { _ in
+            vm.pasteClipboard()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dinkyShowHistory)) { _ in
+            showingHistory = true
+        }
+        .sheet(isPresented: $showingHistory) {
+            HistorySheet().environmentObject(prefs)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .dinkyCheckUpdates)) { _ in
             Task {
                 let result = await updater.check(manual: true)
@@ -295,13 +353,16 @@ struct ContentView: View {
                 await updater.check()
             }
         }
+        .onAppear { updateFolderWatcher() }
+        .onChange(of: prefs.folderWatchEnabled) { _, _ in updateFolderWatcher() }
+        .onChange(of: prefs.watchedFolderPath)  { _, _ in updateFolderWatcher() }
     }
 
     // MARK: - Results list
 
     private var resultsList: some View {
         List(vm.items, id: \.id, selection: $selectedIDs) { item in
-            ResultsRowView(item: item)
+            ResultsRowView(item: item, selectedFormat: vm.selectedFormat)
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.visible)
                 .listRowSeparatorTint(.primary.opacity(0.08))
@@ -314,7 +375,9 @@ struct ContentView: View {
                     return NSItemProvider(contentsOf: url) ?? NSItemProvider()
                 }
                 .contextMenu {
-                    if case .pending = item.status {
+                    if case .processing = item.status {
+                        EmptyView()
+                    } else if case .pending = item.status {
                         let targets = selectedIDs.contains(item.id)
                             ? vm.items.filter { selectedIDs.contains($0.id) }
                             : [item]
@@ -326,6 +389,17 @@ struct ContentView: View {
                         }
                         Button { vm.compressItems(targets, format: .png) } label: {
                             Label("Compress as PNG", systemImage: "photo")
+                        }
+                        Divider()
+                    } else {
+                        Button { vm.recompress(item, as: .webp) } label: {
+                            Label("Re-compress as WebP", systemImage: "photo")
+                        }
+                        Button { vm.recompress(item, as: .avif) } label: {
+                            Label("Re-compress as AVIF", systemImage: "photo")
+                        }
+                        Button { vm.recompress(item, as: .png) } label: {
+                            Label("Re-compress as PNG", systemImage: "photo")
                         }
                         Divider()
                     }
@@ -360,9 +434,14 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .animation(.easeInOut, value: vm.phase)
 
-            if !vm.isEmpty {
-                HStack {
-                    Spacer()
+            HStack {
+                if prefs.lifetimeSavedBytes > 0 {
+                    Text(lifetimeSavingsText)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer()
+                if !vm.isEmpty {
                     Button("Clear All") { vm.clear() }
                         .buttonStyle(.plain)
                         .font(.caption)
@@ -373,6 +452,12 @@ struct ContentView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .adaptiveGlass(in: RoundedRectangle(cornerRadius: 0, style: .continuous))
+    }
+
+    private var lifetimeSavingsText: String {
+        let mb = Double(prefs.lifetimeSavedBytes) / 1_048_576
+        if mb >= 1024 { return String(format: "%.1f GB saved", mb / 1024) }
+        return String(format: "%.0f MB saved", mb)
     }
 
     private var statusText: String {
@@ -428,6 +513,16 @@ struct ContentView: View {
                 .compactMap { $0 as? URL } ?? [])
             : [url]
         return urls.filter { ["jpg","jpeg","png","webp","avif","tiff","bmp"].contains($0.pathExtension.lowercased()) }
+    }
+
+    // MARK: - Folder watcher
+
+    private func updateFolderWatcher() {
+        guard prefs.folderWatchEnabled, !prefs.watchedFolderPath.isEmpty else {
+            folderWatcher.stop(); return
+        }
+        folderWatcher.onNewFiles = { urls in vm.addAndCompress(urls) }
+        folderWatcher.start(at: prefs.watchedFolderPath)
     }
 
     // MARK: - Open panel
