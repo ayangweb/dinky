@@ -5,9 +5,9 @@ A small macOS utility that compresses images. Drop files in, get smaller ones ba
 Supports JPG, PNG, WebP, and AVIF. Outputs WebP, AVIF, or lossless PNG depending on your preference. Strips metadata, respects max dimensions and file size targets, and saves next to the original by default.
 
 <p align="center">
-  <img src="Screenshots/screenshot-drop-zone.png" width="32%" alt="Drop zone idle state" />
-  <img src="Screenshots/screenshot-sidebar-format.png" width="32%" alt="Sidebar — format and destination" />
-  <img src="Screenshots/screenshot-sidebar-advanced.png" width="32%" alt="Sidebar — performance and advanced" />
+  <img src="site/screenshots/screenshot-drop-zone.webp" width="32%" alt="Drop zone idle state" />
+  <img src="site/screenshots/screenshot-sidebar-presets.webp" width="32%" alt="Sidebar — format and presets" />
+  <img src="site/screenshots/screenshot-preset-selected.webp" width="32%" alt="Preset selected with settings summary" />
 </p>
 
 ## About the developer
@@ -16,20 +16,26 @@ Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web 
 
 ## Features
 
-- **Drag and drop** — drop images straight onto the window, or use the file picker
-- **Format conversion** — outputs WebP, AVIF, or lossless PNG depending on your preference
+- **Drag and drop** — drop images onto the window, the Dock icon, or the menu bar popover
+- **Clipboard compress** — paste a copied image straight into Dinky with ⌘⇧V
+- **Format conversion** — Auto, WebP, AVIF, or lossless PNG; Auto picks the right format per image
+- **Compression presets** — save named presets with format, limits, destination, and filename settings; apply in one click
+- **Before & after preview** — side-by-side or slider view to compare original and compressed
+- **Menu bar mode** — compact popover from the menu bar, no main window needed
+- **Watch folder** — point Dinky at a folder and new images added are compressed automatically
 - **Max width** — resize on the way out with common web presets or a custom value
-- **Max file size** — binary-searches the quality level to hit an exact KB/MB target
+- **Max file size** — binary-searches the quality level to hit an exact MB target
 - **Batch compression** — multiple files compress concurrently, live results as they finish
+- **Manual mode** — drop files first, then right-click each one to choose format individually
 - **Show in Finder** — jump straight to any compressed file from the results list
-- **Finder-like selection** — click, cmd+click, shift+click, double-click to open, drag to anywhere
-- **PNG lossless** — run oxipng on PNGs when you need to keep the format (transparency, UI assets, etc.)
-- **Manual mode** — drop files first, then right-click each one to choose WebP, AVIF, or PNG individually
-- **Destination** — save next to the original or pick a custom folder
+- **PNG lossless** — run oxipng on PNGs when you need to keep transparency or format fidelity
+- **Destination** — save next to the original, to Downloads, or pick a custom folder
 - **Performance** — Fast (one at a time) or Fastest (all cores)
 - **Notifications** — get a tap when a batch finishes, with messaging that varies by count and time
 - **Smart quality** — detects photo vs. screenshot per image and picks quality accordingly, so text stays crisp and photos squeeze harder
-- **Update-aware** — checks GitHub for new releases on launch so you don't have to
+- **Session history** — review past compression sessions with file counts and total bytes saved
+- **Apple Shortcuts** — compress images from automations via a native Shortcuts action
+- **Update-aware** — checks GitHub for new releases on every launch so you don't have to
 - **Advanced** — strip metadata, sanitize filenames for web, open output folder automatically, move originals to trash
 - **Quirky idle animation** — three choreographed card-drop variants that loop then hold until you come back
 - ~12 MB. Dinky style.
