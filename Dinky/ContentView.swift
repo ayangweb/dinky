@@ -353,7 +353,11 @@ struct ContentView: View {
                 await updater.check(skipThrottle: true)
             }
         }
-        .onAppear { updateFolderWatcher() }
+        .onAppear {
+            prefs.maxWidthEnabled = false
+            prefs.maxFileSizeEnabled = false
+            updateFolderWatcher()
+        }
         .onChange(of: prefs.folderWatchEnabled) { _, _ in updateFolderWatcher() }
         .onChange(of: prefs.watchedFolderPath)  { _, _ in updateFolderWatcher() }
     }
