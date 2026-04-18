@@ -2,12 +2,12 @@
 
 A small macOS utility that compresses **images**, **videos**, and **PDFs**. Drop files in, get smaller ones back.
 
-For stills: supports JPG, PNG, WebP, AVIF, TIFF, and BMP. Outputs WebP, AVIF, or lossless PNG depending on your preference. For video: export to MP4 with H.264 or HEVC and quality presets. For PDFs: shrink while preserving text and links, or flatten pages for maximum file size reduction. Strips metadata (where applicable), respects max dimensions and file size targets for images, and saves next to the original by default.
+For images: supports JPG, PNG, WebP, AVIF, TIFF, and BMP. Outputs WebP, AVIF, or lossless PNG depending on your preference. For video: export to MP4 with H.264 or HEVC and quality presets. For PDFs: shrink while preserving text and links, or flatten pages for maximum file size reduction. Strips metadata (where applicable), respects max dimensions and file size targets for images, and saves next to the original by default.
 
 <p align="center">
-  <img src="site/screenshots/screenshot-drop-active.webp" height="260" alt="Drop zone with a file being dragged in — Release to compress" />
-  <img src="site/screenshots/screenshot-sidebar-presets.webp" height="260" alt="Sidebar with presets, type tabs, and format picker" />
-  <img src="site/screenshots/screenshot-watch-folder.webp" height="260" alt="Watch folder settings: global watch and per-preset watch folders" />
+  <img src="site/screenshots/screenshot-drop-active.webp" width="32%" alt="Drop zone with a file being dragged in — Release to compress" />
+  <img src="site/screenshots/screenshot-sidebar-presets.webp" width="32%" alt="Sidebar with presets, type tabs, and format picker" />
+  <img src="site/screenshots/screenshot-watch-folder.webp" width="32%" alt="Watch folder settings: global watch and per-preset watch folders" />
 </p>
 
 ## Releases
