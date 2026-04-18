@@ -82,7 +82,7 @@ The app registers as an "Open with" handler and exposes a Finder Quick Action so
 - `actor` concurrency model for compression
 - `@AppStorage` / `UserDefaults` for preferences
 - `NSServices` for Finder integration
-- Claude Sonnet 4.6 and a bit of Opus 4.7
+- Claude Sonnet 4.6, Opus 4.7, and Cursor
 
 ## Compression engines
 
