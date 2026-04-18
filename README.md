@@ -1,8 +1,8 @@
 # Dinky
 
-A small macOS utility that compresses images. Drop files in, get smaller ones back.
+A small macOS utility that compresses **images**, **PDFs**, and **videos**. Drop files in, get smaller ones back.
 
-Supports JPG, PNG, WebP, and AVIF. Outputs WebP, AVIF, or lossless PNG depending on your preference. Strips metadata, respects max dimensions and file size targets, and saves next to the original by default.
+For stills: supports JPG, PNG, WebP, AVIF, TIFF, and BMP. Outputs WebP, AVIF, or lossless PNG depending on your preference. For PDFs: shrink while preserving text and links, or flatten pages for maximum file size reduction. For video: export to MP4 with H.264 or HEVC and quality presets. Strips metadata (where applicable), respects max dimensions and file size targets for images, and saves next to the original by default.
 
 <p align="center">
   <img src="site/screenshots/screenshot-drop-zone.webp" width="32%" alt="Drop zone idle state" />
@@ -16,14 +16,17 @@ Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web 
 
 ## Features
 
-- **Drag and drop** — drop images onto the window, the Dock icon, or the file picker
+- **Drag and drop** — drop images, PDFs, or videos onto the window, the Dock icon, or the file picker
 - **Clipboard compress** — paste a copied image straight into Dinky with ⌘⇧V
-- **Format conversion** — Auto, WebP, AVIF, or lossless PNG; Auto picks the right format per image
+- **Format conversion (images)** — Auto, WebP, AVIF, or lossless PNG; Auto picks the right format per image
+- **PDF compression** — preserve selectable text and links, or flatten pages to images for smaller files
+- **Video compression** — export to MP4 with H.264 or HEVC and quality presets
 - **Compression presets** — save named presets with format, quality, limits, destination, watch folder, and filename settings; apply in one click
-- **Before & after preview** — side-by-side or slider view to compare original and compressed
-- **Watch folder** — point Dinky at a folder and new images added are compressed automatically; global or per-preset with its own folder
-- **Max width** — resize on the way out with common web presets or a custom value
-- **Max file size** — binary-searches the quality level to hit an exact MB target
+- **Before & after preview** — side-by-side or slider view to compare original and compressed (images)
+- **Watch folder** — point Dinky at a folder and new supported files are compressed automatically; global or per-preset with its own folder
+- **Batch speed** — cap parallel jobs: one at a time (Fast), up to three (Faster), or up to eight (Fastest)
+- **Max width** — resize on the way out with common web presets or a custom value (images)
+- **Max file size** — binary-searches the quality level to hit an exact MB target (images)
 - **Batch compression** — multiple files compress concurrently, live results as they finish
 - **Manual mode** — drop files first, then right-click each one to choose format individually
 - **Show in Finder** — jump straight to any compressed file from the results list
@@ -41,7 +44,7 @@ Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web 
 
 ### What others don't do
 
-- **Actually changes the format** — ImageOptim squeezes your JPEG and hands it back as a JPEG. Dinky converts to WebP, AVIF, or lossless PNG, which is where 30–80% of the real savings live. Optimage does this too, but costs money and weighs 62 MB.
+- **Actually changes the format (images)** — ImageOptim squeezes your JPEG and hands it back as a JPEG. Dinky converts to WebP, AVIF, or lossless PNG, which is where 30–80% of the real savings live. Optimage does this too, but costs money and weighs 62 MB.
 - **Results you can act on** — most compression apps give you a done screen you can't do anything with. Dinky's results list works like Finder: select files, drag them somewhere else, double-click to open, right-click to remove individual items.
 - **Notifications with a personality** — other apps either don't notify at all or send a generic "Done." Dinky's notification changes based on how many files you compressed and how long it took. Small things, but they add up.
 - **Free, open source, and tiny** — Optimage is $15. ImageOptim is free but lossless only. Dinky is free, open source, converts formats, and at ~14 MB fits in a fraction of the space either of them takes up.
@@ -56,13 +59,13 @@ I liked [Squoosh](https://github.com/GoogleChromeLabs/squoosh) but didn't want t
 
 [ImageOptim](https://imageoptim.com/mac) is lossless only — it makes your JPEG or PNG smaller without changing the format. Optimage does lossy and lossless but also mostly keeps you in the source format. Both are good at what they do.
 
-Dinky takes a different approach: it converts to WebP, AVIF, or lossless PNG. The format change is where most of the real savings come from — often 30–80% smaller than a JPEG or PNG at the same visual quality. And when you need to keep the PNG format (transparency, UI assets, icons), oxipng squeezes it losslessly without touching a pixel. If you're putting images on the web or into a CMS and you're still working with JPEGs and PNGs, converting the format matters more than squeezing the existing one.
+Dinky takes a different approach for **images**: it converts to WebP, AVIF, or lossless PNG. The format change is where most of the real savings come from — often 30–80% smaller than a JPEG or PNG at the same visual quality. And when you need to keep the PNG format (transparency, UI assets, icons), oxipng squeezes it losslessly without touching a pixel. If you're putting images on the web or into a CMS and you're still working with JPEGs and PNGs, converting the format matters more than squeezing the existing one.
 
 ## How it works
 
 Built entirely in Swift and SwiftUI, targeting macOS 15 Sequoia and later. On macOS 26 Tahoe you get the full liquid glass UI; on Sequoia it uses the frosted material fallback. No Electron, no web views, no third-party UI frameworks, no SPM dependencies. The whole app is ~14 MB, appropriately dinky.
 
-Compression runs through a native `actor`-based service that shells out to platform image tools, keeping the main thread free. Multiple files compress concurrently up to the core count of the machine. Output quality is tuned automatically to hit the target file size if one is set.
+Compression runs through a native `actor`-based service. **Images** use bundled CLI encoders (cwebp, avifenc, oxipng). **PDFs** use PDFKit. **Video** uses AVFoundation export. Multiple files can run concurrently according to your batch speed setting.
 
 The sidebar stores preferences via `@AppStorage`. The results list updates live as each file finishes. Error details are tappable. The idle animation on the drop zone runs through three choreographed variants then holds — portrait, landscape, and wide cards dragged in by a pinch cursor from whatever corner the window is closest to.
 
@@ -79,11 +82,12 @@ The app registers as an "Open with" handler and exposes a Finder Quick Action so
 
 ## Compression engines
 
-Dinky is a native front-end for these open-source CLI tools, which do the actual work:
+Dinky is a native front-end for these pieces:
 
 - [cwebp](https://developers.google.com/speed/webp) — Google's WebP encoder (BSD)
 - [avifenc](https://github.com/AOMediaCodec/libavif) — Alliance for Open Media's AVIF encoder (BSD)
 - [oxipng](https://github.com/shssoichiro/oxipng) — lossless PNG optimizer in Rust (MIT)
+- PDFKit and AVFoundation — built into macOS for PDF rewrite / flatten and video export
 
 ## Install
 
@@ -97,3 +101,21 @@ xattr -dr com.apple.quarantine /Applications/Dinky.app
 ```
 
 Updating Dinky is one click — no browser, no re-drag, no quarantine step. A banner appears when a new version is out; click **Install Update** and the app downloads, installs, and relaunches on its own.
+
+## Agent discovery (dinkyimg.app)
+
+The marketing site is a static Netlify deploy. These URLs are intentional for crawlers and tools:
+
+| URL | Role |
+|-----|------|
+| [https://dinkyimg.app/robots.txt](https://dinkyimg.app/robots.txt) | Crawl rules, AI bot entries, Content-Signals, sitemap pointer |
+| [https://dinkyimg.app/sitemap.xml](https://dinkyimg.app/sitemap.xml) | Canonical URL list |
+| [https://dinkyimg.app/.well-known/api-catalog](https://dinkyimg.app/.well-known/api-catalog) | RFC 9727 linkset (no public HTTP API; see `openapi.yaml`) |
+| [https://dinkyimg.app/openapi.yaml](https://dinkyimg.app/openapi.yaml) | Empty OpenAPI document describing “desktop app only” |
+| [https://dinkyimg.app/.well-known/agent-skills/index.json](https://dinkyimg.app/.well-known/agent-skills/index.json) | Agent Skills discovery index |
+| [https://dinkyimg.app/llms.txt](https://dinkyimg.app/llms.txt) | Concise product summary for LLMs |
+| [https://dinkyimg.app/homepage.md](https://dinkyimg.app/homepage.md) | Markdown homepage mirror |
+
+Requests to `/` with `Accept: text/markdown` receive `homepage.md` with `Content-Type: text/markdown` (Netlify Edge Function).
+
+There is **no** OAuth/OIDC issuer, **no** protected HTTP API, and **no** hosted MCP server on this domain — so discovery documents for those are intentionally **not** published. If that changes later, add the appropriate `/.well-known` metadata only when real endpoints exist.

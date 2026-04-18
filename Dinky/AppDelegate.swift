@@ -10,10 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Open with Dinky / drag onto Dock icon
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        let images = imageURLs(from: urls)
-        guard !images.isEmpty else { return }
+        let accepted = acceptedURLs(from: urls)
+        guard !accepted.isEmpty else { return }
         NSApp.activate(ignoringOtherApps: true)
-        NotificationCenter.default.post(name: .dinkyOpenFiles, object: images)
+        NotificationCenter.default.post(name: .dinkyOpenFiles, object: accepted)
     }
 
     // MARK: - Compress from Clipboard menu command
@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) {
         let opts: [NSPasteboard.ReadingOptionKey: Any] = [
             .urlReadingFileURLsOnly: true,
-            .urlReadingContentsConformToTypes: imageUTIs
+            .urlReadingContentsConformToTypes: acceptedUTIs
         ]
         guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL],
               !urls.isEmpty else { return }
@@ -41,14 +41,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Helpers
 
-    private let imageUTIs = [
+    private let acceptedUTIs = [
         "public.jpeg", "public.png", "org.webmproject.webp",
-        "public.avif", "public.tiff", "com.microsoft.bmp"
+        "public.avif", "public.tiff", "com.microsoft.bmp",
+        "com.adobe.pdf",
+        "public.mpeg-4", "com.apple.quicktime-movie", "public.m4v-video"
     ]
 
-    private func imageURLs(from urls: [URL]) -> [URL] {
-        let exts = Set(["jpg","jpeg","png","webp","avif","tiff","bmp"])
-        return urls.filter { exts.contains($0.pathExtension.lowercased()) }
+    private func acceptedURLs(from urls: [URL]) -> [URL] {
+        urls.filter { MediaTypeDetector.detect($0) != nil }
     }
 }
 

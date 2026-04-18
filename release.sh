@@ -24,14 +24,17 @@ fi
 
 VERSION="$1"
 PREV_VERSION=$(grep "MARKETING_VERSION" Dinky.xcodeproj/project.pbxproj | head -1 | sed 's/.*= //;s/;//')
+PREV_BUILD=$(grep "CURRENT_PROJECT_VERSION" Dinky.xcodeproj/project.pbxproj | head -1 | sed 's/.*= //;s/;//')
 
-echo "▶ Releasing Dinky v$VERSION (was $PREV_VERSION)"
+echo "▶ Releasing Dinky v$VERSION (was $PREV_VERSION, build $PREV_BUILD)"
 echo ""
 
 # ── 1. Bump version ───────────────────────────────────────────────────────────
 
 echo "→ Bumping version in project.pbxproj…"
 sed -i '' "s/MARKETING_VERSION = $PREV_VERSION/MARKETING_VERSION = $VERSION/g" \
+  Dinky.xcodeproj/project.pbxproj
+sed -i '' "s/CURRENT_PROJECT_VERSION = $PREV_BUILD/CURRENT_PROJECT_VERSION = $VERSION/g" \
   Dinky.xcodeproj/project.pbxproj
 
 # ── 2. Update site ────────────────────────────────────────────────────────────
@@ -44,6 +47,12 @@ sed -i '' "s/\"softwareVersion\": \"$PREV_VERSION\"/\"softwareVersion\": \"$VERS
 echo "→ Updating site/llms.txt…"
 sed -i '' "s/v$PREV_VERSION/v$VERSION/g" site/llms.txt
 sed -i '' "s/Dinky-$PREV_VERSION\.dmg/Dinky-$VERSION.dmg/g" site/llms.txt
+
+if [ -f site/homepage.md ]; then
+  echo "→ Updating site/homepage.md…"
+  sed -i '' "s/v$PREV_VERSION/v$VERSION/g" site/homepage.md
+  sed -i '' "s/Dinky-$PREV_VERSION\.dmg/Dinky-$VERSION.dmg/g" site/homepage.md
+fi
 
 # ── 3. Build ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +87,7 @@ ditto -c -k --sequesterRsrc --keepParent \
 
 echo "→ Committing…"
 git add Dinky.xcodeproj/project.pbxproj site/index.html site/llms.txt README.md
+[ -f site/homepage.md ] && git add site/homepage.md
 git commit -m "Bump to v$VERSION"
 git push origin main
 
@@ -91,9 +101,14 @@ gh release create "v$VERSION" \
   --notes-file - \
   "Dinky-$VERSION.dmg" \
   "Dinky-$VERSION.zip" << NOTES
-## What's new
+## Dinky $VERSION — files, not just images
 
-<!-- describe what changed -->
+Dinky is now a **multi-format compressor** on macOS: **images**, **PDFs**, and **videos** in one small app. Drag in files (or use watch folders and presets) and get smaller outputs back.
+
+### Highlights
+- **PDFs** — shrink while keeping text and links selectable, or flatten pages for maximum savings.
+- **Video** — export to MP4 with H.264 or HEVC and the same preset workflow as images.
+- **One UI** — sidebar presets, batch results, smart quality, and history work across supported types.
 
 ## Install
 

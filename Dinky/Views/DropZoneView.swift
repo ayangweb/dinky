@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 enum DropZonePhase: Equatable {
     case idle, hovering, processing, done
@@ -115,7 +116,7 @@ struct DropZoneView: View {
         switch phase {
         case .idle:
             VStack(spacing: 5) {
-                Text("Drop images here")
+                Text("Drop files here")
                     .font(.title3).foregroundStyle(.primary)
                 Text("or click to browse")
                     .font(.caption).foregroundStyle(.secondary)
@@ -153,37 +154,117 @@ struct DropZoneView: View {
 
 // MARK: - Idle drag animation
 
+// MARK: - File card type
+
+private enum FileCardType {
+    case image, video, pdf
+
+    /// UTTypes aligned with Dinky-supported types (see `MediaType`).
+    var workspaceContentType: UTType {
+        switch self {
+        case .image: return .jpeg
+        case .video: return .mpeg4Movie
+        case .pdf:   return .pdf
+        }
+    }
+
+    /// Resolved while the given `ColorScheme`’s `NSAppearance` is current so Finder-style file icons match light / dark UI.
+    func workspaceIcon(for colorScheme: ColorScheme) -> NSImage {
+        let ut = workspaceContentType
+        let name: NSAppearance.Name = (colorScheme == .dark) ? .darkAqua : .aqua
+        guard let appearance = NSAppearance(named: name) else {
+            return NSWorkspace.shared.icon(for: ut)
+        }
+        var icon: NSImage!
+        appearance.performAsCurrentDrawingAppearance {
+            icon = NSWorkspace.shared.icon(for: ut)
+        }
+        return icon
+    }
+}
+
+/// Uniform portrait tiles for the idle fan — same footprint so the stack reads like a deck of cards (system icons letterbox inside).
+private enum IdleFileCardLayout {
+    static let portraitWidth: CGFloat = 54
+    static let portraitHeight: CGFloat = 74
+    static let staticCorner: CGFloat = 7
+    static let animatedCorner: CGFloat = 11
+}
+
+/// Final positions for the 3-card fan (reduce-motion + `playTwoTrips`): left / centre / right with shared baseline. Draw order remains PDF → video → image (back → front).
+private enum IdleThreeCardFan {
+    static let landingY: CGFloat = -80
+
+    static var image: CGSize { CGSize(width: -22, height: landingY - 2) }
+    static var video: CGSize { CGSize(width: 0, height: landingY - 2) }
+    static var pdf: CGSize { CGSize(width: 22, height: landingY - 2) }
+}
+
+// MARK: - Finder-style file card (system document icons)
+
+private struct FinderStyleFileCard: View {
+    let type: FileCardType
+    let width: CGFloat
+    let height: CGFloat
+    var cornerRadius: CGFloat = 8
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Drop shadow (not `Color.primary`) — avoids a bright halo on dark / tinted backgrounds.
+    private var shadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.38) : Color.black.opacity(0.12)
+    }
+
+    private var shadowRadius: CGFloat { colorScheme == .dark ? 10 : 6 }
+    private var shadowY: CGFloat { colorScheme == .dark ? 5 : 3 }
+
+    var body: some View {
+        let icon = type.workspaceIcon(for: colorScheme)
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            Group {
+                if icon.isTemplate {
+                    Image(nsImage: icon)
+                        .renderingMode(.template)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(Color.secondary)
+                } else {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                }
+            }
+            .padding(min(width, height) * 0.12)
+        }
+        .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
+        .frame(width: width, height: height)
+        .id("\(type)-\(colorScheme)")
+    }
+}
+
 // MARK: - Static card stack (reduce motion)
 
 struct StaticCardStack: View {
-    private let themes: [(Color, Color)] = [
-        (Color(red: 0.28, green: 0.56, blue: 1.00), Color(red: 0.52, green: 0.28, blue: 0.96)),
-        (Color(red: 0.96, green: 0.42, blue: 0.28), Color(red: 0.98, green: 0.74, blue: 0.18)),
-        (Color(red: 0.18, green: 0.78, blue: 0.52), Color(red: 0.14, green: 0.62, blue: 0.88)),
-    ]
-
-    private func card(_ themeIndex: Int, width: CGFloat, height: CGFloat) -> some View {
-        let (c1, c2) = themes[themeIndex]
-        return RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(LinearGradient(colors: [c1, c2], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .frame(width: width, height: height)
-            .shadow(color: c1.opacity(0.35), radius: 6, x: 0, y: 3)
-    }
-
     var body: some View {
         ZStack {
-            // wide landscape — back
-            card(2, width: 68, height: 40)
-                .offset(x: 20, y: -72)
+            // PDF — back
+            FinderStyleFileCard(type: .pdf, width: IdleFileCardLayout.portraitWidth, height: IdleFileCardLayout.portraitHeight, cornerRadius: IdleFileCardLayout.staticCorner)
+                .offset(x: IdleThreeCardFan.pdf.width, y: IdleThreeCardFan.pdf.height)
                 .rotationEffect(.degrees(7))
-            // landscape — middle
-            card(1, width: 64, height: 42)
-                .offset(x: 0, y: -82)
-                .rotationEffect(.degrees(2))
-            // portrait — front
-            card(0, width: 42, height: 56)
-                .offset(x: -20, y: -74)
-                .rotationEffect(.degrees(-6))
+            // Video — middle
+            FinderStyleFileCard(type: .video, width: IdleFileCardLayout.portraitWidth, height: IdleFileCardLayout.portraitHeight, cornerRadius: IdleFileCardLayout.staticCorner)
+                .offset(x: IdleThreeCardFan.video.width, y: IdleThreeCardFan.video.height)
+                .rotationEffect(.degrees(0))
+            // Image — front
+            FinderStyleFileCard(type: .image, width: IdleFileCardLayout.portraitWidth, height: IdleFileCardLayout.portraitHeight, cornerRadius: IdleFileCardLayout.staticCorner)
+                .offset(x: IdleThreeCardFan.image.width, y: IdleThreeCardFan.image.height)
+                .rotationEffect(.degrees(-7))
         }
     }
 }
@@ -212,39 +293,26 @@ struct IdleAnimation: View {
     @State private var entryCorner  : Corner  = .bottomRight
     @State private var step         : Int     = 0
 
-    // Captured at loop start so theme never changes mid-animation or on re-render
-    @State private var activeTheme1 : Int     = 0
-    @State private var activeTheme2 : Int     = 2
-    @State private var activeTheme3 : Int     = 4
-
-    private let themes: [(Color, Color)] = [
-        (Color(red: 0.28, green: 0.56, blue: 1.00), Color(red: 0.52, green: 0.28, blue: 0.96)),
-        (Color(red: 0.96, green: 0.42, blue: 0.28), Color(red: 0.98, green: 0.74, blue: 0.18)),
-        (Color(red: 0.18, green: 0.78, blue: 0.52), Color(red: 0.14, green: 0.62, blue: 0.88)),
-        (Color(red: 0.96, green: 0.30, blue: 0.54), Color(red: 0.98, green: 0.56, blue: 0.28)),
-        (Color(red: 0.44, green: 0.28, blue: 0.96), Color(red: 0.22, green: 0.68, blue: 0.98)),
-    ]
-
     private var cardCount   : Int { step % 2 == 0 ? 2 : 1 }
     private var animStyle   : Int { step % 3 }
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // card3 — wide landscape (back layer, third trip only)
-                photoCard(themeIndex: activeTheme3, width: 68, height: 40)
+                // card3 — PDF (back; drawn first)
+                photoCard(type: .pdf)
                     .offset(card3Offset)
                     .rotationEffect(.degrees(card3Angle))
                     .opacity(card3Opacity)
 
-                // card2 — landscape (wider)
-                photoCard(themeIndex: activeTheme2, width: 64, height: 42)
+                // card2 — video (middle)
+                photoCard(type: .video)
                     .offset(card2Offset)
                     .rotationEffect(.degrees(card2Angle))
                     .opacity(card2Opacity)
 
-                // card1 — portrait (taller)
-                photoCard(themeIndex: activeTheme1, width: 42, height: 56)
+                // card1 — image (front)
+                photoCard(type: .image)
                     .offset(card1Offset)
                     .rotationEffect(.degrees(card1Angle))
                     .opacity(card1Opacity)
@@ -274,18 +342,13 @@ struct IdleAnimation: View {
         .onAppear { entryCorner = Self.currentCorner() }
     }
 
-    private func photoCard(themeIndex: Int, width: CGFloat, height: CGFloat) -> some View {
-        let (c1, c2) = themes[themeIndex]
-        return ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(LinearGradient(colors: [c1, c2],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .shadow(color: c1.opacity(0.40), radius: 8, x: 0, y: 4)
-            Image(systemName: "photo.fill")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.90))
-        }
-        .frame(width: width, height: height)
+    private func photoCard(type: FileCardType) -> some View {
+        FinderStyleFileCard(
+            type: type,
+            width: IdleFileCardLayout.portraitWidth,
+            height: IdleFileCardLayout.portraitHeight,
+            cornerRadius: IdleFileCardLayout.animatedCorner
+        )
     }
 
     // MARK: - Corner
@@ -325,23 +388,11 @@ struct IdleAnimation: View {
 
     private func runLoop() async {
         await sleep(200)
-        for i in 0..<3 {
-            guard !Task.isCancelled else { return }
-            // Lock in themes before the animation starts — they won't change until the next loop
-            activeTheme1 = step % 5
-            activeTheme2 = (step + 2) % 5
-            activeTheme3 = (step + 4) % 5
-            switch animStyle {
-            case 0: await playDragAndDrop()
-            case 1: await playSwoop()
-            default: await playTwoTrips()
-            }
-            onLoop()
-            if i < 2 {
-                step += 1
-                await sleep(400)
-            }
-        }
+        guard !Task.isCancelled else { return }
+        // Single sequence: cursor enters, drops image → video → pdf, then exits off-screen.
+        // Cards remain visible as the final resting state until the user hovers back in.
+        await playTwoTrips()
+        onLoop()
         finished = true
     }
 
@@ -438,6 +489,14 @@ struct IdleAnimation: View {
         let lh = landing.height
         let travel = travelDuration()
 
+        // If cards from a previous run are still on screen, fade them out before resetting layout
+        if card1Opacity > 0 || card2Opacity > 0 || card3Opacity > 0 {
+            withAnimation(.easeOut(duration: 0.20)) {
+                card1Opacity = 0; card2Opacity = 0; card3Opacity = 0
+            }
+            await sleep(220)
+        }
+
         // Trip 1 — portrait card, settles left
         await snap(cursor: s,
                    c1: CGSize(width: s.width + 18 * g, height: s.height + 12),
@@ -452,8 +511,8 @@ struct IdleAnimation: View {
 
         withAnimation(.spring(response: 0.26, dampingFraction: 0.55)) {
             cursorLifted = true
-            card1Offset  = CGSize(width: -20, height: lh + 6)
-            card1Angle   = -6
+            card1Offset  = CGSize(width: IdleThreeCardFan.image.width, height: IdleThreeCardFan.image.height)
+            card1Angle   = -7
         }
         await sleep(260)
         withAnimation(.timingCurve(0.55, 0.0, 1.0, 1.0, duration: 0.40)) {
@@ -461,7 +520,7 @@ struct IdleAnimation: View {
         }
         await sleep(340)
 
-        // Trip 2 — landscape card, settles centre
+        // Trip 2 — centre card (video)
         card2Offset = CGSize(width: s.width + 28 * g, height: s.height + 18)
         card2Angle  = 18 * g
         withAnimation(.easeIn(duration: 0.08)) { card2Opacity = 1 }
@@ -475,8 +534,8 @@ struct IdleAnimation: View {
 
         withAnimation(.spring(response: 0.28, dampingFraction: 0.52)) {
             cursorLifted = true
-            card2Offset  = CGSize(width: 0, height: lh - 2)
-            card2Angle   = 2
+            card2Offset  = CGSize(width: IdleThreeCardFan.video.width, height: IdleThreeCardFan.video.height)
+            card2Angle   = 0
         }
         await sleep(260)
         withAnimation(.timingCurve(0.55, 0.0, 1.0, 1.0, duration: 0.40)) {
@@ -484,31 +543,32 @@ struct IdleAnimation: View {
         }
         await sleep(340)
 
-        // Trip 3 — square card, settles right
+        // Trip 3 — PDF (back of fan)
         card3Offset = CGSize(width: s.width + 36 * g, height: s.height + 22)
         card3Angle  = 24 * g
         withAnimation(.easeIn(duration: 0.08)) { card3Opacity = 1 }
 
         withAnimation(.timingCurve(0.22, 0.0, 0.28, 1.0, duration: travel)) {
             cursorOffset = landing
-            card3Offset  = CGSize(width: 22 * g, height: lh + 16)
-            card3Angle   = 8 * g
+            card3Offset  = CGSize(width: 22 * g, height: lh - 2)
+            card3Angle   = 7 * g
         }
         await sleep(Int(travel * 1000))
 
         withAnimation(.spring(response: 0.28, dampingFraction: 0.50)) {
             cursorLifted = true
-            card3Offset  = CGSize(width: 20, height: lh + 8)
+            card3Offset  = CGSize(width: IdleThreeCardFan.pdf.width, height: IdleThreeCardFan.pdf.height)
             card3Angle   = 7
         }
         await sleep(460)
 
-        withAnimation(.timingCurve(0.55, 0.0, 1.0, 1.0, duration: 0.42)) {
-            cursorOffset = s; cursorLifted = false
+        // Cursor exits off-screen — cards stay put as the final resting frame.
+        // Animation is considered "complete" until the user hovers back in (see `.onHover` in body).
+        withAnimation(.timingCurve(0.55, 0.0, 1.0, 1.0, duration: 0.45)) {
+            cursorOffset = s
+            cursorLifted = false
         }
-        await sleep(300)
-
-        // All three cards remain visible — this is the final frozen frame
+        await sleep(460)
     }
 
     // MARK: - Helpers

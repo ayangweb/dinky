@@ -15,6 +15,10 @@ struct HistorySheet: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if prefs.lifetimeSavedBytes > 0 {
+                lifetimeTotalBanner
+                Divider()
+            }
             if prefs.sessionHistory.isEmpty {
                 emptyState
             } else {
@@ -43,6 +47,26 @@ struct HistorySheet: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
+    }
+
+    private var lifetimeTotalBanner: some View {
+        HStack {
+            Text("Total saved")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(lifetimeSavedFormatted + " saved")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+    }
+
+    private var lifetimeSavedFormatted: String {
+        let mb = Double(prefs.lifetimeSavedBytes) / 1_048_576
+        if mb >= 1024 { return String(format: "%.1f GB", mb / 1024) }
+        return String(format: "%.0f MB", mb)
     }
 
     private var emptyState: some View {

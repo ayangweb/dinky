@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ResultsRowView: View {
-    @ObservedObject var item: ImageItem
+    @ObservedObject var item: CompressionItem
     let selectedFormat: CompressionFormat
     var onForceCompress: () -> Void = {}
     @EnvironmentObject var prefs: DinkyPreferences
@@ -12,11 +12,18 @@ struct ResultsRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                if let type = item.detectedContentType {
+                // Content-type / media-type chip
+                if item.mediaType == .image, let type = item.detectedContentType {
                     contentTypeChip(type)
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                         .fixedSize()
                         .help(type.tooltipLabel)
+                } else if item.mediaType == .pdf, let pages = item.pageCount {
+                    mediaChip("\(pages)p")
+                        .help("\(pages) pages")
+                } else if item.mediaType == .video, let secs = item.videoDuration {
+                    mediaChip(formattedDuration(secs))
+                        .help("Duration")
                 }
 
                 VStack(alignment: .leading, spacing: 1) {
@@ -24,7 +31,7 @@ struct ResultsRowView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if case .pending = item.status {
-                        Text(prefs.outputURL(for: item.sourceURL, format: item.formatOverride ?? selectedFormat).lastPathComponent)
+                        Text(pendingOutputLastPathComponent())
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
@@ -48,6 +55,28 @@ struct ResultsRowView: View {
         }
         .sheet(isPresented: $showingPreview) {
             ImagePreviewSheet(item: item)
+        }
+    }
+
+    /// Expected output filename while the row is still queued (matches `CompressionPreset` / `DinkyPreferences` URL rules).
+    private func pendingOutputLastPathComponent() -> String {
+        if let pid = item.presetID,
+           let preset = prefs.savedPresets.first(where: { $0.id == pid }) {
+            switch item.mediaType {
+            case .image:
+                let fmt = item.formatOverride ?? preset.format
+                return preset.outputURL(for: item.sourceURL, format: fmt, globalPrefs: prefs).lastPathComponent
+            case .pdf:
+                return preset.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs).lastPathComponent
+            case .video:
+                return preset.outputURL(for: item.sourceURL, mediaType: .video, globalPrefs: prefs).lastPathComponent
+            }
+        }
+        switch item.mediaType {
+        case .image:
+            return prefs.outputURL(for: item.sourceURL, format: item.formatOverride ?? selectedFormat).lastPathComponent
+        case .pdf, .video:
+            return prefs.outputURL(for: item.sourceURL, mediaType: item.mediaType).lastPathComponent
         }
     }
 
@@ -94,18 +123,20 @@ struct ResultsRowView: View {
 
         case .done(let outputURL, _, _):
             HStack(spacing: 6) {
-                Button {
-                    showingPreview = true
-                } label: {
-                    Image(systemName: "eye")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+                if item.mediaType == .image {
+                    Button {
+                        showingPreview = true
+                    } label: {
+                        Image(systemName: "eye")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Preview before and after")
                 }
-                .buttonStyle(.plain)
-                .help("Preview before and after")
 
                 Button {
                     NSWorkspace.shared.activateFileViewerSelecting([outputURL])
@@ -181,6 +212,24 @@ struct ResultsRowView: View {
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(color))
     }
 
+    private func mediaChip(_ label: String) -> some View {
+        Text(label)
+            .font(.system(size: 9, weight: .semibold).lowercaseSmallCaps())
+            .foregroundStyle(Color.secondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.primary.opacity(0.08))
+            )
+    }
+
+    private func formattedDuration(_ seconds: Double) -> String {
+        let total = Int(seconds)
+        let m = total / 60
+        let s = total % 60
+        return String(format: "%d:%02d", m, s)
+    }
+
     // Small, muted chip shown next to the filename when Smart Quality is on.
     // It's secondary info — colors are soft so the row's primary content still leads.
     @ViewBuilder
@@ -209,12 +258,14 @@ private struct FileTypeIcon: View {
 
     private var color: Color {
         switch ext.lowercased() {
-        case "jpg", "jpeg": return Color(red: 0.96, green: 0.42, blue: 0.28) // orange — theme 2
-        case "png":         return Color(red: 0.28, green: 0.56, blue: 1.00) // blue   — theme 1
-        case "tiff":        return Color(red: 0.18, green: 0.78, blue: 0.52) // green  — theme 3
-        case "bmp":         return Color(red: 0.96, green: 0.30, blue: 0.54) // pink   — theme 4
-        case "webp", "avif": return Color.secondary
-        default:             return Color.secondary
+        case "jpg", "jpeg":       return Color(red: 0.96, green: 0.42, blue: 0.28) // orange
+        case "png":               return Color(red: 0.28, green: 0.56, blue: 1.00) // blue
+        case "tiff":              return Color(red: 0.18, green: 0.78, blue: 0.52) // green
+        case "bmp":               return Color(red: 0.96, green: 0.30, blue: 0.54) // pink
+        case "pdf":               return Color(red: 0.92, green: 0.18, blue: 0.18) // red
+        case "mp4", "mov", "m4v": return Color(red: 0.55, green: 0.28, blue: 0.95) // purple
+        case "webp", "avif":      return Color.secondary
+        default:                  return Color.secondary
         }
     }
 

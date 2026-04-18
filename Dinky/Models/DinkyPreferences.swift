@@ -31,6 +31,32 @@ enum FilenameHandling: String, CaseIterable, Identifiable {
 
 final class DinkyPreferences: ObservableObject {
 
+    /// Stored `concurrentTasks` values allowed in Settings (legacy ints snap to these).
+    static let concurrentCompressionTiers: [Int] = [1, 3, 8]
+
+    /// Maps any stored value to the nearest tier (1, 3, or 8).
+    static func normalizedConcurrentTasks(_ raw: Int) -> Int {
+        switch raw {
+        case ...0: return 3
+        case 1: return 1
+        case 2...4: return 3
+        default: return 8
+        }
+    }
+
+    init() {
+        Self.migrateConcurrentTasksToTiersIfNeeded()
+    }
+
+    private static func migrateConcurrentTasksToTiersIfNeeded() {
+        let key = "concurrentTasks"
+        let d = UserDefaults.standard
+        guard d.object(forKey: key) != nil else { return }
+        let raw = d.integer(forKey: key)
+        let snapped = normalizedConcurrentTasks(raw)
+        if snapped != raw { d.set(snapped, forKey: key) }
+    }
+
     // MARK: Output
     @AppStorage("saveLocation")         var saveLocationRaw: String = SaveLocation.sameFolder.rawValue
     var saveLocation: SaveLocation {
@@ -69,7 +95,10 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("preserveTimestamps")   var preserveTimestamps: Bool = true
     @AppStorage("moveOriginalsToTrash") var moveOriginalsToTrash: Bool = false
     @AppStorage("minimumSavingsPercent") var minimumSavingsPercent: Int = 2
-    @AppStorage("concurrentTasks")      var concurrentTasks: Int = max(1, min(8, ProcessInfo.processInfo.activeProcessorCount))
+    @AppStorage("concurrentTasks")      var concurrentTasks: Int = 3
+
+    /// Parallel compression cap — always one of `concurrentCompressionTiers` (legacy values snap).
+    var concurrentCompressionLimit: Int { Self.normalizedConcurrentTasks(concurrentTasks) }
     @AppStorage("playSoundEffects")     var playSoundEffects: Bool = true
 
     // MARK: Finish
@@ -87,6 +116,85 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("autoFormat")           var autoFormat: Bool = true
     @AppStorage("contentTypeHint")      var contentTypeHintRaw: String = "auto"
 
+    // MARK: Sidebar visibility
+    @AppStorage("sidebar.showImages") var showImagesSection: Bool = true
+    @AppStorage("sidebar.showPDFs")   var showPDFsSection:   Bool = true
+    @AppStorage("sidebar.showVideos") var showVideosSection:  Bool = true
+
+    /// Simplified in-window sidebar (default): quick choices, output summary, and Settings shortcuts.
+    @AppStorage("sidebar.simpleMode") var sidebarSimpleMode: Bool = true
+
+    /// When enabling simple sidebar, scoped sections are turned off; when disabling it, all sections turn back on.
+    func applySidebarSimpleMode(_ simple: Bool) {
+        sidebarSimpleMode = simple
+        if simple {
+            showImagesSection = false
+            showVideosSection = false
+            showPDFsSection = false
+        } else {
+            showImagesSection = true
+            showVideosSection = true
+            showPDFsSection = true
+        }
+    }
+
+    /// Migrates older preferences where simple mode was on but section toggles were still true.
+    func reconcileSidebarSectionsForSimpleModeIfNeeded() {
+        guard sidebarSimpleMode else { return }
+        if showImagesSection || showVideosSection || showPDFsSection {
+            showImagesSection = false
+            showVideosSection = false
+            showPDFsSection = false
+        }
+    }
+
+    /// Turning off Images, Videos, and PDFs in the full sidebar enables simple mode (same as choosing it explicitly).
+    func adoptSimpleSidebarWhenAllSectionsHidden() {
+        guard !showImagesSection, !showVideosSection, !showPDFsSection else { return }
+        applySidebarSimpleMode(true)
+    }
+
+    enum SidebarScopedSection {
+        case images, videos, pdfs
+    }
+
+    /// Updates Images / Videos / PDFs visibility. Turning any section **on** while simple sidebar is active leaves simple mode off and only changes that toggle (others unchanged).
+    func setScopedSidebarSection(_ section: SidebarScopedSection, isOn: Bool) {
+        if isOn && sidebarSimpleMode {
+            sidebarSimpleMode = false
+        }
+        switch section {
+        case .images: showImagesSection = isOn
+        case .videos: showVideosSection = isOn
+        case .pdfs: showPDFsSection = isOn
+        }
+        adoptSimpleSidebarWhenAllSectionsHidden()
+    }
+
+    // MARK: PDF / Video quality + options
+    @AppStorage("pdfOutputMode")  var pdfOutputModeRaw: String = PDFOutputMode.preserveStructure.rawValue
+    var pdfOutputMode: PDFOutputMode {
+        get { PDFOutputMode(rawValue: pdfOutputModeRaw) ?? .preserveStructure }
+        set { pdfOutputModeRaw = newValue.rawValue }
+    }
+    @AppStorage("pdfQuality")     var pdfQualityRaw: String  = PDFQuality.medium.rawValue
+    var pdfQuality: PDFQuality {
+        get { PDFQuality(rawValue: pdfQualityRaw) ?? .medium }
+        set { pdfQualityRaw = newValue.rawValue }
+    }
+    @AppStorage("videoQuality")    var videoQualityRaw: String = VideoQuality.medium.rawValue
+    var videoQuality: VideoQuality {
+        get { VideoQuality(rawValue: videoQualityRaw) ?? .medium }
+        set { videoQualityRaw = newValue.rawValue }
+    }
+    @AppStorage("videoCodecFamily") var videoCodecFamilyRaw: String = VideoCodecFamily.h264.rawValue
+    var videoCodecFamily: VideoCodecFamily {
+        get { VideoCodecFamily(rawValue: videoCodecFamilyRaw) ?? .h264 }
+        set { videoCodecFamilyRaw = newValue.rawValue }
+    }
+    @AppStorage("pdfGrayscale")    var pdfGrayscale:    Bool = false
+    @AppStorage("videoRemoveAudio") var videoRemoveAudio: Bool = false
+
     // MARK: Lifetime stats
     @AppStorage("lifetimeSavedBytesRaw") var lifetimeSavedBytesRaw: Double = 0
     var lifetimeSavedBytes: Int64 {
@@ -97,16 +205,36 @@ final class DinkyPreferences: ObservableObject {
     // MARK: Presets
     @AppStorage("activePresetID") var activePresetID: String = ""
     @AppStorage("savedPresetsData") var savedPresetsData: Data = Data()
+
+    private var cachedSavedPresets: [CompressionPreset]?
     var savedPresets: [CompressionPreset] {
-        get { (try? JSONDecoder().decode([CompressionPreset].self, from: savedPresetsData)) ?? [] }
-        set { savedPresetsData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+        get {
+            if let cachedSavedPresets { return cachedSavedPresets }
+            let v = (try? JSONDecoder().decode([CompressionPreset].self, from: savedPresetsData)) ?? []
+            cachedSavedPresets = v
+            return v
+        }
+        set {
+            cachedSavedPresets = newValue
+            savedPresetsData = (try? JSONEncoder().encode(newValue)) ?? Data()
+        }
     }
 
     // MARK: Session history
     @AppStorage("sessionHistoryData") var sessionHistoryData: Data = Data()
+
+    private var cachedSessionHistory: [SessionRecord]?
     var sessionHistory: [SessionRecord] {
-        get { (try? JSONDecoder().decode([SessionRecord].self, from: sessionHistoryData)) ?? [] }
-        set { sessionHistoryData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+        get {
+            if let cachedSessionHistory { return cachedSessionHistory }
+            let v = (try? JSONDecoder().decode([SessionRecord].self, from: sessionHistoryData)) ?? []
+            cachedSessionHistory = v
+            return v
+        }
+        set {
+            cachedSessionHistory = newValue
+            sessionHistoryData = (try? JSONEncoder().encode(newValue)) ?? Data()
+        }
     }
 
     // MARK: Updates
@@ -146,5 +274,71 @@ final class DinkyPreferences: ObservableObject {
             if out.count > 75 { out = String(out.prefix(75)) }
         }
         return dir.appendingPathComponent(out).appendingPathExtension(format.outputExtension)
+    }
+
+    func outputURL(for source: URL, mediaType: MediaType) -> URL {
+        switch mediaType {
+        case .image:
+            // Shouldn't be called for image — use outputURL(for:format:) instead.
+            // Fallback: keep original extension.
+            let dir  = destinationDirectory(for: source)
+            let stem = source.deletingPathExtension().lastPathComponent
+            var out: String
+            switch filenameHandling {
+            case .appendSuffix:  out = stem + "-dinky"
+            case .replaceOrigin: out = stem
+            case .customSuffix:  out = stem + (customSuffix.isEmpty ? "-dinky" : customSuffix)
+            }
+            return dir.appendingPathComponent(out).appendingPathExtension(source.pathExtension.lowercased())
+        case .pdf:
+            let dir  = destinationDirectory(for: source)
+            let stem = source.deletingPathExtension().lastPathComponent
+            var out: String
+            switch filenameHandling {
+            case .appendSuffix:  out = stem + "-dinky"
+            case .replaceOrigin: out = stem
+            case .customSuffix:  out = stem + (customSuffix.isEmpty ? "-dinky" : customSuffix)
+            }
+            if sanitizeFilenames {
+                out = out.lowercased().replacingOccurrences(of: " ", with: "-")
+                if out.count > 75 { out = String(out.prefix(75)) }
+            }
+            return dir.appendingPathComponent(out).appendingPathExtension("pdf")
+        case .video:
+            // Always output as .mp4 (H.264 or H.265 per video codec preference)
+            let dir  = destinationDirectory(for: source)
+            let stem = source.deletingPathExtension().lastPathComponent
+            var out: String
+            switch filenameHandling {
+            case .appendSuffix:  out = stem + "-dinky"
+            case .replaceOrigin: out = stem
+            case .customSuffix:  out = stem + (customSuffix.isEmpty ? "-dinky" : customSuffix)
+            }
+            if sanitizeFilenames {
+                out = out.lowercased().replacingOccurrences(of: " ", with: "-")
+                if out.count > 75 { out = String(out.prefix(75)) }
+            }
+            return dir.appendingPathComponent(out).appendingPathExtension("mp4")
+        }
+    }
+
+    // MARK: - App Intents / Shortcuts
+
+    /// Reads the same `UserDefaults` keys as `@AppStorage` so Shortcuts match in-app compression defaults.
+    static func compressionSettingsForIntent() -> (
+        stripMetadata: Bool,
+        smartQuality: Bool,
+        contentTypeHint: String,
+        goals: CompressionGoals
+    ) {
+        let d = UserDefaults.standard
+        let strip = d.object(forKey: "stripMetadata") as? Bool ?? false
+        let smart = d.object(forKey: "smartQuality") as? Bool ?? true
+        let hint = d.string(forKey: "contentTypeHint") ?? "auto"
+        let maxWOn = d.object(forKey: "maxWidthEnabled") as? Bool ?? false
+        let maxW = maxWOn ? (d.object(forKey: "maxWidth") as? Int ?? 1920) : nil
+        let maxFSOn = d.object(forKey: "maxFileSizeEnabled") as? Bool ?? false
+        let maxFS = maxFSOn ? (d.object(forKey: "maxFileSizeKB") as? Int ?? 2048) : nil
+        return (strip, smart, hint, CompressionGoals(maxWidth: maxW, maxFileSizeKB: maxFS))
     }
 }

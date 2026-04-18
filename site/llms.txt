@@ -1,13 +1,16 @@
 # Dinky
 
-> A tiny macOS image compression app. Converts JPGs and PNGs to WebP, AVIF, or lossless PNG. Drag and drop, get smaller files back. Free, open source, and entirely local — images never leave your machine.
+> A tiny macOS compression app for images, PDFs, and videos. Converts stills to WebP, AVIF, or lossless PNG; shrinks PDFs; exports video to smaller MP4 (H.264 or HEVC). Drag and drop, get smaller files back. Free, open source, and entirely local — files never leave your machine.
 
 ## What it does
 
-- Converts JPG, PNG, WebP, AVIF, TIFF, BMP → WebP, AVIF, or lossless PNG
+- **Images** — JPG, PNG, WebP, AVIF, TIFF, BMP → WebP, AVIF, or lossless PNG
+- **PDFs** — preserve selectable text and links, or flatten pages to images for maximum shrink
+- **Videos** — common formats (e.g. MP4, MOV) → MP4 with H.264 or HEVC and quality presets
 - Drag and drop or file picker; batch compression with live results
+- **Batch speed** — Fast (one at a time), Faster (up to three parallel), or Fastest (up to eight)
 - Max width resizing (common web presets or custom value)
-- Max file size targeting via binary search on quality
+- Max file size targeting via binary search on quality (images)
 - Smart quality: detects photos vs screenshots via Vision framework + EXIF, adjusts quality per content type
 - Finder Quick Actions — compress without opening the app
 - Manual mode: drop files, then right-click each one to pick format individually
@@ -19,21 +22,23 @@
 
 - macOS 15 Sequoia or later (liquid glass UI on macOS 26 Tahoe; frosted material fallback on Sequoia)
 - SwiftUI + AppKit, zero SPM dependencies
-- ~12 MB installed
-- Compression engines bundled: cwebp (Google), avifenc (AOM), oxipng (Rust/MIT)
+- ~14 MB installed
+- Image engines bundled: cwebp (Google), avifenc (AOM), oxipng (Rust/MIT)
+- PDF via PDFKit; video via AVFoundation export
 - No cloud, no accounts, no telemetry (site uses Fathom analytics, app has none)
 - Open source: MIT license
 
 ## Comparison
 
-- vs **ImageOptim**: ImageOptim is lossless-only — it squeezes a JPEG and returns a JPEG. Dinky converts formats, where the real savings are (30–80% vs same-format squeeze).
+- vs **ImageOptim**: ImageOptim is lossless-only — it squeezes a JPEG and returns a JPEG. Dinky converts image formats, where the real savings are (30–80% vs same-format squeeze).
 - vs **TinyPNG**: TinyPNG uploads images to their servers. Dinky is 100% local.
 - vs **Squoosh**: Browser-based, one image at a time. Dinky is native, batch, offline.
-- vs **Optimage**: Similar feature set but Optimage costs $15 and weighs 62 MB. Dinky is free and ~12 MB.
+- vs **Optimage**: Similar feature set but Optimage costs $15 and weighs 62 MB. Dinky is free and ~14 MB.
 
 ## Links
 
 - Website: https://dinkyimg.app
+- Support: help@dinkyfiles.com
 - GitHub: https://github.com/heyderekj/dinky
 - Latest release: https://github.com/heyderekj/dinky/releases/latest
 - Download v1.6.3: https://github.com/heyderekj/dinky/releases/download/v1.6.3/Dinky-1.6.3.dmg

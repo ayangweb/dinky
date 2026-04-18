@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import CoreGraphics
 import ImageIO
 
@@ -12,18 +13,27 @@ struct CompressionResult {
     let originalSize: Int64
     let outputSize: Int64
     let detectedContentType: ContentType?   // nil when Smart Quality is off
+    var videoDuration: Double? = nil
 }
 
 enum CompressionError: LocalizedError {
     case binaryNotFound(String)
     case processFailed(Int32, String)
     case outputMissing
+    case pdfLoadFailed
+    case pdfPageRenderFailed(Int)
+    case videoExportFailed(String)
+    case videoExportSessionUnavailable
 
     var errorDescription: String? {
         switch self {
         case .binaryNotFound(let n): return "Binary '\(n)' not found in app bundle."
         case .processFailed(let c, let e): return "Process exited \(c): \(e)"
         case .outputMissing: return "Output file was not created."
+        case .pdfLoadFailed: return "Could not open the PDF file."
+        case .pdfPageRenderFailed(let p): return "Could not render page \(p + 1)."
+        case .videoExportFailed(let msg): return "Video export failed: \(msg)"
+        case .videoExportSessionUnavailable: return "Could not create export session for this video."
         }
     }
 }
@@ -113,9 +123,12 @@ actor CompressionService {
             )
         } else {
             let q = quality(for: format, content: detected)
+            // For UI/screenshot WebP, near-lossless preserves text edges that
+            // even q=92 lossy softens. AVIF UI handles crispness via 4:4:4 + slower speed.
+            let nl: Int? = (format == .webp && detected == .ui) ? 60 : nil
             try await compressAtQuality(source: workURL, quality: q,
                                         format: format, strip: stripMetadata, output: outputURL,
-                                        content: detected)
+                                        content: detected, nearLossless: nl)
         }
 
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
@@ -204,25 +217,33 @@ actor CompressionService {
     private func compressAtQuality(
         source: URL, quality: Int,
         format: CompressionFormat, strip: Bool, output: URL,
-        content: ContentType?
+        content: ContentType?,
+        nearLossless: Int? = nil
     ) async throws {
         switch format {
-        case .webp: try await runCwebp(source: source, quality: quality, strip: strip, output: output, content: content)
+        case .webp: try await runCwebp(source: source, quality: quality, strip: strip, output: output, content: content, nearLossless: nearLossless)
         case .avif: try await runAvifenc(source: source, quality: quality, strip: strip, output: output, content: content)
         case .png:  try await runOxipng(source: source, strip: strip, output: output)
         }
     }
 
-    private func runCwebp(source: URL, quality: Int, strip: Bool, output: URL, content: ContentType?) async throws {
+    private func runCwebp(source: URL, quality: Int, strip: Bool, output: URL, content: ContentType?, nearLossless: Int? = nil) async throws {
         let binary = try binaryURL("cwebp")
         let q = String(quality)
-        // -preset must come first — it resets other flags.
         var args: [String]
-        switch content {
-        case .photo:  args = ["-preset", "photo",   "-m", "6", "-sharp_yuv", "-pass", "6", "-af", "-q", q]
-        case .ui:     args = ["-preset", "text",    "-m", "6", "-alpha_q", "100", "-exact", "-q", q]
-        case .mixed:  args = ["-preset", "picture", "-m", "6", "-sharp_yuv", "-q", q]
-        case .none:   args = ["-preset", "picture", "-m", "6", "-q", q]
+        if let nl = nearLossless {
+            // Near-lossless: preprocesses pixel values for better compression
+            // while keeping edges pixel-perfect. Best for UI / text screenshots.
+            // -q here controls compression effort, not visual quality.
+            args = ["-near_lossless", String(nl), "-m", "6", "-alpha_q", "100", "-exact", "-q", "100"]
+        } else {
+            // -preset must come first — it resets other flags.
+            switch content {
+            case .photo:  args = ["-preset", "photo",   "-m", "6", "-sharp_yuv", "-pass", "6", "-af", "-q", q]
+            case .ui:     args = ["-preset", "text",    "-m", "6", "-sharp_yuv", "-alpha_q", "100", "-exact", "-q", q]
+            case .mixed:  args = ["-preset", "picture", "-m", "6", "-sharp_yuv", "-q", q]
+            case .none:   args = ["-preset", "picture", "-m", "6", "-q", q]
+            }
         }
         if strip { args += ["-metadata", "none"] }
         args += [source.path, "-o", output.path]
@@ -236,7 +257,9 @@ actor CompressionService {
         var args: [String]
         switch content {
         case .photo:  args = ["--speed", "4", "--yuv", "420", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
-        case .ui:     args = ["--speed", "6", "--yuv", "444", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
+        // UI: 4:4:4 keeps color edges sharp (no chroma subsampling).
+        // Speed 4 (slower than the default 6) noticeably improves text crispness.
+        case .ui:     args = ["--speed", "4", "--yuv", "444", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
         case .mixed:  args = ["--speed", "5", "--yuv", "422", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
         case .none:   args = ["--speed", "5", "--yuv", "420", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
         }
@@ -285,6 +308,98 @@ actor CompressionService {
             do    { try process.run() }
             catch { cont.resume(throwing: error) }
         }
+    }
+
+    // MARK: - PDF compression
+
+    func compressPDF(
+        source: URL,
+        outputMode: PDFOutputMode,
+        quality: PDFQuality,
+        grayscale: Bool,
+        stripMetadata: Bool,
+        outputURL: URL
+    ) async throws -> CompressionResult {
+        let originalSize = fileSize(source)
+
+        try FileManager.default.createDirectory(
+            at: outputURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        switch outputMode {
+        case .preserveStructure:
+            try PDFCompressor.preserveStructure(source: source, stripMetadata: stripMetadata, outputURL: outputURL)
+        case .flattenPages:
+            try PDFCompressor.compressFlattened(
+                source: source, quality: quality, grayscale: grayscale,
+                stripMetadata: stripMetadata, outputURL: outputURL
+            )
+        }
+
+        guard FileManager.default.fileExists(atPath: outputURL.path) else {
+            throw CompressionError.outputMissing
+        }
+
+        return CompressionResult(outputURL: outputURL,
+                                 originalSize: originalSize,
+                                 outputSize: fileSize(outputURL),
+                                 detectedContentType: nil)
+    }
+
+    // MARK: - Video compression
+
+    func compressVideo(
+        source: URL,
+        quality: VideoQuality,
+        codec: VideoCodecFamily,
+        removeAudio: Bool,
+        outputURL: URL
+    ) async throws -> CompressionResult {
+        try await compressVideo(
+            asset: VideoCompressor.makeURLAsset(url: source),
+            source: source,
+            quality: quality,
+            codec: codec,
+            removeAudio: removeAudio,
+            outputURL: outputURL
+        )
+    }
+
+    /// Reuses a pre-built ``AVURLAsset`` (e.g. shared with ``VideoSmartQuality``) to avoid reopening the file.
+    func compressVideo(
+        asset: AVURLAsset,
+        source: URL,
+        quality: VideoQuality,
+        codec: VideoCodecFamily,
+        removeAudio: Bool,
+        outputURL: URL
+    ) async throws -> CompressionResult {
+        let originalSize = fileSize(source)
+
+        try FileManager.default.createDirectory(
+            at: outputURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let duration = try await VideoCompressor.compress(
+            asset: asset,
+            sourceForMetadata: source,
+            quality: quality,
+            codec: codec,
+            removeAudio: removeAudio,
+            outputURL: outputURL
+        )
+
+        guard FileManager.default.fileExists(atPath: outputURL.path) else {
+            throw CompressionError.outputMissing
+        }
+
+        return CompressionResult(outputURL: outputURL,
+                                 originalSize: originalSize,
+                                 outputSize: fileSize(outputURL),
+                                 detectedContentType: nil,
+                                 videoDuration: duration)
     }
 
     // MARK: - Helpers

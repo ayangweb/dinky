@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 struct ImagePreviewSheet: View {
-    let item: ImageItem
+    let item: CompressionItem
     @Environment(\.dismiss) private var dismiss
 
     enum PreviewMode { case sideBySide, slider }

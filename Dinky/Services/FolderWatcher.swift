@@ -4,10 +4,15 @@ final class FolderWatcher: ObservableObject {
     var onNewFiles: (([URL]) -> Void)?
     private var stream: FSEventStreamRef?
     private var retainedSelf: UnsafeMutableRawPointer?
-    private let imageExtensions = Set(["jpg", "jpeg", "png", "webp", "avif", "tiff", "bmp"])
 
-    func start(at path: String) {
+    /// Subscribes to filesystem changes under one or more directories (`paths` must be non-empty).
+    func start(paths: [String]) {
         stop()
+        let normalized = paths
+            .map { ($0 as NSString).standardizingPath }
+            .filter { !$0.isEmpty }
+        guard !normalized.isEmpty else { return }
+
         let retained = Unmanaged.passRetained(self).toOpaque()
         retainedSelf = retained
         var ctx = FSEventStreamContext(version: 0, info: retained,
@@ -18,24 +23,23 @@ final class FolderWatcher: ObservableObject {
             let cfPaths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
             guard let paths = cfPaths as? [String] else { return }
             let now = Date()
-            let imageExts = watcher.imageExtensions
             let urls = paths
                 .map { URL(fileURLWithPath: $0) }
-                .filter { imageExts.contains($0.pathExtension.lowercased()) }
+                .filter { MediaTypeDetector.detect($0) != nil }
                 .filter { url in
-                    guard let created = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate else { return false }
-                    return now.timeIntervalSince(created) < 10
+                    guard let rv = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey]),
+                          let created = rv.creationDate else { return false }
+                    let modified = rv.contentModificationDate ?? created
+                    let ref = modified > created ? modified : created
+                    return now.timeIntervalSince(ref) < 30
                 }
             guard !urls.isEmpty else { return }
-            // Dispatch async so the FSEvents callback can return before @MainActor work runs.
-            // Calling a @MainActor-isolated method synchronously from a DispatchSource callback
-            // on DispatchQueue.main deadlocks the Swift concurrency executor.
             DispatchQueue.main.async { watcher.onNewFiles?(urls) }
         }
 
         stream = FSEventStreamCreate(
             nil, callback, &ctx,
-            [path] as CFArray,
+            normalized as CFArray,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             1.5,
             FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)

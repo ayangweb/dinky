@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import PDFKit
 
 enum CompressionStatus {
     case pending
@@ -18,18 +19,33 @@ enum CompressionStatus {
 }
 
 @MainActor
-final class ImageItem: ObservableObject, Identifiable {
+final class CompressionItem: ObservableObject, Identifiable {
     let id = UUID()
     let sourceURL: URL
+    let mediaType: MediaType
     var formatOverride: CompressionFormat? = nil
 
     @Published var status: CompressionStatus = .pending
     @Published var detectedContentType: ContentType? = nil
 
     var forceCompress: Bool = false
+    var pageCount: Int? = nil
+    var videoDuration: Double? = nil
+    /// When set, compression uses this preset’s stored options (`CompressionPreset`) instead of the sidebar.
+    var presetID: UUID? = nil
 
-    init(sourceURL: URL) {
+    /// One-shot flatten-PDF quality from the results list context menu; skips smart inference when set.
+    var pdfQualityOverride: PDFQuality? = nil
+    /// One-shot video quality + codec from the context menu; skips smart inference when set.
+    var videoRecompressOverride: (quality: VideoQuality, codec: VideoCodecFamily)? = nil
+
+    init(sourceURL: URL, presetID: UUID? = nil) {
         self.sourceURL = sourceURL
+        self.presetID = presetID
+        self.mediaType = MediaTypeDetector.detect(sourceURL) ?? .image
+        if self.mediaType == .pdf {
+            self.pageCount = PDFDocument(url: sourceURL)?.pageCount
+        }
     }
 
     var filename: String { sourceURL.lastPathComponent }
@@ -64,3 +80,6 @@ final class ImageItem: ObservableObject, Identifiable {
         }
     }
 }
+
+// Keep ImageItem as a typealias so any code not yet updated still compiles.
+typealias ImageItem = CompressionItem

@@ -33,11 +33,16 @@
 		CI000001000000000000001 /* ClipboardImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CI100001000000000000001 /* ClipboardImporter.swift */; };
 		FW000001000000000000001 /* FolderWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = FW100001000000000000001 /* FolderWatcher.swift */; };
 		IPS00001000000000000001 /* ImagePreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = IPS10001000000000000001 /* ImagePreviewSheet.swift */; };
-		PV000001000000000000001 /* PresetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = PV100001000000000000001 /* PresetsView.swift */; };
 		HS000001000000000000001 /* HistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = HS100001000000000000001 /* HistorySheet.swift */; };
 		CP000001000000000000001 /* CompressionPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = CP100001000000000000001 /* CompressionPreset.swift */; };
 		SR000001000000000000001 /* SessionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = SR100001000000000000001 /* SessionRecord.swift */; };
 		INT00001000000000000001 /* CompressImagesIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = INT10001000000000000001 /* CompressImagesIntent.swift */; };
+		MT000001000000000000001 /* MediaType.swift in Sources */ = {isa = PBXBuildFile; fileRef = MT100001000000000000001 /* MediaType.swift */; };
+		PC000001000000000000001 /* PDFCompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = PC100001000000000000001 /* PDFCompressor.swift */; };
+		VC000001000000000000001 /* VideoCompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VC100001000000000000001 /* VideoCompressor.swift */; };
+		PQ000001000000000000001 /* PDFSmartQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = PQ100001000000000000001 /* PDFSmartQuality.swift */; };
+		VQ000001000000000000001 /* VideoSmartQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = VQ100001000000000000001 /* VideoSmartQuality.swift */; };
+		WR000001000000000000001 /* WatchRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = WR100001000000000000001 /* WatchRegistry.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -71,11 +76,16 @@
 		CI100001000000000000001 /* ClipboardImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardImporter.swift; sourceTree = "<group>"; };
 		FW100001000000000000001 /* FolderWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderWatcher.swift; sourceTree = "<group>"; };
 		IPS10001000000000000001 /* ImagePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePreviewSheet.swift; sourceTree = "<group>"; };
-		PV100001000000000000001 /* PresetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetsView.swift; sourceTree = "<group>"; };
 		HS100001000000000000001 /* HistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySheet.swift; sourceTree = "<group>"; };
 		CP100001000000000000001 /* CompressionPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompressionPreset.swift; sourceTree = "<group>"; };
 		SR100001000000000000001 /* SessionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRecord.swift; sourceTree = "<group>"; };
 		INT10001000000000000001 /* CompressImagesIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompressImagesIntent.swift; sourceTree = "<group>"; };
+		MT100001000000000000001 /* MediaType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaType.swift; sourceTree = "<group>"; };
+		PC100001000000000000001 /* PDFCompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFCompressor.swift; sourceTree = "<group>"; };
+		VC100001000000000000001 /* VideoCompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCompressor.swift; sourceTree = "<group>"; };
+		PQ100001000000000000001 /* PDFSmartQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFSmartQuality.swift; sourceTree = "<group>"; };
+		VQ100001000000000000001 /* VideoSmartQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoSmartQuality.swift; sourceTree = "<group>"; };
+		WR100001000000000000001 /* WatchRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRegistry.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +107,7 @@
 				F5D3DAE858994431BC84C13F /* DinkyPreferences.swift */,
 				CP100001000000000000001 /* CompressionPreset.swift */,
 				SR100001000000000000001 /* SessionRecord.swift */,
+				MT100001000000000000001 /* MediaType.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -110,7 +121,6 @@
 				BB100001000000000000001 /* SidebarView.swift */,
 				UB100001000000000000001 /* UpdateBanner.swift */,
 				IPS10001000000000000001 /* ImagePreviewSheet.swift */,
-				PV100001000000000000001 /* PresetsView.swift */,
 				HS100001000000000000001 /* HistorySheet.swift */,
 			);
 			path = Views;
@@ -123,6 +133,11 @@
 				CC100001000000000000001 /* ContentClassifier.swift */,
 				CI100001000000000000001 /* ClipboardImporter.swift */,
 				FW100001000000000000001 /* FolderWatcher.swift */,
+				PC100001000000000000001 /* PDFCompressor.swift */,
+				VC100001000000000000001 /* VideoCompressor.swift */,
+				PQ100001000000000000001 /* PDFSmartQuality.swift */,
+				VQ100001000000000000001 /* VideoSmartQuality.swift */,
+				WR100001000000000000001 /* WatchRegistry.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -297,11 +312,16 @@
 				CI000001000000000000001 /* ClipboardImporter.swift in Sources */,
 				FW000001000000000000001 /* FolderWatcher.swift in Sources */,
 				IPS00001000000000000001 /* ImagePreviewSheet.swift in Sources */,
-				PV000001000000000000001 /* PresetsView.swift in Sources */,
 				HS000001000000000000001 /* HistorySheet.swift in Sources */,
 				CP000001000000000000001 /* CompressionPreset.swift in Sources */,
 				SR000001000000000000001 /* SessionRecord.swift in Sources */,
 				INT00001000000000000001 /* CompressImagesIntent.swift in Sources */,
+				MT000001000000000000001 /* MediaType.swift in Sources */,
+				PC000001000000000000001 /* PDFCompressor.swift in Sources */,
+				VC000001000000000000001 /* VideoCompressor.swift in Sources */,
+				PQ000001000000000000001 /* PDFSmartQuality.swift in Sources */,
+				VQ000001000000000000001 /* VideoSmartQuality.swift in Sources */,
+				WR000001000000000000001 /* WatchRegistry.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

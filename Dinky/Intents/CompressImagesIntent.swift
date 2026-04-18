@@ -4,7 +4,7 @@ import Foundation
 struct CompressImagesIntent: AppIntent {
     static var title: LocalizedStringResource = "Compress Images"
     static var description = IntentDescription(
-        "Compresses image files using Dinky and returns the compressed versions.",
+        "Compresses image files using Dinky and returns the compressed versions. Uses your chosen format below, plus Smart quality (if enabled), strip metadata, resize, and file-size limits from the app’s Settings — not Auto format from the sidebar.",
         categoryName: "Images"
     )
 
@@ -20,7 +20,8 @@ struct CompressImagesIntent: AppIntent {
 
     func perform() async throws -> some ReturnsValue<[IntentFile]> {
         let outputFormat = format.compressionFormat
-        let goals = CompressionGoals(maxWidth: nil, maxFileSizeKB: nil)
+        let settings = DinkyPreferences.compressionSettingsForIntent()
+        let goals = settings.goals
         var results: [IntentFile] = []
 
         for image in images {
@@ -45,10 +46,11 @@ struct CompressImagesIntent: AppIntent {
                 source: tmpIn,
                 format: outputFormat,
                 goals: goals,
-                stripMetadata: true,
+                stripMetadata: settings.stripMetadata,
                 outputURL: tmpOut,
                 moveToTrash: false,
-                smartQuality: false
+                smartQuality: settings.smartQuality,
+                contentTypeHint: settings.contentTypeHint
             )
             defer { try? FileManager.default.removeItem(at: result.outputURL) }
 

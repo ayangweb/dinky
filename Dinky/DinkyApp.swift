@@ -1,17 +1,29 @@
 import SwiftUI
 import AppKit
 
+/// Shares one `DinkyPreferences` instance between `ContentViewModel` and the environment.
+@MainActor
+private final class DinkyRootModel: ObservableObject {
+    let prefs: DinkyPreferences
+    let contentVM: ContentViewModel
+
+    init() {
+        let p = DinkyPreferences()
+        self.prefs = p
+        self.contentVM = ContentViewModel(prefs: p)
+    }
+}
+
 @main
 struct DinkyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var prefs = DinkyPreferences()
+    @StateObject private var root = DinkyRootModel()
     @StateObject private var updater = UpdateChecker()
-    @StateObject private var vm = ContentViewModel(prefs: DinkyPreferences())
 
     var body: some Scene {
         WindowGroup {
-            ContentView(prefs: prefs, vm: vm)
-                .environmentObject(prefs)
+            ContentView(prefs: root.prefs, vm: root.contentVM)
+                .environmentObject(root.prefs)
                 .environmentObject(updater)
                 .background(.ultraThinMaterial)        // frosted glass fill
                 .background(TransparentWindow())       // makes NSWindow itself see-through
@@ -27,7 +39,7 @@ struct DinkyApp: App {
         }
         .commands {
             CommandGroup(after: .newItem) {
-                Button("Open Images…") {
+                Button("Open Files…") {
                     NotificationCenter.default.post(name: .dinkyOpenPanel, object: nil)
                 }
                 .keyboardShortcut("o", modifiers: .command)
@@ -54,7 +66,7 @@ struct DinkyApp: App {
 
         Settings {
             PreferencesView()
-                .environmentObject(prefs)
+                .environmentObject(root.prefs)
                 .environmentObject(updater)
         }
     }
@@ -89,7 +101,11 @@ private func showAboutPanel() {
 
     var ghAttrs = linkAttrs
     ghAttrs[.link] = URL(string: "https://github.com/heyderekj/dinky")!
-    credits.append(NSAttributedString(string: "github.com/heyderekj/dinky", attributes: ghAttrs))
+    credits.append(NSAttributedString(string: "github.com/heyderekj/dinky\n", attributes: ghAttrs))
+
+    var supportAttrs = linkAttrs
+    supportAttrs[.link] = URL(string: "mailto:\(S.supportEmail)")!
+    credits.append(NSAttributedString(string: S.supportEmail, attributes: supportAttrs))
 
     NSApplication.shared.orderFrontStandardAboutPanel(options: [
         NSApplication.AboutPanelOptionKey.credits: credits

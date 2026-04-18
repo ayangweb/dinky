@@ -2,27 +2,95 @@ import SwiftUI
 import AppKit
 import UserNotifications
 
+// MARK: - In-window navigation (contextual links between preference tabs)
+
+private enum OpenPreferencesRelatedTabKey: EnvironmentKey {
+    static let defaultValue: (PreferencesTab) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    /// Switch the Settings window to another tab (used for small “see also” links).
+    fileprivate var openPreferencesRelatedTab: (PreferencesTab) -> Void {
+        get { self[OpenPreferencesRelatedTabKey.self] }
+        set { self[OpenPreferencesRelatedTabKey.self] = newValue }
+    }
+}
+
+/// Small accent link, same spirit as ``SidebarView``’s “Change folder or naming…” / preset rows.
+private struct PreferencesRelatedTabLink: View {
+    @Environment(\.openPreferencesRelatedTab) private var openTab
+    let title: String
+    let tab: PreferencesTab
+
+    var body: some View {
+        Button(title) { openTab(tab) }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundStyle(Color.accentColor)
+    }
+}
+
+/// Tabs in the Settings window — use `openWindow(to:)` to deep-link from the main window sidebar.
+enum PreferencesTab: Int, CaseIterable, Hashable {
+    case general = 0
+    case output = 1
+    case watch = 2
+    case presets = 3
+
+    static let pendingTabUserDefaultsKey = "prefs.pendingTab"
+
+    /// Opens Settings and selects this tab (including when the window is already open).
+    static func openWindow(to tab: PreferencesTab) {
+        UserDefaults.standard.set(tab.rawValue, forKey: pendingTabUserDefaultsKey)
+        NotificationCenter.default.post(name: .dinkySelectPreferencesTab, object: tab.rawValue)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    fileprivate static func consumePendingSelection() -> PreferencesTab? {
+        guard UserDefaults.standard.object(forKey: pendingTabUserDefaultsKey) != nil else { return nil }
+        let raw = UserDefaults.standard.integer(forKey: pendingTabUserDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: pendingTabUserDefaultsKey)
+        return PreferencesTab(rawValue: raw)
+    }
+}
+
 struct PreferencesView: View {
     @EnvironmentObject var prefs: DinkyPreferences
     @EnvironmentObject var updater: UpdateChecker
+    @State private var selectedTab: PreferencesTab = .general
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             GeneralTab()
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(PreferencesTab.general)
                 .environmentObject(prefs)
                 .environmentObject(updater)
             OutputTab()
                 .tabItem { Label("Output", systemImage: "folder") }
+                .tag(PreferencesTab.output)
                 .environmentObject(prefs)
             WatchFoldersTab()
                 .tabItem { Label("Watch", systemImage: "eye") }
+                .tag(PreferencesTab.watch)
                 .environmentObject(prefs)
             PresetsTab()
                 .tabItem { Label("Presets", systemImage: "slider.horizontal.3") }
+                .tag(PreferencesTab.presets)
                 .environmentObject(prefs)
         }
-        .frame(width: 480, height: 460)
+        .environment(\.openPreferencesRelatedTab, { selectedTab = $0 })
+        .frame(width: 480, height: 520)
+        .onAppear {
+            if let tab = PreferencesTab.consumePendingSelection() {
+                selectedTab = tab
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dinkySelectPreferencesTab)) { note in
+            guard let raw = note.object as? Int, let tab = PreferencesTab(rawValue: raw) else { return }
+            selectedTab = tab
+            UserDefaults.standard.removeObject(forKey: PreferencesTab.pendingTabUserDefaultsKey)
+        }
     }
 }
 
@@ -67,7 +135,22 @@ private struct GeneralTab: View {
                     Text("10%").tag(10)
                 }
                 .pickerStyle(.segmented)
-                Text("Skip files where compression savings fall below this threshold.")
+                Text("Applies to images, PDFs, and videos. Skip files where savings fall below this threshold.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Picker(S.concurrentCompressionPickerLabel, selection: Binding(
+                    get: { DinkyPreferences.normalizedConcurrentTasks(prefs.concurrentTasks) },
+                    set: { prefs.concurrentTasks = $0 }
+                )) {
+                    ForEach(DinkyPreferences.concurrentCompressionTiers, id: \.self) { limit in
+                        Text(S.concurrentCompressionTierOption(limit: limit))
+                            .tag(limit)
+                            .accessibilityLabel(S.concurrentCompressionAccessibilityLabel(limit: limit))
+                    }
+                }
+                .pickerStyle(.menu)
+                Text(S.concurrentCompressionFootnote)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -77,6 +160,8 @@ private struct GeneralTab: View {
                 ))
             } header: {
                 Text("Compression")
+            } footer: {
+                PreferencesRelatedTabLink(title: "Per-preset compression & media…", tab: .presets)
             }
 
             // 3. Alerts
@@ -97,9 +182,49 @@ private struct GeneralTab: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Text("Notifications")
+            } footer: {
+                Button("Notification settings…") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(Color.accentColor)
             }
 
-            // 4. Accessibility
+            // 4. Sidebar
+            Section {
+                Toggle("Use simple sidebar", isOn: Binding(
+                    get: { prefs.sidebarSimpleMode },
+                    set: { prefs.applySidebarSimpleMode($0) }
+                ))
+                Text("On by default: quick choices and plain-language summaries. Turn off to show every image, PDF, and video control in the sidebar.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Show Images in sidebar", isOn: Binding(
+                    get: { prefs.showImagesSection },
+                    set: { prefs.setScopedSidebarSection(.images, isOn: $0) }
+                ))
+                Toggle("Show Videos in sidebar", isOn: Binding(
+                    get: { prefs.showVideosSection },
+                    set: { prefs.setScopedSidebarSection(.videos, isOn: $0) }
+                ))
+                Toggle("Show PDFs in sidebar", isOn: Binding(
+                    get: { prefs.showPDFsSection },
+                    set: { prefs.setScopedSidebarSection(.pdfs, isOn: $0) }
+                ))
+                Text(prefs.sidebarSimpleMode
+                     ? "Simple sidebar shows quick choices only. Turn on a section below for the full sidebar with that tab, or turn off simple sidebar to enable every section."
+                     : "Sections you turn off stay available in Settings and in the full sidebar.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Sidebar")
+            } footer: {
+                PreferencesRelatedTabLink(title: "Presets & automatic folders…", tab: .presets)
+            }
+
+            // 5. Accessibility
             Section {
                 Toggle("Reduce motion", isOn: Binding(
                     get: { prefs.reduceMotion },
@@ -112,6 +237,11 @@ private struct GeneralTab: View {
                 Text("Accessibility")
             }
 
+            Section {
+                Link(S.supportEmail, destination: URL(string: "mailto:\(S.supportEmail)")!)
+            } header: {
+                Text("Support")
+            }
         }
         .formStyle(.grouped)
         .padding(.top, 8)
@@ -194,8 +324,13 @@ private struct OutputTab: View {
                 }
             } header: {
                 Text("Filename")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("These are the defaults for the main window. Presets can set their own folder and filename rules.")
+                        .font(.caption)
+                    PreferencesRelatedTabLink(title: "Per-preset output…", tab: .presets)
+                }
             }
-
         }
         .formStyle(.grouped)
         .padding(.top, 8)
@@ -219,12 +354,25 @@ private struct OutputTab: View {
 
 // MARK: - Presets
 
+/// Sub-panel when **Applies to** is All (Image / PDF / Video); ignored for single-type presets.
+private enum PresetMediaSettingsTab: String, CaseIterable, Identifiable {
+    case image, pdf, video
+    var id: String { rawValue }
+}
+
 private struct PresetsTab: View {
     @EnvironmentObject var prefs: DinkyPreferences
     @State private var selectedID: UUID? = nil
+    @State private var presetMediaSettingsTab: PresetMediaSettingsTab = .image
 
     private var selectedPreset: CompressionPreset? {
         prefs.savedPresets.first { $0.id == selectedID }
+    }
+
+    private func presetListSecondaryLine(_ preset: CompressionPreset) -> String {
+        let scope = PresetMediaScope(rawValue: preset.presetMediaScopeRaw)?.displayName ?? PresetMediaScope.all.displayName
+        let fmt = preset.autoFormat ? "Auto" : preset.format.displayName
+        return "\(scope) · \(fmt)"
     }
 
     var body: some View {
@@ -234,6 +382,45 @@ private struct PresetsTab: View {
         }
         .formStyle(.grouped)
         .animation(.easeInOut(duration: 0.2), value: selectedID)
+        .animation(.easeInOut(duration: 0.15), value: presetMediaSettingsTab)
+        .animation(.easeInOut(duration: 0.15), value: selectedPreset?.presetMediaScopeRaw)
+        .onChange(of: selectedID) { _, newID in
+            guard let id = newID,
+                  let p = prefs.savedPresets.first(where: { $0.id == id }) else { return }
+            syncMediaTabToPresetScope(PresetMediaScope(rawValue: p.presetMediaScopeRaw) ?? .all)
+        }
+        .onChange(of: selectedPreset?.presetMediaScopeRaw) { _, raw in
+            guard let raw, let scope = PresetMediaScope(rawValue: raw) else { return }
+            switch scope {
+            case .all: break
+            case .image: presetMediaSettingsTab = .image
+            case .pdf: presetMediaSettingsTab = .pdf
+            case .video: presetMediaSettingsTab = .video
+            }
+        }
+    }
+
+    private func syncMediaTabToPresetScope(_ scope: PresetMediaScope) {
+        switch scope {
+        case .all: break
+        case .image: presetMediaSettingsTab = .image
+        case .pdf: presetMediaSettingsTab = .pdf
+        case .video: presetMediaSettingsTab = .video
+        }
+    }
+
+    private func presetMediaScope(for snapshot: CompressionPreset) -> PresetMediaScope {
+        let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        return PresetMediaScope(rawValue: live.presetMediaScopeRaw) ?? .all
+    }
+
+    private func effectiveMediaTab(for snapshot: CompressionPreset) -> PresetMediaSettingsTab {
+        switch presetMediaScope(for: snapshot) {
+        case .all: return presetMediaSettingsTab
+        case .image: return .image
+        case .pdf: return .pdf
+        case .video: return .video
+        }
     }
 
     private var presetListSection: some View {
@@ -251,7 +438,7 @@ private struct PresetsTab: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(preset.name).foregroundStyle(.primary)
-                                Text(preset.autoFormat ? "Auto" : preset.format.displayName)
+                                Text(presetListSecondaryLine(preset))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -287,58 +474,70 @@ private struct PresetsTab: View {
         Section("Name") {
             TextField("Preset name", text: binding(\.name, snapshot: snapshot))
         }
-        Section("Format") {
-            FormatChipPicker(
-                autoFormat: binding(\.autoFormat, snapshot: snapshot),
-                selectedFormat: binding(\.format, snapshot: snapshot)
-            )
-        }
-        Section("Quality") {
+        Section("Compression") {
             let liveForQuality = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
             Toggle("Smart quality", isOn: binding(\.smartQuality, snapshot: snapshot))
             if !liveForQuality.smartQuality {
-                ContentTypeChipPicker(contentTypeHintRaw: binding(\.contentTypeHintRaw, snapshot: snapshot))
+                if presetMediaScope(for: snapshot) == .all {
+                    Picker("Manual compression", selection: $presetMediaSettingsTab) {
+                        Text("Image").tag(PresetMediaSettingsTab.image)
+                        Text("PDF").tag(PresetMediaSettingsTab.pdf)
+                        Text("Video").tag(PresetMediaSettingsTab.video)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("Manual compression by media type")
+                }
+                switch effectiveMediaTab(for: snapshot) {
+                case .image:
+                    ContentTypeChipPicker(contentTypeHintRaw: binding(\.contentTypeHintRaw, snapshot: snapshot))
+                case .pdf:
+                    presetManualCompressionPDFControls(snapshot)
+                case .video:
+                    presetManualCompressionVideoControls(snapshot)
+                }
             } else {
-                Text("Detects content type per image automatically.")
+                Text("Adjusts compression from each file: image encoding from content, PDF tier from the document, video strength from resolution and bitrate.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        Section("Max Width") {
-            Toggle("Limit width", isOn: binding(\.maxWidthEnabled, snapshot: snapshot))
-            if snapshot.maxWidthEnabled {
-                presetChips(
-                    presets: [("640", 640), ("1080", 1080), ("1280", 1280),
-                              ("1920", 1920), ("2560", 2560), ("3840", 3840)],
-                    current: snapshot.maxWidth,
-                    onSelect: { set(\.maxWidth, to: $0, for: snapshot) }
-                )
-                HStack(spacing: 6) {
-                    TextField("", value: binding(\.maxWidth, snapshot: snapshot), format: .number)
-                        .textFieldStyle(.roundedBorder).frame(width: 80)
-                        .labelsHidden()
-                    Text("px").foregroundStyle(.secondary)
+        Section {
+            Picker("Applies to", selection: binding(\.presetMediaScopeRaw, snapshot: snapshot)) {
+                ForEach(PresetMediaScope.allCases) { scope in
+                    Text(scope.displayName).tag(scope.rawValue)
                 }
             }
-        }
-        Section("Max File Size") {
-            Toggle("Limit file size", isOn: binding(\.maxFileSizeEnabled, snapshot: snapshot))
-            if snapshot.maxFileSizeEnabled {
-                presetChips(
-                    presets: [("0.5 MB", 512), ("1 MB", 1024), ("2 MB", 2048),
-                              ("5 MB", 5120), ("10 MB", 10240)],
-                    current: snapshot.maxFileSizeKB,
-                    onSelect: { set(\.maxFileSizeKB, to: $0, for: snapshot) }
-                )
-                HStack(spacing: 6) {
-                    TextField("", value: mbBinding(for: snapshot), format: .number)
-                        .textFieldStyle(.roundedBorder).frame(width: 80)
-                        .labelsHidden()
-                    Text("MB").foregroundStyle(.secondary)
+            if presetMediaScope(for: snapshot) == .all {
+                Picker("Media settings", selection: $presetMediaSettingsTab) {
+                    Text("Image").tag(PresetMediaSettingsTab.image)
+                    Text("PDF").tag(PresetMediaSettingsTab.pdf)
+                    Text("Video").tag(PresetMediaSettingsTab.video)
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("Media settings")
+            }
+            switch effectiveMediaTab(for: snapshot) {
+            case .image:
+                presetImageControls(snapshot)
+            case .pdf:
+                presetPDFControls(snapshot)
+            case .video:
+                presetVideoControls(snapshot)
+            }
+        } header: {
+            Text("Media")
+        } footer: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Watch folders use this preset only for matching file types. Other files use the global sidebar settings.")
+                    .font(.caption)
+                PreferencesRelatedTabLink(title: "Global watch folder…", tab: .watch)
             }
         }
-        Section("Destination") {
+        Section {
             let liveForDest = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
             Picker("Save to", selection: binding(\.saveLocationRaw, snapshot: snapshot)) {
                 Text("Same folder as original").tag("sameFolder")
@@ -375,14 +574,24 @@ private struct PresetsTab: View {
                     TextField("-dinky", text: binding(\.customSuffix, snapshot: snapshot))
                 }
             }
+        } header: {
+            Text("Destination")
+        } footer: {
+            PreferencesRelatedTabLink(title: "Default Output settings…", tab: .output)
         }
         Section("Watch Folder") {
             let liveForWatch = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
             Toggle("Watch this folder", isOn: binding(\.watchFolderEnabled, snapshot: snapshot))
             if liveForWatch.watchFolderEnabled {
                 Picker("Folder", selection: binding(\.watchFolderModeRaw, snapshot: snapshot)) {
-                    Text("Same as destination").tag("destination")
+                    Text("Use global watch").tag("global")
                     Text("Unique folder…").tag("unique")
+                }
+                if liveForWatch.watchFolderModeRaw == "global" {
+                    Text("Uses the folder set in Settings → Watch → Global, with the main window’s current settings. Add a unique folder below only if you want this preset’s options applied automatically somewhere else.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    PreferencesRelatedTabLink(title: "Edit global watch folder…", tab: .watch)
                 }
                 if liveForWatch.watchFolderModeRaw == "unique" {
                     HStack {
@@ -397,7 +606,7 @@ private struct PresetsTab: View {
                             .buttonStyle(.bordered)
                     }
                 }
-                Text("New images added to this folder are automatically compressed using this preset.")
+                Text("Unique folder: new files are compressed with this preset’s saved options, independent of the sidebar.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -422,6 +631,149 @@ private struct PresetsTab: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// Fixed PDF tier when Smart quality is off (flatten mode). Output mode lives under Media.
+    @ViewBuilder
+    private func presetManualCompressionPDFControls(_ snapshot: CompressionPreset) -> some View {
+        let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        VStack(alignment: .leading, spacing: 8) {
+            if PDFOutputMode(rawValue: live.pdfOutputModeRaw) == .flattenPages {
+                QualityChipPicker(
+                    options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                    selected: binding(\.pdfQualityRaw, snapshot: snapshot)
+                )
+            } else {
+                Text("Low / Medium / High apply when Flatten (smallest) is selected under Media.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Fixed video strength when Smart quality is off. Codec and audio live under Media.
+    @ViewBuilder
+    private func presetManualCompressionVideoControls(_ snapshot: CompressionPreset) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            QualityChipPicker(
+                options: VideoQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                selected: binding(\.videoQualityRaw, snapshot: snapshot)
+            )
+            Text("Codec and audio options are under Media.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func presetImageControls(_ snapshot: CompressionPreset) -> some View {
+        let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        // Single container so Form doesn’t allocate one row per child (Divider/Toggle rows looked like blank gaps).
+        VStack(alignment: .leading, spacing: 10) {
+            FormatChipPicker(
+                autoFormat: binding(\.autoFormat, snapshot: snapshot),
+                selectedFormat: binding(\.format, snapshot: snapshot)
+            )
+            Divider()
+            Toggle("Limit width", isOn: binding(\.maxWidthEnabled, snapshot: snapshot))
+            if live.maxWidthEnabled {
+                presetChips(
+                    presets: [("640", 640), ("1080", 1080), ("1280", 1280),
+                              ("1920", 1920), ("2560", 2560), ("3840", 3840)],
+                    current: live.maxWidth,
+                    onSelect: { set(\.maxWidth, to: $0, for: snapshot) }
+                )
+                HStack(spacing: 6) {
+                    TextField("", value: binding(\.maxWidth, snapshot: snapshot), format: .number)
+                        .textFieldStyle(.roundedBorder).frame(width: 80)
+                        .labelsHidden()
+                    Text("px").foregroundStyle(.secondary)
+                }
+            }
+            Divider()
+            Toggle("Limit file size", isOn: binding(\.maxFileSizeEnabled, snapshot: snapshot))
+            if live.maxFileSizeEnabled {
+                presetChips(
+                    presets: [("0.5 MB", 512), ("1 MB", 1024), ("2 MB", 2048),
+                              ("5 MB", 5120), ("10 MB", 10240)],
+                    current: live.maxFileSizeKB,
+                    onSelect: { set(\.maxFileSizeKB, to: $0, for: snapshot) }
+                )
+                HStack(spacing: 6) {
+                    TextField("", value: mbBinding(for: snapshot), format: .number)
+                        .textFieldStyle(.roundedBorder).frame(width: 80)
+                        .labelsHidden()
+                    Text("MB").foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func presetPDFControls(_ snapshot: CompressionPreset) -> some View {
+        let livePDF = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("Output", selection: binding(\.pdfOutputModeRaw, snapshot: snapshot)) {
+                Text("Preserve text & links").tag(PDFOutputMode.preserveStructure.rawValue)
+                Text("Flatten (smallest)").tag(PDFOutputMode.flattenPages.rawValue)
+            }
+            .pickerStyle(.segmented)
+
+            if PDFOutputMode(rawValue: livePDF.pdfOutputModeRaw) == .flattenPages {
+                QualityChipPicker(
+                    options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                    selected: binding(\.pdfQualityRaw, snapshot: snapshot)
+                )
+                .disabled(livePDF.smartQuality)
+                if livePDF.smartQuality {
+                    Text("Manual tier is a fallback when smart analysis can’t run. Turn off Smart quality under Compression to fix Low / Medium / High.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Toggle("Grayscale PDF", isOn: binding(\.pdfGrayscale, snapshot: snapshot))
+                if livePDF.pdfGrayscale {
+                    Text("Smaller files when color isn’t needed.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("Low / Medium / High and grayscale apply when Flatten (smallest) is selected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func presetVideoControls(_ snapshot: CompressionPreset) -> some View {
+        let liveVideo = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        VStack(alignment: .leading, spacing: 10) {
+            QualityChipPicker(
+                options: VideoCodecFamily.allCases.map { ($0.chipLabel, $0.rawValue, $0.description) },
+                selected: binding(\.videoCodecFamilyRaw, snapshot: snapshot)
+            )
+            QualityChipPicker(
+                options: VideoQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                selected: binding(\.videoQualityRaw, snapshot: snapshot)
+            )
+            .disabled(liveVideo.smartQuality)
+            if liveVideo.smartQuality {
+                Text("Manual video quality is a fallback when metadata can’t be read. Codec above always applies.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Toggle("Strip audio track", isOn: binding(\.videoRemoveAudio, snapshot: snapshot))
+            if liveVideo.videoRemoveAudio {
+                Text("Best for screen recordings or silent clips.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func addPreset() {
@@ -549,9 +901,11 @@ private struct WatchFoldersTab: View {
                         Button("Choose…") { pickGlobalWatchFolder() }
                             .buttonStyle(.bordered)
                     }
-                    Text("New images dropped here are compressed with your current settings.")
+                    Text("The global folder uses whatever settings are in the main window (sidebar). Presets can add separate watched folders in their own settings.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    PreferencesRelatedTabLink(title: "Sidebar & behavior in General…", tab: .general)
                 }
             } header: {
                 Text("Global")
@@ -559,10 +913,13 @@ private struct WatchFoldersTab: View {
 
             Section {
                 if prefs.savedPresets.isEmpty {
-                    Text("No presets yet. Add one in the Presets tab.")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 4)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No presets yet. Create one to watch a folder with saved compression options.")
+                            .foregroundStyle(.secondary)
+                        PreferencesRelatedTabLink(title: "Open Presets…", tab: .presets)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
                 } else {
                     ForEach(prefs.savedPresets) { preset in
                         WatchFolderPresetRow(preset: preset)
@@ -623,12 +980,10 @@ private struct WatchFolderPresetRow: View {
                 ? "No folder set — configure in Presets"
                 : URL(fileURLWithPath: live.watchFolderPath).lastPathComponent
         }
-        switch live.saveLocationRaw {
-        case "downloads":    return "Downloads"
-        case "custom":       return prefs.customFolderDisplayPath.isEmpty ? "Custom folder" : URL(fileURLWithPath: prefs.customFolderDisplayPath).lastPathComponent
-        case "presetCustom": return live.presetCustomFolderPath.isEmpty ? "Unique output folder" : URL(fileURLWithPath: live.presetCustomFolderPath).lastPathComponent
-        default:             return "Same folder as source"
+        if !prefs.watchedFolderPath.isEmpty {
+            return "Global (\(URL(fileURLWithPath: prefs.watchedFolderPath).lastPathComponent))"
         }
+        return "Global watch — choose folder in Watch tab"
     }
 
     private var enabledBinding: Binding<Bool> {
