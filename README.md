@@ -10,6 +10,10 @@ For stills: supports JPG, PNG, WebP, AVIF, TIFF, and BMP. Outputs WebP, AVIF, or
   <img src="site/screenshots/screenshot-preset-selected.webp" width="32%" alt="Preset selected with settings summary" />
 </p>
 
+## Releases
+
+**1.x** (from 1.0 on) was **images only**. **2.0** added **videos and PDFs** alongside images. Older 1.x DMGs and ZIPs stay on [GitHub Releases](https://github.com/heyderekj/dinky/releases) for anyone who needs them; use the [latest release](https://github.com/heyderekj/dinky/releases/latest) for full format support.
+
 ## About the developer
 
 Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web designer working primarily in Webflow and Figma (and now more in Cursor and Claude). Image compression is a constant part of the job — every site build involves optimizing photos for fast load times, and doing that by hand in a browser or through a bloated app gets old fast. Dinky came out of that frustration.

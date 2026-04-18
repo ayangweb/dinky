@@ -18,6 +18,10 @@
 - Completion sound scales with savings: Tink (< 100 KB), Pop (< 1 MB), Glass (< 5 MB), Hero (5 MB+)
 - Update checker: polls GitHub Releases on launch, shows banner if newer version exists
 
+## Version line
+
+- **1.x** (from 1.0): images only. **2.0+**: images, videos, and PDFs. Older 1.x binaries remain on GitHub Releases for archival use.
+
 ## Technical details
 
 - macOS 15 Sequoia or later (liquid glass UI on macOS 26 Tahoe; frosted material fallback on Sequoia)
