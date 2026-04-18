@@ -96,8 +96,8 @@ private func showAboutPanel() {
     credits.append(NSAttributedString(string: bundleSizeString() + "\n", attributes: baseAttrs))
 
     var siteAttrs = linkAttrs
-    siteAttrs[.link] = URL(string: "https://dinkyimg.app")!
-    credits.append(NSAttributedString(string: "dinkyimg.app\n", attributes: siteAttrs))
+    siteAttrs[.link] = URL(string: "https://dinkyfiles.com")!
+    credits.append(NSAttributedString(string: "dinkyfiles.com\n", attributes: siteAttrs))
 
     var ghAttrs = linkAttrs
     ghAttrs[.link] = URL(string: "https://github.com/heyderekj/dinky")!
