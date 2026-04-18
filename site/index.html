@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dinky makes images, PDFs, and videos smaller.</title>
-  <meta name="description" content="A tiny macOS app that compresses images (WebP, AVIF, lossless PNG), PDFs, and videos (MP4). Drag and drop, get smaller files back. ~14 MB. Free and open source." />
+  <title>Dinky makes files smaller.</title>
+  <meta name="description" content="Dinky makes files smaller." />
 
   <link rel="canonical" href="https://dinkyfiles.com" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="app-icon.webp" />
 
-  <meta property="og:title" content="Dinky makes images, PDFs, and videos smaller." />
-  <meta property="og:description" content="A tiny macOS app that compresses images (WebP, AVIF, lossless PNG), PDFs, and videos (MP4). Drag and drop, get smaller files back. ~14 MB. Free and open source." />
+  <meta property="og:title" content="Dinky makes files smaller." />
+  <meta property="og:description" content="Dinky makes files smaller." />
   <meta property="og:image" content="https://dinkyfiles.com/screenshots/screenshot-drop-zone.webp" />
   <meta property="og:url" content="https://dinkyfiles.com" />
   <meta property="og:type" content="website" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Dinky makes images, PDFs, and videos smaller." />
-  <meta name="twitter:description" content="A tiny macOS app that compresses images, PDFs, and videos. ~14 MB. Free and open source." />
+  <meta name="twitter:title" content="Dinky makes files smaller." />
+  <meta name="twitter:description" content="Dinky makes files smaller." />
   <meta name="twitter:image" content="https://dinkyfiles.com/screenshots/screenshot-drop-zone.webp" />
 
   <script type="application/ld+json">
@@ -28,7 +28,7 @@
     "name": "Dinky",
     "operatingSystem": "macOS",
     "applicationCategory": "UtilitiesApplication",
-    "description": "A tiny macOS app that compresses images (WebP, AVIF, lossless PNG), PDFs, and videos (MP4). Drag and drop, get smaller files back.",
+    "description": "Dinky makes files smaller.",
     "url": "https://dinkyfiles.com",
     "downloadUrl": "https://github.com/heyderekj/dinky/releases/download/v2.0.0/Dinky-2.0.0.dmg",
     "softwareVersion": "2.0.0",
@@ -246,7 +246,7 @@
       display: grid;
       grid-template-columns: 3fr 2fr;
       gap: 16px;
-      align-items: stretch;
+      align-items: center;
     }
 
     .ss-row.is-rev {
@@ -255,9 +255,8 @@
 
     .ss-row > img {
       width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center;
+      height: auto;
+      align-self: center;
     }
 
     .ss-shot {
@@ -277,21 +276,22 @@
       background: var(--faq-row-even);
       border: 1px solid var(--divider);
       border-radius: 12px;
-      padding: 32px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 24px;
+      gap: 18px;
+      align-self: stretch;
     }
 
     .ss-card.is-hero {
-      gap: 14px;
+      gap: 12px;
     }
 
     .ss-card-features {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 24px;
+      gap: 18px;
     }
 
     .ss-card-features.is-2col {
@@ -300,14 +300,14 @@
     }
 
     .ss-card-feature .feature-icon {
-      width: 22px;
-      height: 22px;
-      margin-bottom: 10px;
+      width: 20px;
+      height: 20px;
+      margin-bottom: 6px;
     }
 
     .ss-card-feature h3 {
-      margin: 0 0 6px;
-      font-size: 16px;
+      margin: 0 0 4px;
+      font-size: 15px;
       font-weight: 600;
       letter-spacing: -0.01em;
       color: var(--text);
@@ -316,7 +316,7 @@
     .ss-card-feature p {
       margin: 0;
       font-size: 13px;
-      line-height: 1.55;
+      line-height: 1.5;
       color: var(--text-secondary);
     }
 
@@ -966,7 +966,7 @@
   <section class="hero">
     <img src="app-icon.webp" alt="Dinky app icon" class="app-icon" />
     <h1>Dinky</h1>
-    <p class="tagline">Making files smaller since 2026.</p>
+    <p class="tagline">Dinky makes files smaller.</p>
     <p class="description">
       A tiny macOS app that shrinks images, PDFs, and videos. Drag, drop, get smaller files back. Free and open source.
     </p>
