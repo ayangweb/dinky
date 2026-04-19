@@ -52,6 +52,7 @@
 		KS000001000000000000001 /* CustomShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = KS100001000000000000001 /* CustomShortcut.swift */; };
 		SH000001000000000000001 /* ShortcutRecorderField.swift in Sources */ = {isa = PBXBuildFile; fileRef = SH100001000000000000001 /* ShortcutRecorderField.swift */; };
 		GH000001000000000000001 /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = GH100001000000000000001 /* GlobalHotkeyManager.swift */; };
+		DR000001000000000000001 /* DiagnosticsReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DR100001000000000000001 /* DiagnosticsReporter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -104,6 +105,7 @@
 		KS100001000000000000001 /* CustomShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomShortcut.swift; sourceTree = "<group>"; };
 		SH100001000000000000001 /* ShortcutRecorderField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderField.swift; sourceTree = "<group>"; };
 		GH100001000000000000001 /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
+		DR100001000000000000001 /* DiagnosticsReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsReporter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +166,7 @@
 				VCC1001000000000000001 /* VideoContentClassifier.swift */,
 				WR100001000000000000001 /* WatchRegistry.swift */,
 				GH100001000000000000001 /* GlobalHotkeyManager.swift */,
+				DR100001000000000000001 /* DiagnosticsReporter.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -358,6 +361,7 @@
 				KS000001000000000000001 /* CustomShortcut.swift in Sources */,
 				SH000001000000000000001 /* ShortcutRecorderField.swift in Sources */,
 				GH000001000000000000001 /* GlobalHotkeyManager.swift in Sources */,
+				DR000001000000000000001 /* DiagnosticsReporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
