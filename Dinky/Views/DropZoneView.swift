@@ -121,7 +121,7 @@ struct DropZoneView: View {
                 Text("or click to browse")
                     .font(.caption).foregroundStyle(.secondary)
                 Button(action: onPaste) {
-                    Text("or paste (⌘⇧V)")
+                    Text("or paste (\(prefs.shortcut(for: .pasteClipboard).displayString))")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

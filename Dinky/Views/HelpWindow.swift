@@ -3,12 +3,14 @@ import AppKit
 
 // MARK: - Window scene
 
-/// Opens via the Help menu (⌘?) and from the in-window button on errors.
+/// Opens via the Help menu and from the in-window button on errors.
 /// Renders `Help.md` from the bundle. Keeping content in markdown means we can
 /// edit the help copy without touching SwiftUI code, and never ship a `.help`
 /// bundle (which would add weight and indexing overhead — see CLAUDE.md).
+/// Shortcut glyphs in the doc are filled in from the user’s Settings → Shortcuts.
 struct HelpWindow: View {
-    @State private var sections: [HelpSection] = HelpDocument.load()
+    @EnvironmentObject private var prefs: DinkyPreferences
+    @State private var sections: [HelpSection] = []
     @State private var selection: HelpSection.ID?
 
     var body: some View {
@@ -40,7 +42,20 @@ struct HelpWindow: View {
         }
         .frame(minWidth: 720, minHeight: 520)
         .onAppear {
-            if selection == nil { selection = sections.first?.id }
+            reloadHelpDocument()
+        }
+        .onChange(of: prefs.shortcutHelpFingerprint) { _, _ in
+            reloadHelpDocument()
+        }
+    }
+
+    private func reloadHelpDocument() {
+        let previous = selection
+        sections = HelpDocument.load(prefs: prefs)
+        if let previous, sections.contains(where: { $0.id == previous }) {
+            selection = previous
+        } else {
+            selection = sections.first?.id
         }
     }
 }
@@ -163,16 +178,36 @@ enum HelpBlock: Hashable {
 /// Inline markdown (bold, italic, links, code) is left as-is and rendered later
 /// via `Text(LocalizedStringKey:)`, which understands those tokens natively.
 enum HelpDocument {
-    static func load() -> [HelpSection] {
+    static func load(prefs: DinkyPreferences) -> [HelpSection] {
         guard let url = Bundle.main.url(forResource: "Help", withExtension: "md"),
-              let raw = try? String(contentsOf: url, encoding: .utf8) else {
+              var raw = try? String(contentsOf: url, encoding: .utf8) else {
             return [HelpSection(
                 id: "missing",
                 title: "Help",
                 blocks: [.paragraph("Help content couldn't be loaded.")]
             )]
         }
+        raw = substituteShortcuts(in: raw, prefs: prefs)
         return parse(raw)
+    }
+
+    /// Replaces `{{SK_*}}` tokens in `Help.md` with the user’s current shortcuts (and fixed menu items).
+    private static func substituteShortcuts(in markdown: String, prefs: DinkyPreferences) -> String {
+        let pairs: [(String, String)] = [
+            ("{{SK_OPEN_FILES}}", prefs.shortcut(for: .openFiles).displayString),
+            ("{{SK_PASTE}}", prefs.shortcut(for: .pasteClipboard).displayString),
+            ("{{SK_COMPRESS_NOW}}", prefs.shortcut(for: .compressNow).displayString),
+            ("{{SK_CLEAR_ALL}}", prefs.shortcut(for: .clearAll).displayString),
+            ("{{SK_DELETE}}", prefs.shortcut(for: .deleteSelected).displayString),
+            ("{{SK_TOGGLE_SIDEBAR}}", DinkyFixedShortcut.toggleSidebar.shortcut.displayString),
+            ("{{SK_SETTINGS}}", DinkyFixedShortcut.settings.shortcut.displayString),
+            ("{{SK_HELP}}", DinkyFixedShortcut.dinkyHelp.shortcut.displayString),
+        ]
+        var s = markdown
+        for (token, value) in pairs {
+            s = s.replacingOccurrences(of: token, with: value)
+        }
+        return s
     }
 
     static func parse(_ markdown: String) -> [HelpSection] {

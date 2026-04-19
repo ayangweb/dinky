@@ -82,6 +82,7 @@ struct PreferencesView: View {
             ShortcutsTab()
                 .tabItem { Label("Shortcuts", systemImage: "keyboard") }
                 .tag(PreferencesTab.shortcuts)
+                .environmentObject(prefs)
         }
         .environment(\.openPreferencesRelatedTab, { selectedTab = $0 })
         .frame(width: 480, height: 520)
@@ -104,11 +105,45 @@ private struct GeneralTab: View {
     @EnvironmentObject var prefs: DinkyPreferences
     @EnvironmentObject var updater: UpdateChecker
     @State private var confirmResetLifetime = false
+    // Mirror the live `SMAppService.mainApp` status so the toggle stays in sync if the user changes it
+    // from System Settings → General → Login Items while Dinky is open.
+    @State private var launchAtLoginEnabled: Bool = LaunchAtLoginManager.isEnabled
 
     var body: some View {
         Form {
-            // 1. How the app behaves at its core
+            // 1. Drop / compress trigger behavior (distinct from what happens to originals)
             Section {
+                Toggle("Open Dinky at login", isOn: Binding(
+                    get: { launchAtLoginEnabled },
+                    set: { newValue in
+                        LaunchAtLoginManager.setEnabled(newValue)
+                        // Re-read so the toggle reflects what the system actually accepted.
+                        launchAtLoginEnabled = LaunchAtLoginManager.isEnabled
+                    }
+                ))
+                if LaunchAtLoginManager.requiresApproval {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                        Text("Approve Dinky in System Settings → General → Login Items.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open…") { LaunchAtLoginManager.openLoginItemsSettings() }
+                            .buttonStyle(.borderless)
+                            .font(.caption)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
+
+                Toggle("Auto-clear queue when done", isOn: Binding(
+                    get: { prefs.autoClearWhenDone },
+                    set: { prefs.autoClearWhenDone = $0 }
+                ))
+                Text("Removes finished rows shortly after a batch completes. Failed or skipped files stay so you can act on them.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Toggle("Manual mode", isOn: Binding(
                     get: { prefs.manualMode },
                     set: { prefs.manualMode = $0 }
@@ -117,18 +152,66 @@ private struct GeneralTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Toggle("Move originals to trash after compressing", isOn: Binding(
-                    get: { prefs.moveOriginalsToTrash },
-                    set: { prefs.moveOriginalsToTrash = $0 }
+                Toggle("Global Clipboard Compress", isOn: Binding(
+                    get: { prefs.pasteClipboardGlobalEnabled },
+                    set: { newValue in
+                        prefs.pasteClipboardGlobalEnabled = newValue
+                        NotificationCenter.default.post(name: .dinkyGlobalPasteHotkeyChanged, object: nil)
+                    }
                 ))
-                Text("Permanent once the trash is emptied.")
+                Text(S.behaviorPasteClipboardGlobalFootnote(currentShortcutDisplay: prefs.shortcut(for: .pasteClipboard).displayString))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                PreferencesRelatedTabLink(title: "Change shortcut in Keyboard Shortcuts…", tab: .shortcuts)
             } header: {
                 Text("Behavior")
             }
 
-            // 2. How compression works
+            // 2. What to do with source files after a successful compress
+            Section {
+                Picker("After compressing, originals:", selection: Binding(
+                    get: { prefs.originalsAction },
+                    set: { prefs.originalsAction = $0 }
+                )) {
+                    Text("Stay where they are").tag(OriginalsAction.keep)
+                    Text("Move to Trash").tag(OriginalsAction.trash)
+                    Text("Move to Backup folder").tag(OriginalsAction.backup)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                if prefs.originalsAction == .trash {
+                    Text("Permanent once the trash is emptied.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if prefs.originalsAction == .backup {
+                    HStack {
+                        Text(prefs.originalsBackupFolderDisplayPath.isEmpty
+                             ? prefs.defaultOriginalsBackupFolderURL().path
+                             : prefs.originalsBackupFolderDisplayPath)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { pickOriginalsBackupFolder() }
+                            .buttonStyle(.bordered)
+                        if !prefs.originalsBackupFolderBookmark.isEmpty {
+                            Button("Use default") {
+                                prefs.originalsBackupFolderBookmark = Data()
+                                prefs.originalsBackupFolderDisplayPath = ""
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                    Text("Original files are moved here after a successful compress.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Original Files")
+            }
+
+            // 3. How compression works
             Section {
                 Picker("Skip if savings below", selection: Binding(
                     get: { prefs.minimumSavingsPercent },
@@ -169,7 +252,7 @@ private struct GeneralTab: View {
                 PreferencesRelatedTabLink(title: "Per-preset compression & media…", tab: .presets)
             }
 
-            // 3. Alerts
+            // 4. Alerts
             Section {
                 Toggle("Play sound when done", isOn: Binding(
                     get: { prefs.playSoundEffects },
@@ -196,7 +279,7 @@ private struct GeneralTab: View {
                 .foregroundStyle(Color.accentColor)
             }
 
-            // 4. Sidebar
+            // 5. Sidebar
             Section {
                 Toggle("Use simple sidebar", isOn: Binding(
                     get: { prefs.sidebarSimpleMode },
@@ -229,7 +312,7 @@ private struct GeneralTab: View {
                 PreferencesRelatedTabLink(title: "Presets & automatic folders…", tab: .presets)
             }
 
-            // 5. Accessibility
+            // 6. Accessibility
             Section {
                 Toggle("Reduce motion", isOn: Binding(
                     get: { prefs.reduceMotion },
@@ -242,7 +325,7 @@ private struct GeneralTab: View {
                 Text("Accessibility")
             }
 
-            // 6. Session history (lifetime total; per-session list is in History window)
+            // 7. Session history (lifetime total; per-session list is in History window)
             Section {
                 Button("Reset total saved statistics…") {
                     confirmResetLifetime = true
@@ -264,6 +347,7 @@ private struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .padding(.top, 8)
+        .onAppear { launchAtLoginEnabled = LaunchAtLoginManager.isEnabled }
         .confirmationDialog(
             "Reset the running total of bytes saved across all sessions?",
             isPresented: $confirmResetLifetime,
@@ -275,6 +359,20 @@ private struct GeneralTab: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This does not clear the per-session list in History.")
+        }
+    }
+
+    private func pickOriginalsBackupFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        if panel.runModal() == .OK, let url = panel.url {
+            prefs.originalsBackupFolderDisplayPath = url.path
+            if let bookmark = try? url.bookmarkData(options: .withSecurityScope) {
+                prefs.originalsBackupFolderBookmark = bookmark
+            }
         }
     }
 
@@ -1036,10 +1134,34 @@ private struct WatchFolderPresetRow: View {
 // MARK: - Shortcuts
 
 private struct ShortcutsTab: View {
+    @EnvironmentObject private var prefs: DinkyPreferences
+    @State private var shortcutErrors: [ShortcutAction: String] = [:]
+    @State private var recordingAction: ShortcutAction?
+
     var body: some View {
         Form {
             Section {
-                ForEach(S.keyboardShortcutReference) { row in
+                ForEach(ShortcutAction.allCases) { action in
+                    shortcutRow(for: action)
+                }
+                HStack {
+                    Spacer()
+                    Button(S.shortcutsResetAll) {
+                        prefs.resetAllShortcuts()
+                        shortcutErrors = [:]
+                        recordingAction = nil
+                    }
+                    .disabled(ShortcutAction.allCases.allSatisfy { prefs.isDefaultShortcut($0) })
+                }
+            } header: {
+                Text(S.shortcutsCustomizableHeader)
+            } footer: {
+                Text(S.shortcutsTabServicesFooter)
+                    .font(.caption)
+            }
+
+            Section {
+                ForEach(S.fixedMenuShortcutReference) { row in
                     HStack(spacing: 12) {
                         Text(row.title)
                             .lineLimit(1)
@@ -1052,10 +1174,7 @@ private struct ShortcutsTab: View {
                     .accessibilityLabel("\(row.title), \(row.keys)")
                 }
             } header: {
-                Text("Menu commands")
-            } footer: {
-                Text(S.shortcutsTabServicesFooter)
-                    .font(.caption)
+                Text(S.shortcutsFixedHeader)
             }
 
             Section {
@@ -1076,6 +1195,108 @@ private struct ShortcutsTab: View {
         }
         .formStyle(.grouped)
         .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private func shortcutRow(for action: ShortcutAction) -> some View {
+        let s = prefs.shortcut(for: action)
+        let sysWarn = ShortcutValidator.systemWarning(for: s)
+        let isRecording = recordingAction == action
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Text(action.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 12)
+                HStack(spacing: 6) {
+                    ShortcutRecorderField(
+                        prefs: prefs,
+                        action: action,
+                        isRecording: recordingBinding(for: action),
+                        inlineError: errorBinding(for: action)
+                    )
+                    .frame(minWidth: 128, maxWidth: 160)
+                    if let w = sysWarn, !isRecording {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                            .help("\(S.shortcutsSystemWarningPrefix) \(w)")
+                            .accessibilityLabel("\(S.shortcutsSystemWarningPrefix) \(w)")
+                    }
+                    if isRecording {
+                        Button(S.shortcutsCancelEdit) {
+                            recordingAction = nil
+                            shortcutErrors.removeValue(forKey: action)
+                        }
+                        .fixedSize()
+                    } else {
+                        Button(S.shortcutsEdit) {
+                            shortcutErrors.removeValue(forKey: action)
+                            recordingAction = action
+                        }
+                        .fixedSize()
+                        if !prefs.isDefaultShortcut(action) {
+                            Button(S.shortcutsResetRow) {
+                                prefs.resetShortcut(action)
+                                shortcutErrors.removeValue(forKey: action)
+                            }
+                            .fixedSize()
+                        }
+                    }
+                }
+            }
+            if isRecording {
+                Text(S.shortcutsRecorderHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let err = shortcutErrors[action] {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel(for: action, shortcut: s, systemWarn: sysWarn, isRecording: isRecording))
+    }
+
+    private func accessibilityLabel(for action: ShortcutAction, shortcut: CustomShortcut, systemWarn: String?, isRecording: Bool) -> String {
+        var parts = "\(action.title), \(shortcut.displayString)"
+        if isRecording { parts += ", recording — \(S.shortcutsRecorderHint)" }
+        if let w = systemWarn, !isRecording { parts += ", \(S.shortcutsSystemWarningPrefix) \(w)" }
+        if let e = shortcutErrors[action] { parts += ", \(e)" }
+        return parts
+    }
+
+    private func recordingBinding(for action: ShortcutAction) -> Binding<Bool> {
+        Binding(
+            get: { recordingAction == action },
+            set: { newValue in
+                if newValue {
+                    if recordingAction != action {
+                        if let prev = recordingAction {
+                            shortcutErrors.removeValue(forKey: prev)
+                        }
+                        recordingAction = action
+                    }
+                } else if recordingAction == action {
+                    recordingAction = nil
+                }
+            }
+        )
+    }
+
+    private func errorBinding(for action: ShortcutAction) -> Binding<String?> {
+        Binding(
+            get: { shortcutErrors[action] },
+            set: { newVal in
+                if let newVal {
+                    shortcutErrors[action] = newVal
+                } else {
+                    shortcutErrors.removeValue(forKey: action)
+                }
+            }
+        )
     }
 }
 

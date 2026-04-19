@@ -21,6 +21,8 @@ extension Notification.Name {
     static let dinkyToggleSidebar       = Notification.Name("dinkyToggleSidebar")
     static let dinkyDeleteSelectedRows  = Notification.Name("dinkyDeleteSelectedRows")
     static let dinkyStartCompression    = Notification.Name("dinkyStartCompression")
+    /// Re-register the system-wide “Clipboard Compress” hotkey (toggle or shortcut changed).
+    static let dinkyGlobalPasteHotkeyChanged = Notification.Name("dinkyGlobalPasteHotkeyChanged")
 }
 
 enum S {
@@ -66,6 +68,11 @@ enum S {
     // Preferences
     static let prefsTitle    = "Preferences"
 
+    /// Settings › General › Behavior — global clipboard shortcut explainer (combo comes from `CustomShortcut.displayString`).
+    static func behaviorPasteClipboardGlobalFootnote(currentShortcutDisplay: String) -> String {
+        "Triggers Clipboard Compress from any app while Dinky is running (currently \(currentShortcutDisplay))."
+    }
+
     /// Settings › General › Compression — parallel job cap (three tiers: 1, 3, or 8).
     /// Wording matches the marketing site (“Fast / Fastest”) with a middle **Faster** step.
     static let concurrentCompressionPickerLabel = "Batch speed"
@@ -108,19 +115,29 @@ enum S {
     // Settings → Shortcuts (keep in sync with `DinkyApp` menu commands + standard Help / Settings)
     static let shortcutsTabServicesFooter =
         "Assign shortcuts for Finder’s “Compress with Dinky” in System Settings → Keyboard → Keyboard Shortcuts → Services."
-    static let shortcutsTabHelpFooter =
-        "For watch folders, presets, and full troubleshooting, open Dinky Help from the Help menu (⌘?)."
+    static var shortcutsTabHelpFooter: String {
+        let k = DinkyFixedShortcut.dinkyHelp.shortcut.displayString
+        return "For watch folders, presets, and full troubleshooting, open Dinky Help from the Help menu (\(k))."
+    }
     static let shortcutsAppDescription =
         "Dinky exposes a Compress Images action to the Shortcuts app. Use it to pipe files from Finder or other actions through Dinky with a chosen format — same engine as in-app compression (Smart quality, resize, and metadata follow Settings)."
 
-    static let keyboardShortcutReference: [KeyboardShortcutReference] = [
-        .init(title: "Open Files…", keys: "⌘O"),
-        .init(title: "Compress from Clipboard", keys: "⌘⇧V"),
-        .init(title: "Compress Now", keys: "⌘↩"),
-        .init(title: "Clear All", keys: "⌘⌥K"),
-        .init(title: "Toggle Sidebar", keys: "⌘⇧\\"),
-        .init(title: "Delete Selected", keys: "⌘⌫"),
-        .init(title: "Settings", keys: "⌘,"),
-        .init(title: "Dinky Help", keys: "⌘?"),
-    ]
+    static let shortcutsCustomizableHeader = "Customize"
+    static let shortcutsFixedHeader = "System & help"
+    static let shortcutsResetAll = "Reset All Shortcuts"
+    static let shortcutsResetRow = "Reset"
+    static let shortcutsEdit = "Edit"
+    static let shortcutsCancelEdit = "Cancel"
+    static let shortcutsRecorderPrompt = "Press a key…"
+    /// Inline hint shown beneath the recorder while it’s listening.
+    static let shortcutsRecorderHint = "Press a combo to save · Esc to cancel · Delete to reset"
+    static let shortcutsConflictPrefix = "Already used by"
+    static let shortcutsSystemWarningPrefix = "Overrides macOS:"
+
+    /// Non-customizable menu items (matches `DinkyFixedShortcut` + system Settings).
+    static var fixedMenuShortcutReference: [KeyboardShortcutReference] {
+        DinkyFixedShortcut.allCases.map {
+            KeyboardShortcutReference(title: $0.title, keys: $0.shortcut.displayString)
+        }
+    }
 }

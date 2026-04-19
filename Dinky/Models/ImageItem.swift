@@ -4,6 +4,8 @@ import PDFKit
 
 enum CompressionStatus {
     case pending
+    /// Direct media URL fetch in progress (`totalBytes` nil when length unknown).
+    case downloading(progress: Double, bytesReceived: Int64, totalBytes: Int64?, displayHost: String)
     case processing
     case done(outputURL: URL, originalSize: Int64, outputSize: Int64)
     /// Compressed below the user's threshold. `savedPercent` is `nil` when the
@@ -17,7 +19,7 @@ enum CompressionStatus {
 
     var isTerminal: Bool {
         switch self {
-        case .pending, .processing: return false
+        case .pending, .downloading, .processing: return false
         default: return true
         }
     }
@@ -26,8 +28,9 @@ enum CompressionStatus {
 @MainActor
 final class CompressionItem: ObservableObject, Identifiable {
     let id = UUID()
-    let sourceURL: URL
-    let mediaType: MediaType
+    /// Local file URL (or temp path while a remote URL is still downloading).
+    var sourceURL: URL
+    var mediaType: MediaType
     var formatOverride: CompressionFormat? = nil
 
     @Published var status: CompressionStatus = .pending
@@ -42,6 +45,12 @@ final class CompressionItem: ObservableObject, Identifiable {
     var videoDuration: Double? = nil
     /// When set, compression uses this preset’s stored options (`CompressionPreset`) instead of the sidebar.
     var presetID: UUID? = nil
+    /// True when the file was fetched from an `http(s)` URL (temp download). Affects output path and original disposal.
+    var isURLDownloadSource: Bool = false
+    /// While downloading, the original remote URL (for cancel / logging).
+    var pendingRemoteURL: URL?
+    /// Cancel an in-flight URL download.
+    var downloadTask: Task<Void, Never>?
 
     /// One-shot flatten-PDF quality from the results list context menu; skips smart inference when set.
     var pdfQualityOverride: PDFQuality? = nil
@@ -51,10 +60,10 @@ final class CompressionItem: ObservableObject, Identifiable {
     /// `0...1` while `AVAssetExportSession` is running; `nil` otherwise.
     @Published var videoExportProgress: Double? = nil
 
-    init(sourceURL: URL, presetID: UUID? = nil) {
+    init(sourceURL: URL, presetID: UUID? = nil, mediaType: MediaType? = nil) {
         self.sourceURL = sourceURL
         self.presetID = presetID
-        self.mediaType = MediaTypeDetector.detect(sourceURL) ?? .image
+        self.mediaType = mediaType ?? (MediaTypeDetector.detect(sourceURL) ?? .image)
         if self.mediaType == .pdf {
             self.pageCount = PDFDocument(url: sourceURL)?.pageCount
         }
@@ -84,6 +93,8 @@ final class CompressionItem: ObservableObject, Identifiable {
     var statusLabel: String {
         switch status {
         case .pending:               return "Waiting"
+        case .downloading(let p, _, _, _):
+            return p >= 0 ? String(format: "Downloading %.0f%%", p * 100) : "Downloading…"
         case .processing:            return "Processing…"
         case .done:                  return String(format: "%.1f%% smaller", savedPercent)
         case .skipped:               return S.skipped

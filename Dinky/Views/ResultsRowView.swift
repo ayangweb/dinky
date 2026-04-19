@@ -4,6 +4,7 @@ struct ResultsRowView: View {
     @ObservedObject var item: CompressionItem
     let selectedFormat: CompressionFormat
     var onForceCompress: () -> Void = {}
+    var onCancelDownload: () -> Void = {}
     @EnvironmentObject var prefs: DinkyPreferences
     @State private var showingError = false
     @State private var showingPreview = false
@@ -43,10 +44,16 @@ struct ResultsRowView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(item.filename)
+                    Text(rowTitle)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if case .pending = item.status {
+                        Text(pendingOutputLastPathComponent())
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } else if case .downloading = item.status {
                         Text(pendingOutputLastPathComponent())
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.tertiary)
@@ -98,29 +105,37 @@ struct ResultsRowView: View {
         }
     }
 
+    private var rowTitle: String {
+        if let remote = item.pendingRemoteURL {
+            return remote.host ?? remote.absoluteString
+        }
+        return item.filename
+    }
+
     private var accessibilityRowLabel: String {
-        "\(item.filename), \(item.statusLabel)"
+        "\(rowTitle), \(item.statusLabel)"
     }
 
     /// Expected output filename while the row is still queued (matches `CompressionPreset` / `DinkyPreferences` URL rules).
     private func pendingOutputLastPathComponent() -> String {
+        let urlDL = item.isURLDownloadSource
         if let pid = item.presetID,
            let preset = prefs.savedPresets.first(where: { $0.id == pid }) {
             switch item.mediaType {
             case .image:
                 let fmt = item.formatOverride ?? preset.format
-                return preset.outputURL(for: item.sourceURL, format: fmt, globalPrefs: prefs).lastPathComponent
+                return preset.outputURL(for: item.sourceURL, format: fmt, globalPrefs: prefs, isFromURLDownload: urlDL).lastPathComponent
             case .pdf:
-                return preset.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs).lastPathComponent
+                return preset.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs, isFromURLDownload: urlDL).lastPathComponent
             case .video:
-                return preset.outputURL(for: item.sourceURL, mediaType: .video, globalPrefs: prefs).lastPathComponent
+                return preset.outputURL(for: item.sourceURL, mediaType: .video, globalPrefs: prefs, isFromURLDownload: urlDL).lastPathComponent
             }
         }
         switch item.mediaType {
         case .image:
-            return prefs.outputURL(for: item.sourceURL, format: item.formatOverride ?? selectedFormat).lastPathComponent
+            return prefs.outputURL(for: item.sourceURL, format: item.formatOverride ?? selectedFormat, isFromURLDownload: urlDL).lastPathComponent
         case .pdf, .video:
-            return prefs.outputURL(for: item.sourceURL, mediaType: item.mediaType).lastPathComponent
+            return prefs.outputURL(for: item.sourceURL, mediaType: item.mediaType, isFromURLDownload: urlDL).lastPathComponent
         }
     }
 
@@ -140,6 +155,17 @@ struct ResultsRowView: View {
             .font(.system(.caption, design: .monospaced))
             .foregroundStyle(.secondary)
 
+        case .downloading(_, let received, let total, _):
+            if let total, total > 0 {
+                Text("\(bytes(received)) / \(bytes(total))")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("—")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+
         default:
             Text(bytes(item.originalSize))
                 .font(.system(.caption, design: .monospaced))
@@ -155,6 +181,34 @@ struct ResultsRowView: View {
         case .pending:
             chip("Queued", color: .secondary.opacity(0.35), fg: .primary)
                 .help("Waiting to compress")
+
+        case .downloading(let progress, _, let totalBytes, let displayHost):
+            HStack(spacing: 8) {
+                if let t = totalBytes, t > 0 {
+                    ProgressView(value: progress, total: 1)
+                        .scaleEffect(0.72)
+                        .frame(width: 52)
+                    Text("\(Int((progress * 100).rounded(.towardZero)))%")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                        .scaleEffect(0.65)
+                    Text("Fetching")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    onCancelDownload()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Cancel download")
+            }
+            .help("Downloading from \(displayHost)")
 
         case .processing:
             Group {

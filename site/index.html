@@ -4,21 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dinky makes files smaller.</title>
-  <meta name="description" content="Dinky compresses images, videos &amp; PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, clipboard paste. Free, open source, runs entirely on your Mac." />
+  <meta name="description" content="Dinky compresses images, videos &amp; PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, URL drop, clipboard paste. Free, open source, runs on your Mac." />
 
   <link rel="canonical" href="https://dinkyfiles.com" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="app-icon.webp" />
 
   <meta property="og:title" content="Dinky makes files smaller." />
-  <meta property="og:description" content="Dinky compresses images, videos &amp; PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, clipboard paste. Free, open source, runs entirely on your Mac." />
+  <meta property="og:description" content="Dinky compresses images, videos &amp; PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, URL drop, clipboard paste. Free, open source, runs on your Mac." />
   <meta property="og:image" content="https://dinkyfiles.com/screenshots/screenshot-drop-zone.webp" />
   <meta property="og:url" content="https://dinkyfiles.com" />
   <meta property="og:type" content="website" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Dinky makes files smaller." />
-  <meta name="twitter:description" content="Dinky compresses images, videos &amp; PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, clipboard paste. Free, open source, runs entirely on your Mac." />
+  <meta name="twitter:description" content="Dinky compresses images, videos &amp; PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, URL drop, clipboard paste. Free, open source, runs on your Mac." />
   <meta name="twitter:image" content="https://dinkyfiles.com/screenshots/screenshot-drop-zone.webp" />
 
   <script type="application/ld+json">
@@ -28,7 +28,7 @@
     "name": "Dinky",
     "operatingSystem": "macOS",
     "applicationCategory": "UtilitiesApplication",
-    "description": "Dinky compresses images, videos & PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, clipboard paste. Free, open source, runs entirely on your Mac.",
+    "description": "Dinky compresses images, videos & PDFs on macOS—WebP, AVIF, MP4, presets, watch folders, URL drop, clipboard paste. Free, open source, runs on your Mac.",
     "url": "https://dinkyfiles.com",
     "downloadUrl": "https://github.com/heyderekj/dinky/releases/download/v2.1.1/Dinky-2.1.1.dmg",
     "softwareVersion": "2.1.1",
@@ -213,7 +213,7 @@
       .app-icon.is-wiggling { animation: none; }
     }
 
-    /* GitHub hover star burst — count scales with real stargazers */
+    /* GitHub hover star burst — count grows gently with stargazers (sqrt curve, capped) */
     .gh-star {
       position: fixed;
       pointer-events: none;
@@ -1170,7 +1170,7 @@
               <path fill-rule="evenodd" d="M3 9.375C3 8.339 3.84 7.5 4.875 7.5h9.75c1.036 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V9.375Zm9.586 4.594a.75.75 0 0 0-1.172-.938l-2.476 3.096-.908-.907a.75.75 0 0 0-1.06 1.06l1.5 1.5a.75.75 0 0 0 1.116-.062l3-3.75Z" clip-rule="evenodd"/>
             </svg>
             <h3>Clipboard compress</h3>
-            <p>Copy an image anywhere — screenshot, Figma export, browser grab — and hit ⌘⇧V. Done.</p>
+            <p>Copy an image anywhere — screenshot, Figma export, browser grab — and hit ⌘⇧V. Works system-wide, even when Dinky isn't focused.</p>
           </div>
           <div class="ss-card-feature">
             <!-- rectangle-stack -->
@@ -1211,7 +1211,7 @@
               <path fill-rule="evenodd" d="M12 12.75a.75.75 0 0 1 .75.75v3.69l1.72-1.72a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l1.72 1.72v-3.69a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd"/>
             </svg>
             <h3>Smart destination</h3>
-            <p>Save next to the original, pick a custom folder, or send originals to the Trash on success — set per preset or globally.</p>
+            <p>Save next to the original, pick a custom folder, and decide what happens to originals: keep them, move to the Trash, or tuck them into a Backup folder — set per preset or globally.</p>
           </div>
         </div>
       </div>
@@ -1382,6 +1382,35 @@
       </svg>
       <h3>Easy updating</h3>
       <p>One click checks for new releases when they become available.</p>
+    </div>
+
+    <!-- Row 3: new in 2.2 -->
+
+    <div class="feature">
+      <!-- link -->
+      <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M19.902 4.098a3.75 3.75 0 0 0-5.304 0l-4.5 4.5a3.75 3.75 0 0 0 1.035 6.037.75.75 0 0 1-.646 1.353 5.25 5.25 0 0 1-1.449-8.45l4.5-4.5a5.25 5.25 0 1 1 7.424 7.424l-1.757 1.757a.75.75 0 1 1-1.06-1.06l1.757-1.757a3.75 3.75 0 0 0 0-5.304Zm-7.389 4.267a.75.75 0 0 1 1-.353 5.25 5.25 0 0 1 1.449 8.45l-4.5 4.5a5.25 5.25 0 1 1-7.424-7.424l1.757-1.757a.75.75 0 1 1 1.06 1.06l-1.757 1.757a3.75 3.75 0 1 0 5.304 5.304l4.5-4.5a3.75 3.75 0 0 0-1.035-6.037.75.75 0 0 1-.354-1Z" clip-rule="evenodd"/>
+      </svg>
+      <h3>Compress from a URL</h3>
+      <p>Drop or paste a direct image, video, or PDF link. Dinky downloads it, compresses, and cleans up the temp copy. Up to 500 MB.</p>
+    </div>
+
+    <div class="feature">
+      <!-- command-line -->
+      <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M2.25 5.25a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V5.25Zm3.97.97a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06l-2.25 2.25a.75.75 0 0 1-1.06-1.06l1.72-1.72-1.72-1.72a.75.75 0 0 1 0-1.06Zm4.28 4.28a.75.75 0 0 0 0 1.5h3a.75.75 0 0 0 0-1.5h-3Z" clip-rule="evenodd"/>
+      </svg>
+      <h3>Custom shortcuts</h3>
+      <p>Rebind Open Files, Clipboard Compress, Compress Now, Clear, and Delete in Settings → Shortcuts.</p>
+    </div>
+
+    <div class="feature">
+      <!-- power -->
+      <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M12 2.25a.75.75 0 0 1 .75.75v9a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.382 5.968a.75.75 0 0 1-.139 1.05 7.5 7.5 0 1 0 9.514 0 .75.75 0 1 1 .91-1.192A9 9 0 1 1 6.332 5.83a.75.75 0 0 1 1.05.139Z" clip-rule="evenodd"/>
+      </svg>
+      <h3>Launch at login</h3>
+      <p>Opt in once and Dinky's ready the moment you log in — handy alongside Watch Folders for set-and-forget compression.</p>
     </div>
 
   </section>
@@ -1572,6 +1601,16 @@
       </div>
 
       <div class="faq-item">
+        <h3 class="faq-q">Can Dinky compress something from a URL?</h3>
+        <p class="faq-a">Yes. Drag a direct media link (<code>https://…/photo.jpg</code>, <code>…/clip.mp4</code>, <code>…/file.pdf</code>) onto the window, or copy the link and hit ⌘⇧V (Clipboard Compress). Dinky downloads it to a temp folder, compresses, and cleans up after itself. Direct media links only — webpages and share pages get rejected — and 500 MB max per file.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3 class="faq-q">Can I share a URL’s compressed version straight to Dropbox or Google Drive?</h3>
+        <p class="faq-a">Yes. Dinky doesn’t upload to clouds itself, but two workflows cover the usual case: <strong>Synced folders</strong> — create a preset whose destination is your cloud-synced folder (e.g. <code>~/Dropbox/Compressed/</code>), drop a media URL on Dinky, and the compressed file lands there and syncs automatically. <strong>Apple Shortcuts</strong> — pair Watch Folder with the <em>Compress Images</em> Shortcuts action to auto-upload, copy a share link, or post to chat.</p>
+      </div>
+
+      <div class="faq-item">
         <h3 class="faq-q">Who made this and why?</h3>
         <p class="faq-a"><a href="https://heyderekj.com" target="_blank">Derek Castelli</a>, a freelance web designer in Webflow and Figma. Image compression comes up on every build, Optimage crashed one day, and Dinky was the excuse to build his first Mac app.</p>
       </div>
@@ -1640,18 +1679,21 @@
       const tools = {
         image: [
           { name: 'ImageOptim',  data: { price: 'Free',     mac: CHECK, batch: CHECK,     presets: CROSS, watch: CROSS, strip: CHECK, local: CHECK, size: '17 MB' } },
+          { name: 'Clop',        data: { price: 'Freemium', mac: CHECK, batch: CHECK,     presets: CHECK, watch: 'Pro', strip: CHECK, local: CHECK, size: '~90 MB' } },
           { name: 'Squoosh',     data: { price: 'Free',     mac: 'Web', batch: CROSS,     presets: CROSS, watch: CROSS, strip: CHECK, local: CHECK, size: 'Web' } },
           { name: 'TinyPNG',     data: { price: 'Freemium', mac: 'Web', batch: 'Limited', presets: CROSS, watch: CROSS, strip: CHECK, local: CROSS, size: 'Web' } },
           { name: 'Optimage',    data: { price: 'Freemium', mac: CHECK, batch: CHECK,     presets: CROSS, watch: CROSS, strip: CHECK, local: CHECK, size: '62 MB' } }
         ],
         pdf: [
           { name: 'Adobe Acrobat', data: { price: '$$',       mac: CHECK, batch: 'Limited', presets: CHECK, watch: CROSS, strip: CHECK, local: CHECK, size: '500+ MB' } },
+          { name: 'Clop',          data: { price: 'Freemium', mac: CHECK, batch: CHECK,     presets: CHECK, watch: 'Pro', strip: CHECK, local: CHECK, size: '~90 MB' } },
           { name: 'PDF Squeezer',  data: { price: 'Paid',     mac: CHECK, batch: CHECK,     presets: CHECK, watch: CHECK, strip: CHECK, local: CHECK, size: '20 MB' } },
           { name: 'Smallpdf',      data: { price: 'Freemium', mac: 'Web', batch: 'Limited', presets: CROSS, watch: CROSS, strip: CROSS, local: CROSS, size: 'Web' } },
           { name: 'Preview',       data: { price: 'Free',     mac: CHECK, batch: CROSS,     presets: CROSS, watch: CROSS, strip: CROSS, local: CHECK, size: 'Built-in' } }
         ],
         video: [
           { name: 'HandBrake',  data: { price: 'Free', mac: CHECK, batch: CHECK, presets: CHECK,   watch: CHECK, strip: CHECK, local: CHECK, size: '46 MB' } },
+          { name: 'Clop',       data: { price: 'Freemium', mac: CHECK, batch: CHECK, presets: CHECK, watch: 'Pro', strip: CHECK, local: CHECK, size: '~90 MB' } },
           { name: 'Permute',    data: { price: 'Paid', mac: CHECK, batch: CHECK, presets: CHECK,   watch: CROSS, strip: CHECK, local: CHECK, size: '60 MB' } },
           { name: 'FFmpeg',     data: { price: 'Free', mac: 'CLI', batch: CHECK, presets: 'Manual', watch: CROSS, strip: CHECK, local: CHECK, size: '80 MB' } },
           { name: 'Compressor', data: { price: '$$',   mac: CHECK, batch: CHECK, presets: CHECK,   watch: CHECK, strip: CHECK, local: CHECK, size: '500+ MB' } }
@@ -1721,15 +1763,23 @@
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (reduceMotion) return;
 
-      // Cap so 1000+ stars don't choke the browser; floor so it always feels alive.
+      // Decoupled from the real stargazer count: a sqrt curve so the burst grows
+      // slowly with popularity (e.g. 10★ → ~6, 100★ → ~13, 1k★ → ~18) and never
+      // gets dense enough to feel like confetti spam.
       function emitCount() {
-        const n = __ghStarCount | 0;
-        return Math.max(5, Math.min(n, 80));
+        const n = Math.max(0, __ghStarCount | 0);
+        return Math.max(3, Math.min(Math.round(3 + Math.sqrt(n)), 18));
       }
 
       let bursting = false;
 
-      function spawnStar(cx, cy) {
+      // Map total particle count (3–18) to a 0..1 "energy" value used to speed
+      // things up as the burst grows: more stars = quicker fly-out + tighter stagger.
+      function energyFor(total) {
+        return Math.max(0, Math.min(1, (total - 3) / 15));
+      }
+
+      function spawnStar(cx, cy, energy) {
         const star = document.createElement('span');
         star.className = 'gh-star';
         star.textContent = '★';
@@ -1740,7 +1790,11 @@
         const dy = Math.sin(angle) * dist - 30; // slight upward bias = more "celebratory"
         const rot = (Math.random() - 0.5) * 720;
         const size = 10 + Math.random() * 16;
-        const dur = 900 + Math.random() * 500;
+        // Lerp duration from leisurely (≈900–1400ms) at low counts to snappy
+        // (≈450–700ms) at the cap, so a big burst feels more energetic.
+        const durMin = 900 - 450 * energy;
+        const durJitter = 500 - 250 * energy;
+        const dur = durMin + Math.random() * durJitter;
 
         star.style.left = cx + 'px';
         star.style.top = cy + 'px';
@@ -1748,7 +1802,7 @@
         star.style.setProperty('--dx', dx.toFixed(1) + 'px');
         star.style.setProperty('--dy', dy.toFixed(1) + 'px');
         star.style.setProperty('--rot', rot.toFixed(0) + 'deg');
-        star.style.setProperty('--dur', dur + 'ms');
+        star.style.setProperty('--dur', Math.round(dur) + 'ms');
 
         document.body.appendChild(star);
         star.addEventListener('animationend', () => star.remove(), { once: true });
@@ -1765,10 +1819,11 @@
         const cy = rect.top + rect.height / 2;
 
         const total = emitCount();
-        // Stagger so it streams instead of dumping all at once.
-        const stagger = total > 30 ? 8 : 18;
+        const energy = energyFor(total);
+        // Tighten the stream as the burst grows — 22ms at low counts, 8ms at the cap.
+        const stagger = Math.round(22 - 14 * energy);
         for (let i = 0; i < total; i++) {
-          setTimeout(() => spawnStar(cx, cy), i * stagger);
+          setTimeout(() => spawnStar(cx, cy, energy), i * stagger);
         }
         // Clear the button color when the burst is mostly through, not after the
         // last lingering particle. The 180ms CSS transition softens the trail-off.

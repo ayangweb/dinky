@@ -185,7 +185,11 @@ extension CompressionPreset {
         )
     }
 
-    func destinationDirectory(for source: URL, globalPrefs: DinkyPreferences) -> URL {
+    func destinationDirectory(for source: URL, globalPrefs: DinkyPreferences, isFromURLDownload: Bool = false) -> URL {
+        if isFromURLDownload, saveLocationRaw == "sameFolder" {
+            return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+                ?? source.deletingLastPathComponent()
+        }
         switch saveLocationRaw {
         case "sameFolder":
             return source.deletingLastPathComponent()
@@ -205,8 +209,8 @@ extension CompressionPreset {
         FilenameHandling(rawValue: filenameHandlingRaw) ?? .appendSuffix
     }
 
-    func outputURL(for source: URL, format: CompressionFormat, globalPrefs: DinkyPreferences) -> URL {
-        let dir = destinationDirectory(for: source, globalPrefs: globalPrefs)
+    func outputURL(for source: URL, format: CompressionFormat, globalPrefs: DinkyPreferences, isFromURLDownload: Bool = false) -> URL {
+        let dir = destinationDirectory(for: source, globalPrefs: globalPrefs, isFromURLDownload: isFromURLDownload)
         let stem = source.deletingPathExtension().lastPathComponent
         var out: String
         switch filenameHandling {
@@ -221,10 +225,10 @@ extension CompressionPreset {
         return dir.appendingPathComponent(out).appendingPathExtension(format.outputExtension)
     }
 
-    func outputURL(for source: URL, mediaType: MediaType, globalPrefs: DinkyPreferences) -> URL {
+    func outputURL(for source: URL, mediaType: MediaType, globalPrefs: DinkyPreferences, isFromURLDownload: Bool = false) -> URL {
         switch mediaType {
         case .image:
-            let dir = destinationDirectory(for: source, globalPrefs: globalPrefs)
+            let dir = destinationDirectory(for: source, globalPrefs: globalPrefs, isFromURLDownload: isFromURLDownload)
             let stem = source.deletingPathExtension().lastPathComponent
             var out: String
             switch filenameHandling {
@@ -238,7 +242,7 @@ extension CompressionPreset {
             }
             return dir.appendingPathComponent(out).appendingPathExtension(source.pathExtension.lowercased())
         case .pdf:
-            let dir = destinationDirectory(for: source, globalPrefs: globalPrefs)
+            let dir = destinationDirectory(for: source, globalPrefs: globalPrefs, isFromURLDownload: isFromURLDownload)
             let stem = source.deletingPathExtension().lastPathComponent
             var out: String
             switch filenameHandling {
@@ -252,7 +256,7 @@ extension CompressionPreset {
             }
             return dir.appendingPathComponent(out).appendingPathExtension("pdf")
         case .video:
-            let dir = destinationDirectory(for: source, globalPrefs: globalPrefs)
+            let dir = destinationDirectory(for: source, globalPrefs: globalPrefs, isFromURLDownload: isFromURLDownload)
             let stem = source.deletingPathExtension().lastPathComponent
             var out: String
             switch filenameHandling {

@@ -39,37 +39,7 @@ struct DinkyApp: App {
         }
         .commands {
             CommandGroup(after: .newItem) {
-                Button("Open Files…") {
-                    NotificationCenter.default.post(name: .dinkyOpenPanel, object: nil)
-                }
-                .keyboardShortcut("o", modifiers: .command)
-
-                Button("Compress from Clipboard") {
-                    NSApp.sendAction(Selector(("compressFromClipboard:")), to: nil, from: nil)
-                }
-                .keyboardShortcut("v", modifiers: [.command, .shift])
-
-                Divider()
-
-                Button("Compress Now") {
-                    NotificationCenter.default.post(name: .dinkyStartCompression, object: nil)
-                }
-                .keyboardShortcut(.return, modifiers: .command)
-
-                Button("Clear All") {
-                    NotificationCenter.default.post(name: .dinkyClearAll, object: nil)
-                }
-                .keyboardShortcut("k", modifiers: [.command, .option])
-
-                Button("Toggle Sidebar") {
-                    NotificationCenter.default.post(name: .dinkyToggleSidebar, object: nil)
-                }
-                .keyboardShortcut("\\", modifiers: [.command, .shift])
-
-                Button("Delete Selected") {
-                    NotificationCenter.default.post(name: .dinkyDeleteSelectedRows, object: nil)
-                }
-                .keyboardShortcut(.delete, modifiers: .command)
+                DinkyShortcutCommands(prefs: root.prefs)
             }
             CommandGroup(replacing: .appInfo) {
                 Button("About Dinky") {
@@ -98,13 +68,54 @@ struct DinkyApp: App {
                 .environmentObject(updater)
         }
 
-        // Opened via the Help menu (⌘?). Single-instance; reuses the same
+        // Opened via the Help menu. Single-instance; reuses the same
         // window if it's already on screen.
         Window("Dinky Help", id: "help") {
             HelpWindow()
+                .environmentObject(root.prefs)
         }
         .defaultSize(width: 820, height: 600)
         .commandsRemoved()
+    }
+}
+
+// MARK: - File menu shortcuts (user-customizable)
+
+private struct DinkyShortcutCommands: View {
+    @ObservedObject var prefs: DinkyPreferences
+
+    var body: some View {
+        Button("Open Files…") {
+            NotificationCenter.default.post(name: .dinkyOpenPanel, object: nil)
+        }
+        .keyboardShortcut(prefs.shortcut(for: .openFiles).swiftUIKeyboardShortcut)
+
+        Button("Clipboard Compress") {
+            NSApp.sendAction(Selector(("compressFromClipboard:")), to: nil, from: nil)
+        }
+        .keyboardShortcut(prefs.shortcut(for: .pasteClipboard).swiftUIKeyboardShortcut)
+
+        Divider()
+
+        Button("Compress Now") {
+            NotificationCenter.default.post(name: .dinkyStartCompression, object: nil)
+        }
+        .keyboardShortcut(prefs.shortcut(for: .compressNow).swiftUIKeyboardShortcut)
+
+        Button("Clear All") {
+            NotificationCenter.default.post(name: .dinkyClearAll, object: nil)
+        }
+        .keyboardShortcut(prefs.shortcut(for: .clearAll).swiftUIKeyboardShortcut)
+
+        Button("Toggle Sidebar") {
+            NotificationCenter.default.post(name: .dinkyToggleSidebar, object: nil)
+        }
+        .keyboardShortcut("\\", modifiers: [.command, .shift])
+
+        Button("Delete Selected") {
+            NotificationCenter.default.post(name: .dinkyDeleteSelectedRows, object: nil)
+        }
+        .keyboardShortcut(prefs.shortcut(for: .deleteSelected).swiftUIKeyboardShortcut)
     }
 }
 

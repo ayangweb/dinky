@@ -15,6 +15,21 @@ enum SaveLocation: String, CaseIterable, Identifiable {
     }
 }
 
+/// What to do with the original file after a successful compress (global setting).
+enum OriginalsAction: String, CaseIterable, Identifiable {
+    case keep = "keep"
+    case trash = "trash"
+    case backup = "backup"
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .keep: return "Stay where they are"
+        case .trash: return "Move to Trash"
+        case .backup: return "Move to Backup folder"
+        }
+    }
+}
+
 enum FilenameHandling: String, CaseIterable, Identifiable {
     case appendSuffix  = "appendSuffix"
     case replaceOrigin = "replaceOrigin"
@@ -46,6 +61,17 @@ final class DinkyPreferences: ObservableObject {
 
     init() {
         Self.migrateConcurrentTasksToTiersIfNeeded()
+        Self.migrateMoveOriginalsToOriginalsActionIfNeeded()
+    }
+
+    /// Migrates legacy `moveOriginalsToTrash` Bool to `originalsAction` once.
+    private static func migrateMoveOriginalsToOriginalsActionIfNeeded() {
+        let d = UserDefaults.standard
+        let legacyKey = "moveOriginalsToTrash"
+        guard d.object(forKey: legacyKey) != nil else { return }
+        let wasTrash = d.bool(forKey: legacyKey)
+        d.set(wasTrash ? OriginalsAction.trash.rawValue : OriginalsAction.keep.rawValue, forKey: "originalsAction")
+        d.removeObject(forKey: legacyKey)
     }
 
     private static func migrateConcurrentTasksToTiersIfNeeded() {
@@ -93,7 +119,13 @@ final class DinkyPreferences: ObservableObject {
     // MARK: Compression behavior
     @AppStorage("stripMetadata")        var stripMetadata: Bool = false
     @AppStorage("preserveTimestamps")   var preserveTimestamps: Bool = true
-    @AppStorage("moveOriginalsToTrash") var moveOriginalsToTrash: Bool = false
+    @AppStorage("originalsAction") private var originalsActionRaw: String = OriginalsAction.keep.rawValue
+    var originalsAction: OriginalsAction {
+        get { OriginalsAction(rawValue: originalsActionRaw) ?? .keep }
+        set { originalsActionRaw = newValue.rawValue }
+    }
+    @AppStorage("originalsBackupFolderBookmark") var originalsBackupFolderBookmark: Data = Data()
+    @AppStorage("originalsBackupFolderDisplayPath") var originalsBackupFolderDisplayPath: String = ""
     @AppStorage("minimumSavingsPercent") var minimumSavingsPercent: Int = 2
     @AppStorage("concurrentTasks")      var concurrentTasks: Int = 3
 
@@ -106,6 +138,9 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("notifyWhenDone")       var notifyWhenDone: Bool = false
     @AppStorage("sanitizeFilenames")    var sanitizeFilenames: Bool = false
     @AppStorage("manualMode")           var manualMode: Bool = false
+    /// Empties finished rows from the queue after a short delay when a batch completes.
+    /// Failed/skipped rows are kept so the user can act on them.
+    @AppStorage("autoClearWhenDone")    var autoClearWhenDone: Bool = false
     @AppStorage("reduceMotion")         var reduceMotion: Bool = false
     @AppStorage("folderWatchEnabled")   var folderWatchEnabled: Bool = false
     @AppStorage("watchedFolderPath")    var watchedFolderPath: String = ""
@@ -249,6 +284,86 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("lastUpdateCheck")         var lastUpdateCheck: Double = 0
     @AppStorage("dismissedUpdateVersion")  var dismissedUpdateVersion: String = ""
 
+    // MARK: Keyboard shortcuts (customizable menu commands)
+
+    @AppStorage("shortcut.openFiles") private var shortcutOpenFilesData: Data = Data()
+    @AppStorage("shortcut.pasteClipboard") private var shortcutPasteClipboardData: Data = Data()
+    @AppStorage("shortcut.compressNow") private var shortcutCompressNowData: Data = Data()
+    @AppStorage("shortcut.clearAll") private var shortcutClearAllData: Data = Data()
+    @AppStorage("shortcut.deleteSelected") private var shortcutDeleteSelectedData: Data = Data()
+
+    /// When on, `RegisterEventHotKey` mirrors “Clipboard Compress” so it works while another app is frontmost.
+    @AppStorage("shortcut.pasteClipboardGlobal") var pasteClipboardGlobalEnabled: Bool = false
+
+    func shortcut(for action: ShortcutAction) -> CustomShortcut {
+        let data: Data
+        switch action {
+        case .openFiles: data = shortcutOpenFilesData
+        case .pasteClipboard: data = shortcutPasteClipboardData
+        case .compressNow: data = shortcutCompressNowData
+        case .clearAll: data = shortcutClearAllData
+        case .deleteSelected: data = shortcutDeleteSelectedData
+        }
+        if data.isEmpty { return action.defaultShortcut }
+        return (try? JSONDecoder().decode(CustomShortcut.self, from: data)) ?? action.defaultShortcut
+    }
+
+    func setShortcut(_ shortcut: CustomShortcut, for action: ShortcutAction) {
+        objectWillChange.send()
+        let encoded = (try? JSONEncoder().encode(shortcut)) ?? Data()
+        switch action {
+        case .openFiles: shortcutOpenFilesData = encoded
+        case .pasteClipboard: shortcutPasteClipboardData = encoded
+        case .compressNow: shortcutCompressNowData = encoded
+        case .clearAll: shortcutClearAllData = encoded
+        case .deleteSelected: shortcutDeleteSelectedData = encoded
+        }
+        if action == .pasteClipboard {
+            NotificationCenter.default.post(name: .dinkyGlobalPasteHotkeyChanged, object: nil)
+        }
+    }
+
+    func resetShortcut(_ action: ShortcutAction) {
+        objectWillChange.send()
+        switch action {
+        case .openFiles: shortcutOpenFilesData = Data()
+        case .pasteClipboard: shortcutPasteClipboardData = Data()
+        case .compressNow: shortcutCompressNowData = Data()
+        case .clearAll: shortcutClearAllData = Data()
+        case .deleteSelected: shortcutDeleteSelectedData = Data()
+        }
+        if action == .pasteClipboard {
+            NotificationCenter.default.post(name: .dinkyGlobalPasteHotkeyChanged, object: nil)
+        }
+    }
+
+    func resetAllShortcuts() {
+        objectWillChange.send()
+        shortcutOpenFilesData = Data()
+        shortcutPasteClipboardData = Data()
+        shortcutCompressNowData = Data()
+        shortcutClearAllData = Data()
+        shortcutDeleteSelectedData = Data()
+        NotificationCenter.default.post(name: .dinkyGlobalPasteHotkeyChanged, object: nil)
+    }
+
+    func isDefaultShortcut(_ action: ShortcutAction) -> Bool {
+        shortcut(for: action) == action.defaultShortcut
+    }
+
+    /// For `HelpWindow` to refresh when any stored shortcut changes.
+    var shortcutHelpFingerprint: String {
+        [
+            shortcutOpenFilesData,
+            shortcutPasteClipboardData,
+            shortcutCompressNowData,
+            shortcutClearAllData,
+            shortcutDeleteSelectedData,
+        ]
+        .map { $0.base64EncodedString() }
+        .joined(separator: "|")
+    }
+
     // MARK: URL helpers
 
     /// When the user renames a security-scoped folder in Finder, the bookmark still resolves but stored path strings can lag. Refreshes paths and bookmark data (when stale). Safe to call often (e.g. app activation, folder watcher refresh).
@@ -260,6 +375,10 @@ final class DinkyPreferences: ObservableObject {
         if saveLocation == .custom, let r = Self.reanchorDirectory(bookmark: customFolderBookmark) {
             if r.path != customFolderDisplayPath { customFolderDisplayPath = r.path }
             if r.bookmark != customFolderBookmark { customFolderBookmark = r.bookmark }
+        }
+        if originalsAction == .backup, let r = Self.reanchorDirectory(bookmark: originalsBackupFolderBookmark) {
+            if r.path != originalsBackupFolderDisplayPath { originalsBackupFolderDisplayPath = r.path }
+            if r.bookmark != originalsBackupFolderBookmark { originalsBackupFolderBookmark = r.bookmark }
         }
         var presets = savedPresets
         var touched = false
@@ -320,7 +439,33 @@ final class DinkyPreferences: ObservableObject {
                         bookmarkDataIsStale: &stale)
     }
 
-    func destinationDirectory(for source: URL) -> URL {
+    /// Default backup folder when the user hasn't picked one: `~/Pictures/Dinky Originals`.
+    func defaultOriginalsBackupFolderURL() -> URL {
+        let pictures = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Pictures", isDirectory: true)
+        return pictures.appendingPathComponent("Dinky Originals", isDirectory: true)
+    }
+
+    /// Resolved bookmark for originals backup, or the default folder URL.
+    func originalsBackupDestinationURL() -> URL {
+        if !originalsBackupFolderBookmark.isEmpty {
+            var stale = false
+            if let u = try? URL(resolvingBookmarkData: originalsBackupFolderBookmark,
+                                 options: .withSecurityScope, relativeTo: nil,
+                                 bookmarkDataIsStale: &stale) {
+                return u
+            }
+        }
+        return defaultOriginalsBackupFolderURL()
+    }
+
+    /// Where compressed output should land. When `isFromURLDownload` is true and `sameFolder` is selected,
+    /// `sameFolder` is meaningless (source is in temp) — fall back to Downloads.
+    func destinationDirectory(for source: URL, isFromURLDownload: Bool = false) -> URL {
+        if isFromURLDownload, saveLocation == .sameFolder {
+            return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+                ?? source.deletingLastPathComponent()
+        }
         switch saveLocation {
         case .sameFolder: return source.deletingLastPathComponent()
         case .downloads:  return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
@@ -329,8 +474,8 @@ final class DinkyPreferences: ObservableObject {
         }
     }
 
-    func outputURL(for source: URL, format: CompressionFormat) -> URL {
-        let dir  = destinationDirectory(for: source)
+    func outputURL(for source: URL, format: CompressionFormat, isFromURLDownload: Bool = false) -> URL {
+        let dir  = destinationDirectory(for: source, isFromURLDownload: isFromURLDownload)
         let stem = source.deletingPathExtension().lastPathComponent
         var out: String
         switch filenameHandling {
@@ -345,12 +490,12 @@ final class DinkyPreferences: ObservableObject {
         return dir.appendingPathComponent(out).appendingPathExtension(format.outputExtension)
     }
 
-    func outputURL(for source: URL, mediaType: MediaType) -> URL {
+    func outputURL(for source: URL, mediaType: MediaType, isFromURLDownload: Bool = false) -> URL {
         switch mediaType {
         case .image:
             // Shouldn't be called for image — use outputURL(for:format:) instead.
             // Fallback: keep original extension.
-            let dir  = destinationDirectory(for: source)
+            let dir  = destinationDirectory(for: source, isFromURLDownload: isFromURLDownload)
             let stem = source.deletingPathExtension().lastPathComponent
             var out: String
             switch filenameHandling {
@@ -360,7 +505,7 @@ final class DinkyPreferences: ObservableObject {
             }
             return dir.appendingPathComponent(out).appendingPathExtension(source.pathExtension.lowercased())
         case .pdf:
-            let dir  = destinationDirectory(for: source)
+            let dir  = destinationDirectory(for: source, isFromURLDownload: isFromURLDownload)
             let stem = source.deletingPathExtension().lastPathComponent
             var out: String
             switch filenameHandling {
@@ -375,7 +520,7 @@ final class DinkyPreferences: ObservableObject {
             return dir.appendingPathComponent(out).appendingPathExtension("pdf")
         case .video:
             // Always output as .mp4 (H.264 or H.265 per video codec preference)
-            let dir  = destinationDirectory(for: source)
+            let dir  = destinationDirectory(for: source, isFromURLDownload: isFromURLDownload)
             let stem = source.deletingPathExtension().lastPathComponent
             var out: String
             switch filenameHandling {

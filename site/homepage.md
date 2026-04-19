@@ -13,12 +13,16 @@ A tiny macOS app for **images**, **videos**, and **PDFs**. Convert stills to Web
 ## Highlights
 
 - **Drag and drop** — images, videos, or PDFs on the window, Dock, or file picker
-- **Clipboard compress** — paste a copied image with ⌘⇧V
+- **Clipboard compress** — paste a copied image with ⌘⇧V; the hotkey works system-wide, even when Dinky isn't focused
+- **Compress from a URL** — drop or paste a direct media link and Dinky downloads it (max 500 MB) before compressing
 - **Images** — WebP, AVIF, or lossless PNG; Smart Quality (photo vs. graphic); max width and target file size
 - **Videos** — MP4 export with codec and quality presets
 - **PDFs** — preserve structure or flatten pages for smaller output
 - **Batch speed** — Fast / Faster / Fastest (parallel job caps)
 - **Watch folder** — auto-compress files dropped into a watched folder
+- **Originals** — keep, move to Trash, or move to a Backup folder per preset
+- **Custom keyboard shortcuts** — rebind Open Files, Clipboard Compress, Compress Now, Clear, and Delete
+- **Launch at login** — opt in once and Dinky's ready when you log in
 - **Presets**, **before/after preview**, **Finder Quick Actions**, **in-app updates**
 
 ## Install

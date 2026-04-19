@@ -23,8 +23,8 @@ That's it. The defaults are good. Read on if you want to bend them to your will.
 You don't have to open the app first. Pick whichever fits how you work.
 
 - **Drag & drop** onto the Dinky window or the Dock icon.
-- **Open Files…** — `⌘O` to pick from a sheet.
-- **Compress from Clipboard** — `⌘⇧V` pastes a supported **file** copied in Finder (images, videos, PDFs) or **raw image** data (PNG/TIFF from screenshots or browsers).
+- **Open Files…** — `{{SK_OPEN_FILES}}` to pick from a sheet.
+- **Clipboard Compress** — `{{SK_PASTE}}` pastes a supported **file** copied in Finder (images, videos, PDFs) or **raw image** data (PNG/TIFF from screenshots or browsers).
 - **Right-click in Finder → Services → Compress with Dinky** — works on selections of any size.
 - **Watch a folder** — Dinky compresses anything new that lands in it. (See *Watch folders* below.)
 - **Quick Action** — assign a keyboard shortcut to "Compress with Dinky" in System Settings → Keyboard → Keyboard Shortcuts → Services.
@@ -116,7 +116,7 @@ Drop files into a folder and let Dinky handle them in the background.
 
 Turn on **Settings → General → Manual mode** when you want full control.
 
-Files dropped in won't auto-compress. Right-click any row to pick a format on the spot, use **File → Compress Now** (`⌘↩`) when the queue is ready, or change settings in the sidebar first. Useful when one batch contains very different files.
+Files dropped in won't auto-compress. Right-click any row to pick a format on the spot, use **File → Compress Now** (`{{SK_COMPRESS_NOW}}`) when the queue is ready, or change settings in the sidebar first. Useful when one batch contains very different files.
 
 ---
 
@@ -126,14 +126,14 @@ You’ll find the same list in **Settings → Shortcuts** so you don’t have to
 
 | Shortcut | Action |
 | --- | --- |
-| `⌘O` | Open files… |
-| `⌘⇧V` | Compress from clipboard |
-| `⌘↩` | Compress Now (runs the queue — especially useful in Manual mode) |
-| `⌘⌥K` | Clear All |
-| `⌘⇧\\` | Toggle format sidebar |
-| `⌘⌫` | Delete selected rows |
-| `⌘,` | Settings |
-| `⌘?` | This Help window |
+| `{{SK_OPEN_FILES}}` | Open files… |
+| `{{SK_PASTE}}` | Clipboard Compress |
+| `{{SK_COMPRESS_NOW}}` | Compress Now (runs the queue — especially useful in Manual mode) |
+| `{{SK_CLEAR_ALL}}` | Clear All |
+| `{{SK_TOGGLE_SIDEBAR}}` | Toggle format sidebar |
+| `{{SK_DELETE}}` | Delete selected rows |
+| `{{SK_SETTINGS}}` | Settings |
+| `{{SK_HELP}}` | This Help window |
 
 Add your own for *Compress with Dinky* in **System Settings → Keyboard → Keyboard Shortcuts → Services**.
 

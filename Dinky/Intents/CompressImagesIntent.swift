@@ -48,7 +48,9 @@ struct CompressImagesIntent: AppIntent {
                 goals: goals,
                 stripMetadata: settings.stripMetadata,
                 outputURL: tmpOut,
-                moveToTrash: false,
+                originalsAction: .keep,
+                backupFolderURL: nil,
+                isURLDownloadSource: false,
                 smartQuality: settings.smartQuality,
                 contentTypeHint: settings.contentTypeHint
             )

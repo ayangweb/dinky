@@ -3,8 +3,18 @@ import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
+    private var globalPasteHotkeyObserver: NSObjectProtocol?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
+        GlobalHotkeyManager.shared.syncFromDefaults()
+        globalPasteHotkeyObserver = NotificationCenter.default.addObserver(
+            forName: .dinkyGlobalPasteHotkeyChanged,
+            object: nil,
+            queue: .main
+        ) { _ in
+            GlobalHotkeyManager.shared.syncFromDefaults()
+        }
     }
 
     // MARK: - Open with Dinky / drag onto Dock icon
@@ -16,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.post(name: .dinkyOpenFiles, object: accepted)
     }
 
-    // MARK: - Compress from Clipboard menu command
+    // MARK: - Clipboard Compress menu command
 
     @objc func compressFromClipboard(_ sender: Any?) {
         NotificationCenter.default.post(name: .dinkyPasteClipboard, object: nil)

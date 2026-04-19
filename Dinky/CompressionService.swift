@@ -87,7 +87,9 @@ actor CompressionService {
         goals: CompressionGoals,
         stripMetadata: Bool,
         outputURL: URL,
-        moveToTrash: Bool = false,
+        originalsAction: OriginalsAction = .keep,
+        backupFolderURL: URL? = nil,
+        isURLDownloadSource: Bool = false,
         smartQuality: Bool = false,
         contentTypeHint: String = "auto",
         /// When Smart Quality is on and the caller already classified (e.g. Auto format), skip a second Vision pass.
@@ -148,8 +150,18 @@ actor CompressionService {
             throw CompressionError.outputMissing
         }
 
-        if moveToTrash {
-            try? FileManager.default.trashItem(at: source, resultingItemURL: nil)
+        if isURLDownloadSource {
+            // Temp download — never trash/backup the temp path; remove silently.
+            try? FileManager.default.removeItem(at: source)
+        } else {
+            switch originalsAction {
+            case .keep:
+                break
+            case .trash:
+                try? OriginalsHandler.dispose(originalAt: source, action: .trash, backupFolder: nil)
+            case .backup:
+                try? OriginalsHandler.dispose(originalAt: source, action: .backup, backupFolder: backupFolderURL)
+            }
         }
 
         return CompressionResult(outputURL: outputURL,

@@ -21,7 +21,8 @@ Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web 
 ## Features
 
 - **Drag and drop** — drop images, videos, or PDFs onto the window, the Dock icon, or the file picker
-- **Clipboard compress** — paste a copied image straight into Dinky with ⌘⇧V
+- **Clipboard compress** — paste a copied image straight into Dinky with ⌘⇧V; the hotkey works system-wide, even when Dinky isn't focused
+- **Compress from a URL** — drop or paste a direct `http(s)` link to an image, video, or PDF; Dinky downloads it (max 500 MB) into a temp folder, compresses, and cleans up after itself
 - **Format conversion (images)** — Auto, WebP, AVIF, or lossless PNG; Auto picks the right format per image
 - **PDF compression** — preserve selectable text and links, or flatten pages to images for smaller files
 - **Video compression** — export to MP4 with H.264 or HEVC and quality presets
@@ -36,13 +37,16 @@ Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web 
 - **Show in Finder** — jump straight to any compressed file from the results list
 - **PNG lossless** — run oxipng on PNGs when you need to keep transparency or format fidelity
 - **Destination** — save next to the original, to Downloads, or pick a custom folder; presets can have their own unique output folder
+- **Originals** — keep, move to Trash, or move to a Backup folder of your choosing on every successful compress; set per preset or globally
 - **Notifications** — sound and system notification when a batch finishes; sound scales with savings: a soft tink for tiny saves, a full chime for big ones
 - **Smart quality** — auto-detects photo vs. graphic (UI, illustration, logo, screenshot) per image and picks quality accordingly; or force Photo, Graphic, or Mixed per preset
 - **Session history** — review past compression sessions with file counts and total bytes saved
 - **Apple Shortcuts** — compress images from automations via a native Shortcuts action
+- **Custom keyboard shortcuts** — rebind Open Files, Clipboard Compress, Compress Now, Clear, and Delete in Settings → Shortcuts
+- **Launch at login** — opt in once and Dinky's ready the moment you log in (handy alongside Watch Folders for set-and-forget compression)
 - **Easy updating** — one click checks for a new release, installs, and relaunches; no browser, no re-drag
 - **Skip threshold** — skip files below a minimum savings target: Off, 2%, 5%, or 10%
-- **Advanced** — strip metadata, sanitize filenames for web, open output folder automatically, move originals to trash
+- **Advanced** — strip metadata, sanitize filenames for web, open output folder automatically
 - **Quirky idle animation** — three choreographed card-drop variants that loop then hold until you come back
 - ~16 MB. Dinky style.
 

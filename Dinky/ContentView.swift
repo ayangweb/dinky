@@ -3,11 +3,27 @@ import UniformTypeIdentifiers
 import UserNotifications
 import Darwin
 import AppKit
+import PDFKit
 
 enum PasteClipboardResult {
     case added
     case emptyClipboard
     case duplicateInQueue
+}
+
+// MARK: - AsyncSemaphore
+
+private actor AsyncSemaphore {
+    private var count: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    init(limit: Int) { count = limit }
+    func wait() async {
+        if count > 0 { count -= 1; return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func signal() {
+        if waiters.isEmpty { count += 1 } else { waiters.removeFirst().resume() }
+    }
 }
 
 @MainActor
@@ -16,6 +32,9 @@ final class ContentViewModel: ObservableObject {
     @Published var isProcessing = false
     @Published var phase: DropZonePhase = .idle
     private var compressionStartTime: Date = .now
+
+    /// Limits parallel `URLDownloader` work when many links are dropped at once.
+    private static let remoteDownloadSemaphore = AsyncSemaphore(limit: 4)
 
     var selectedFormat: CompressionFormat
     var prefs: DinkyPreferences
@@ -124,16 +143,94 @@ final class ContentViewModel: ObservableObject {
     }
 
     func remove(_ item: CompressionItem) {
+        item.downloadTask?.cancel()
+        item.downloadTask = nil
         cleanupPasteTemps(for: [item])
         items.removeAll { $0.id == item.id }
         if items.isEmpty { phase = .idle }
     }
 
     func pasteClipboard() -> PasteClipboardResult {
-        guard let url = ClipboardImporter.importFromClipboard() else { return .emptyClipboard }
-        if items.contains(where: { $0.sourceURL.path == url.path }) { return .duplicateInQueue }
-        addAndCompress([url])
-        return .added
+        guard let imp = ClipboardImporter.importFromClipboard() else { return .emptyClipboard }
+        switch imp {
+        case .localFile(let url):
+            if items.contains(where: { $0.sourceURL.path == url.path }) { return .duplicateInQueue }
+            addAndCompress([url])
+            return .added
+        case .remoteURL(let url):
+            if items.contains(where: { $0.pendingRemoteURL == url }) { return .duplicateInQueue }
+            queueRemoteDownload(urls: [url], force: false)
+            return .added
+        }
+    }
+
+    /// Download remote `http(s)` media URLs (max 4 concurrent), then queue for compression.
+    func queueRemoteDownload(urls: [URL], force: Bool) {
+        for url in urls {
+            let placeholder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("dinky_dl_placeholder_\(UUID().uuidString)")
+            let item = CompressionItem(sourceURL: placeholder, presetID: nil, mediaType: .image)
+            item.pendingRemoteURL = url
+            item.isURLDownloadSource = true
+            item.status = .downloading(progress: 0, bytesReceived: 0, totalBytes: nil, displayHost: url.host ?? "…")
+            if force { item.forceCompress = true }
+            items.append(item)
+
+            let host = url.host ?? "…"
+            item.downloadTask = Task { [weak self] in
+                guard let self else { return }
+                await Self.remoteDownloadSemaphore.wait()
+                do {
+                    let local = try await URLDownloader.download(url) { progress, total in
+                        Task { @MainActor in
+                            guard let it = self.items.first(where: { $0.id == item.id }) else { return }
+                            let received: Int64
+                            if let t = total, t > 0 {
+                                received = Int64((Double(t) * progress).rounded(.down))
+                            } else {
+                                received = 0
+                            }
+                            it.status = .downloading(
+                                progress: progress,
+                                bytesReceived: received,
+                                totalBytes: total,
+                                displayHost: host
+                            )
+                        }
+                    }
+                    await MainActor.run {
+                        guard let idx = self.items.firstIndex(where: { $0.id == item.id }) else { return }
+                        let row = self.items[idx]
+                        row.sourceURL = local
+                        row.mediaType = MediaTypeDetector.detect(local) ?? .image
+                        if row.mediaType == .pdf {
+                            row.pageCount = PDFDocument(url: local)?.pageCount
+                        }
+                        row.pendingRemoteURL = nil
+                        row.downloadTask = nil
+                        row.status = .pending
+                        if !self.prefs.manualMode { self.compress() }
+                    }
+                } catch is CancellationError {
+                    await MainActor.run { self.remove(item) }
+                } catch {
+                    await MainActor.run {
+                        guard let idx = self.items.firstIndex(where: { $0.id == item.id }) else { return }
+                        self.items[idx].status = .failed(Self.userFacingDownloadFailure(error))
+                        self.items[idx].downloadTask = nil
+                    }
+                }
+                await Self.remoteDownloadSemaphore.signal()
+            }
+        }
+        // Re-sort by placeholder size (0) — keep order
+    }
+
+    private static func userFacingDownloadFailure(_ error: Error) -> Error {
+        if let le = error as? LocalizedError, let d = le.errorDescription, !d.isEmpty {
+            return NSError(domain: "Dinky", code: 0, userInfo: [NSLocalizedDescriptionKey: d])
+        }
+        return error
     }
 
     /// Removes selected items except those currently compressing (matches row context menu rules).
@@ -159,11 +256,14 @@ final class ContentViewModel: ObservableObject {
 
     func compress() {
         guard !isProcessing else { return }
+        let pending = items.filter { if case .pending = $0.status { return true }; return false }
+        // Nothing to do — don't flicker the drop zone into a `.done` "All done!"
+        // screen when the user fires Compress Now with an empty queue.
+        guard !pending.isEmpty else { return }
         isProcessing = true
         phase = .processing
         compressionStartTime = .now
 
-        let pending = items.filter { if case .pending = $0.status { return true }; return false }
         let batchPreset = batchSharedPreset(from: pending)
 
         Task {
@@ -171,7 +271,8 @@ final class ContentViewModel: ObservableObject {
                 let mediaSem = AsyncSemaphore(limit: prefs.concurrentCompressionLimit)
                 let videoSem = AsyncSemaphore(limit: Self.concurrentVideoExportLimit)
                 for item in pending {
-                    switch item.mediaType {
+                    let mediaType = item.mediaType
+                    switch mediaType {
                     case .video:
                         await videoSem.wait()
                     case .image, .pdf:
@@ -179,7 +280,7 @@ final class ContentViewModel: ObservableObject {
                     }
                     group.addTask { [weak self] in
                         defer {
-                            switch item.mediaType {
+                            switch mediaType {
                             case .video:
                                 Task { await videoSem.signal() }
                             case .image, .pdf:
@@ -192,7 +293,9 @@ final class ContentViewModel: ObservableObject {
             }
             await MainActor.run {
                 self.isProcessing = false
-                self.phase = .done
+                // If the queue was emptied mid-run (Clear All, autoClear race, etc.),
+                // don't strand the empty drop zone in `.done` — fall back to idle.
+                self.phase = self.items.isEmpty ? .idle : .done
                 let batchSaved = self.items.reduce(Int64(0)) { $0 + $1.savedBytes }
                 self.prefs.lifetimeSavedBytes += batchSaved
 
@@ -231,7 +334,29 @@ final class ContentViewModel: ObservableObject {
                 if notify {
                     self.sendNotification(count: doneItems.count, seconds: elapsed)
                 }
+
+                if self.prefs.autoClearWhenDone, doneItems.isEmpty == false {
+                    self.scheduleAutoClearAfterBatch()
+                }
             }
+        }
+    }
+
+    /// Removes successfully-finished rows after a short delay so the user has a moment to glance at the results.
+    /// Failed/skipped/downloading rows are intentionally kept so they remain actionable.
+    private func scheduleAutoClearAfterBatch() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let self else { return }
+            // A new batch may have started in the meantime; bail rather than yanking rows mid-process.
+            guard !self.isProcessing else { return }
+            let toRemove = self.items.filter {
+                if case .done = $0.status { return true }
+                return false
+            }
+            guard toRemove.isEmpty == false else { return }
+            for item in toRemove { self.remove(item) }
+            if self.items.isEmpty { self.phase = .idle }
         }
     }
 
@@ -298,11 +423,13 @@ final class ContentViewModel: ObservableObject {
         }
 
         await MainActor.run { item.status = .processing }
+        let urlDL = item.isURLDownloadSource
         let outputURL: URL = {
-            if let pr = preset { return pr.outputURL(for: item.sourceURL, format: format, globalPrefs: prefs) }
-            return prefs.outputURL(for: item.sourceURL, format: format)
+            if let pr = preset { return pr.outputURL(for: item.sourceURL, format: format, globalPrefs: prefs, isFromURLDownload: urlDL) }
+            return prefs.outputURL(for: item.sourceURL, format: format, isFromURLDownload: urlDL)
         }()
         let replaceOrigin = (preset.map { FilenameHandling(rawValue: $0.filenameHandlingRaw) } ?? prefs.filenameHandling) == .replaceOrigin
+        let backupURL = prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
         do {
             let result = try await CompressionService.shared.compress(
                 source: item.sourceURL,
@@ -310,7 +437,9 @@ final class ContentViewModel: ObservableObject {
                 goals: goals,
                 stripMetadata: strip,
                 outputURL: outputURL,
-                moveToTrash: prefs.moveOriginalsToTrash,
+                originalsAction: prefs.originalsAction,
+                backupFolderURL: backupURL,
+                isURLDownloadSource: urlDL,
                 smartQuality: smartQ,
                 contentTypeHint: hint,
                 preclassifiedContent: preclassifiedForSmartQ
@@ -329,11 +458,19 @@ final class ContentViewModel: ObservableObject {
                     item.status = .done(outputURL: result.outputURL,
                                         originalSize: result.originalSize,
                                         outputSize: result.outputSize)
-                    if replaceOrigin {
-                        try? FileManager.default.trashItem(at: item.sourceURL, resultingItemURL: nil)
-                    }
                     if self.prefs.preserveTimestamps {
                         self.copyTimestamp(from: item.sourceURL, to: result.outputURL)
+                    }
+                    if replaceOrigin {
+                        if urlDL {
+                            try? FileManager.default.removeItem(at: item.sourceURL)
+                        } else {
+                            try? OriginalsHandler.disposeForReplace(
+                                originalAt: item.sourceURL,
+                                action: self.prefs.originalsAction,
+                                backupFolder: self.prefs.originalsAction == .backup ? self.prefs.originalsBackupDestinationURL() : nil
+                            )
+                        }
                     }
                 }
             }
@@ -354,10 +491,11 @@ final class ContentViewModel: ObservableObject {
             return q
         }
         let preset = activePreset(for: item)
+        let urlDL = item.isURLDownloadSource
         await MainActor.run { item.status = .processing }
         let intendedOutput: URL = {
-            if let pr = preset { return pr.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs) }
-            return prefs.outputURL(for: item.sourceURL, mediaType: .pdf)
+            if let pr = preset { return pr.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs, isFromURLDownload: urlDL) }
+            return prefs.outputURL(for: item.sourceURL, mediaType: .pdf, isFromURLDownload: urlDL)
         }()
         let pdfFallback = preset.map { PDFQuality(rawValue: $0.pdfQualityRaw) ?? .medium } ?? prefs.pdfQuality
         let sourceURL = item.sourceURL
@@ -416,7 +554,15 @@ final class ContentViewModel: ObservableObject {
             } else {
                 producedURL = result.outputURL
                 if replaceOrigin {
-                    try? FileManager.default.trashItem(at: item.sourceURL, resultingItemURL: nil)
+                    if urlDL {
+                        try? FileManager.default.removeItem(at: item.sourceURL)
+                    } else {
+                        try? OriginalsHandler.disposeForReplace(
+                            originalAt: item.sourceURL,
+                            action: prefs.originalsAction,
+                            backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
+                        )
+                    }
                 }
             }
 
@@ -461,14 +607,15 @@ final class ContentViewModel: ObservableObject {
             return o
         }
         let preset = activePreset(for: item)
+        let urlDL = item.isURLDownloadSource
         await MainActor.run {
             item.status = .processing
             item.videoExportProgress = 0
         }
         defer { item.videoExportProgress = nil }
         let intendedOutput: URL = {
-            if let pr = preset { return pr.outputURL(for: item.sourceURL, mediaType: .video, globalPrefs: prefs) }
-            return prefs.outputURL(for: item.sourceURL, mediaType: .video)
+            if let pr = preset { return pr.outputURL(for: item.sourceURL, mediaType: .video, globalPrefs: prefs, isFromURLDownload: urlDL) }
+            return prefs.outputURL(for: item.sourceURL, mediaType: .video, isFromURLDownload: urlDL)
         }()
         let videoFallback = preset.map { VideoQuality.resolve($0.videoQualityRaw) } ?? prefs.videoQuality
         let sourceURL = item.sourceURL
@@ -553,7 +700,15 @@ final class ContentViewModel: ObservableObject {
             } else {
                 producedURL = result.outputURL
                 if replaceOrigin {
-                    try? FileManager.default.trashItem(at: item.sourceURL, resultingItemURL: nil)
+                    if urlDL {
+                        try? FileManager.default.removeItem(at: item.sourceURL)
+                    } else {
+                        try? OriginalsHandler.disposeForReplace(
+                            originalAt: item.sourceURL,
+                            action: prefs.originalsAction,
+                            backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
+                        )
+                    }
                 }
             }
 
@@ -651,21 +806,6 @@ final class ContentViewModel: ObservableObject {
     }
 }
 
-// MARK: - AsyncSemaphore
-
-private actor AsyncSemaphore {
-    private var count: Int
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-    init(limit: Int) { count = limit }
-    func wait() async {
-        if count > 0 { count -= 1; return }
-        await withCheckedContinuation { waiters.append($0) }
-    }
-    func signal() {
-        if waiters.isEmpty { count += 1 } else { waiters.removeFirst().resume() }
-    }
-}
-
 struct PNGInputError: LocalizedError {
     var errorDescription: String? {
         "PNG lossless only works on PNG files. Try WebP or AVIF for this one."
@@ -730,7 +870,7 @@ struct ContentView: View {
             Image(systemName: "hand.tap")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text("Manual mode: files stay queued until you right-click a row or choose Compress Now (⌘↩) from the File menu.")
+            Text("Manual mode: files stay queued until you right-click a row or choose Compress Now (\(prefs.shortcut(for: .compressNow).displayString)) from the File menu.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -750,7 +890,7 @@ struct ContentView: View {
         .padding(.vertical, 10)
         .adaptiveGlass(in: RoundedRectangle(cornerRadius: 0, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Manual mode is on. Files stay queued until you compress them from the row menu or File menu.")
+        .accessibilityLabel("Manual mode is on. Files stay queued until you compress them from the row menu or File menu Compress Now, \(prefs.shortcut(for: .compressNow).displayString).")
     }
 
     var body: some View {
@@ -773,7 +913,7 @@ struct ContentView: View {
             }
             .animation(.easeInOut(duration: 0.25), value: updater.availableVersion)
             // Drop handler lives here, above the sidebar, so the overlay can't block it
-            .onDrop(of: [.fileURL], isTargeted: $isDropTargeted, perform: handleDrop)
+            .onDrop(of: [.fileURL, .url], isTargeted: $isDropTargeted, perform: handleDrop)
 
             // ── Floating sidebar (top-aligned, height = content only) ──
             if sidebarVisible {
@@ -848,6 +988,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            URLDownloader.sweepOldDownloads()
             prefs.reconcileSidebarSectionsForSimpleModeIfNeeded()
             updateFolderWatcher()
         }
@@ -867,21 +1008,34 @@ struct ContentView: View {
 
     private var resultsList: some View {
         List(vm.items, id: \.id, selection: $selectedIDs) { item in
-            ResultsRowView(item: item, selectedFormat: vm.selectedFormat, onForceCompress: { vm.forceCompress(item) })
+            ResultsRowView(
+                item: item,
+                selectedFormat: vm.selectedFormat,
+                onForceCompress: { vm.forceCompress(item) },
+                onCancelDownload: { vm.remove(item) }
+            )
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.visible)
                 .listRowSeparatorTint(.primary.opacity(0.08))
                 .onTapGesture(count: 2) {
+                    if case .downloading = item.status { return }
                     let url = item.outputURL ?? item.sourceURL
                     NSWorkspace.shared.open(url)
                 }
                 .onDrag {
+                    if case .downloading = item.status { return NSItemProvider() }
                     let url = item.outputURL ?? item.sourceURL
                     return NSItemProvider(contentsOf: url) ?? NSItemProvider()
                 }
                 .contextMenu {
                     if case .processing = item.status {
                         EmptyView()
+                    } else if case .downloading = item.status {
+                        Button {
+                            vm.remove(item)
+                        } label: {
+                            Label("Cancel Download", systemImage: "xmark.circle")
+                        }
                     } else if case .pending = item.status {
                         let targets = selectedIDs.contains(item.id)
                             ? vm.items.filter { selectedIDs.contains($0.id) }
@@ -1042,28 +1196,40 @@ struct ContentView: View {
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         var collected: [URL] = []
+        var remoteURLs: [URL] = []
         let force = NSEvent.modifierFlags.contains(.option)
         let group = DispatchGroup()
         let lock  = NSLock()
 
         for provider in providers {
-            guard provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) else { continue }
-            group.enter()
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                defer { group.leave() }
-                var resolved: URL?
-                if let url  = item as? URL  { resolved = url }
-                else if let url = item as? NSURL as URL? { resolved = url }
-                else if let data = item as? Data { resolved = URL(dataRepresentation: data, relativeTo: nil) }
-                guard let url = resolved else { return }
-                let files = expandAndFilter(url)
-                lock.lock(); collected.append(contentsOf: files); lock.unlock()
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                group.enter()
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                    defer { group.leave() }
+                    var resolved: URL?
+                    if let url  = item as? URL  { resolved = url }
+                    else if let url = item as? NSURL as URL? { resolved = url }
+                    else if let data = item as? Data { resolved = URL(dataRepresentation: data, relativeTo: nil) }
+                    guard let url = resolved else { return }
+                    let files = expandAndFilter(url)
+                    lock.lock(); collected.append(contentsOf: files); lock.unlock()
+                }
+            } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                group.enter()
+                provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { item, _ in
+                    defer { group.leave() }
+                    let resolved: URL? = (item as? URL) ?? (item as? NSURL) as URL?
+                    guard let url = resolved,
+                          let scheme = url.scheme?.lowercased(),
+                          scheme == "http" || scheme == "https" else { return }
+                    lock.lock(); remoteURLs.append(url); lock.unlock()
+                }
             }
         }
 
         group.notify(queue: .main) {
-            guard !collected.isEmpty else { return }
-            vm.addAndCompress(collected, force: force)
+            if !collected.isEmpty { vm.addAndCompress(collected, force: force) }
+            if !remoteURLs.isEmpty { vm.queueRemoteDownload(urls: remoteURLs, force: force) }
         }
         return true
     }
