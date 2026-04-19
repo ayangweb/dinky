@@ -213,6 +213,45 @@
       .app-icon.is-wiggling { animation: none; }
     }
 
+    /* GitHub hover star burst — count scales with real stargazers */
+    .gh-star {
+      position: fixed;
+      pointer-events: none;
+      color: #FFD60A;
+      text-shadow:
+        0 0 6px rgba(255, 214, 10, 0.55),
+        0 0 14px rgba(255, 184, 0, 0.35);
+      transform: translate(-50%, -50%) scale(0.4);
+      z-index: 200;
+      line-height: 1;
+      animation: gh-star-fly var(--dur, 1100ms) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+      will-change: transform, opacity;
+    }
+    @keyframes gh-star-fly {
+      0%   { transform: translate(-50%, -50%) scale(0.3) rotate(0deg); opacity: 0; }
+      18%  { opacity: 1; }
+      100% {
+        transform:
+          translate(calc(-50% + var(--dx)), calc(-50% + var(--dy)))
+          scale(1) rotate(var(--rot));
+        opacity: 0;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .gh-star { display: none; }
+    }
+
+    /* Sync the in-button star + count with the burst color */
+    .btn-secondary .gh-star-anchor,
+    .btn-secondary #gh-stars-count {
+      transition: color 180ms ease, text-shadow 180ms ease;
+    }
+    .btn-secondary.is-bursting .gh-star-anchor,
+    .btn-secondary.is-bursting #gh-stars-count {
+      color: #FFD60A;
+      text-shadow: 0 0 6px rgba(255, 214, 10, 0.45);
+    }
+
     h1 {
       font-size: 56px;
       font-weight: 600;
@@ -1085,7 +1124,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
         </svg>
-        GitHub<span id="gh-stars"></span>
+        GitHub<span id="gh-stars"> · <span class="gh-star-anchor" aria-hidden="true">★</span><span id="gh-stars-count"></span></span>
       </a>
     </div>
     <p class="version">~16 MB · v2.1.1 · Requires macOS 15 Sequoia</p>
@@ -1665,14 +1704,84 @@
       });
     })();
 
+    let __ghStarCount = 12; // fallback before fetch resolves
     fetch('https://api.github.com/repos/heyderekj/dinky')
       .then(r => r.json())
       .then(d => {
-        if (d.stargazers_count) {
-          document.getElementById('gh-stars').textContent = ' · ★ ' + d.stargazers_count.toLocaleString();
+        if (typeof d.stargazers_count === 'number') {
+          __ghStarCount = d.stargazers_count;
+          document.getElementById('gh-stars-count').textContent = ' ' + d.stargazers_count.toLocaleString();
         }
       })
       .catch(() => {});
+
+    (function () {
+      const ghBtn = document.querySelector('a.btn-secondary[href*="github.com/heyderekj/dinky"]');
+      if (!ghBtn) return;
+
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion) return;
+
+      // Cap so 1000+ stars don't choke the browser; floor so it always feels alive.
+      function emitCount() {
+        const n = __ghStarCount | 0;
+        return Math.max(5, Math.min(n, 80));
+      }
+
+      let bursting = false;
+
+      function spawnStar(cx, cy) {
+        const star = document.createElement('span');
+        star.className = 'gh-star';
+        star.textContent = '★';
+
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 70 + Math.random() * 130;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist - 30; // slight upward bias = more "celebratory"
+        const rot = (Math.random() - 0.5) * 720;
+        const size = 10 + Math.random() * 16;
+        const dur = 900 + Math.random() * 500;
+
+        star.style.left = cx + 'px';
+        star.style.top = cy + 'px';
+        star.style.fontSize = size + 'px';
+        star.style.setProperty('--dx', dx.toFixed(1) + 'px');
+        star.style.setProperty('--dy', dy.toFixed(1) + 'px');
+        star.style.setProperty('--rot', rot.toFixed(0) + 'deg');
+        star.style.setProperty('--dur', dur + 'ms');
+
+        document.body.appendChild(star);
+        star.addEventListener('animationend', () => star.remove(), { once: true });
+      }
+
+      function burst() {
+        if (bursting) return;
+        bursting = true;
+        ghBtn.classList.add('is-bursting');
+
+        const anchor = ghBtn.querySelector('.gh-star-anchor');
+        const rect = (anchor || ghBtn).getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        const total = emitCount();
+        // Stagger so it streams instead of dumping all at once.
+        const stagger = total > 30 ? 8 : 18;
+        for (let i = 0; i < total; i++) {
+          setTimeout(() => spawnStar(cx, cy), i * stagger);
+        }
+        // Clear the button color when the burst is mostly through, not after the
+        // last lingering particle. The 180ms CSS transition softens the trail-off.
+        const colorFor = total * stagger + 250;
+        setTimeout(() => { ghBtn.classList.remove('is-bursting'); }, colorFor);
+        // Keep the re-trigger debounce a touch longer so a quick re-hover doesn't pile bursts.
+        setTimeout(() => { bursting = false; }, total * stagger + 600);
+      }
+
+      ghBtn.addEventListener('mouseenter', burst);
+      ghBtn.addEventListener('focus', burst);
+    })();
   </script>
 
   <script>
