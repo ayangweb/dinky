@@ -12,6 +12,7 @@
 - **Clipboard Compress** — system-wide hotkey (default ⌘⇧V) works even when Dinky isn't focused; pastes file URLs, raw image bytes, or media URLs from the clipboard
 - **Custom keyboard shortcuts** — rebind Open Files, Clipboard Compress, Compress Now, Clear, and Delete in Settings → Shortcuts
 - **Launch at login** — opt-in via SMAppService so Dinky and any watch folders are ready at login
+- **Localized** — functional UI follows the system language for 12 Tier-1 macOS locales (de, es, fr, it, ja, ko, nl, pt-BR, ru, tr, zh-Hans, zh-Hant); brand voice and playful copy stay in English
 - **Originals** — keep, move to Trash, or move to a Backup folder per preset / globally
 - **Batch speed** — Fast (one at a time), Faster (up to three parallel), or Fastest (up to eight)
 - Max width resizing (common web presets or custom value)

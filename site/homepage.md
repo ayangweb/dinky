@@ -23,6 +23,7 @@ A tiny macOS app for **images**, **videos**, and **PDFs**. Convert stills to Web
 - **Originals** — keep, move to Trash, or move to a Backup folder per preset
 - **Custom keyboard shortcuts** — rebind Open Files, Clipboard Compress, Compress Now, Clear, and Delete
 - **Launch at login** — opt in once and Dinky's ready when you log in
+- **Speaks 12 languages** — German, Spanish, French, Italian, Japanese, Korean, Dutch, Brazilian Portuguese, Russian, Turkish, Simplified Chinese, Traditional Chinese
 - **Presets**, **before/after preview**, **Finder Quick Actions**, **in-app updates**
 
 ## Install
