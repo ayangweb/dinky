@@ -86,7 +86,7 @@ Presets are saved combinations of settings. Build one for each repeating task.
 Examples that work well:
 
 - **Web hero images** — WebP, max width 1920, append `-web`.
-- **Client deliverables** — JPEG, max width 2560, replace original, save to `~/Deliverables/`.
+- **Client deliverables** — WebP, max width 2560, replace original, save to `~/Deliverables/`.
 - **Screen recordings** — H.264 Balanced, strip audio.
 - **Scanned PDFs** — flatten, medium quality, grayscale.
 
@@ -172,8 +172,8 @@ You used *Flatten (smallest)*. Switch the preset's PDF output to *Preserve text 
 **Right-click "Compress with Dinky" isn't showing up.**
 Open Dinky once after installing so macOS registers the Service. If it still doesn't appear, enable it in **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders**.
 
-**A watch folder stopped working.**
-macOS sometimes drops folder permissions after an OS update or app move. Re-pick the folder in **Settings → Watch** to refresh access.
+**Why doesn't Dinky output JPEG?**
+WebP and AVIF are strictly better than JPEG — same visual quality, smaller file, and supported everywhere that matters. If your platform requires a `.jpg`, try WebP first; it's accepted almost universally now. If you hit a place that genuinely rejects it, get in touch and let us know.
 
 ---
 
