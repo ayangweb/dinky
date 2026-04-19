@@ -100,8 +100,8 @@
 
     @media (prefers-color-scheme: dark) {
       :root {
-        /* Brighter blue on dark bg = higher WCAG contrast vs near-black page (links + eyebrow) */
-        --bg: #000000;
+        /* Brighter blue on dark bg = higher WCAG contrast vs page bg (links + eyebrow); bg is midpoint #000 ↔ #1c1c1e */
+        --bg: #0e0e0f;
         --text: #f5f5f7;
         --text-secondary: #98989d;
         --brand: #5694f0;
@@ -120,7 +120,7 @@
         --cmp-cross: #48484a;
         --cmp-dim: #636366;
         /* OKLCH */
-        --bg: oklch(0 0 0);
+        --bg: oklch(0.1137 0.0019 286.09);
         --text: oklch(0.9707 0.0027 286.35);
         --text-secondary: oklch(0.6812 0.0073 286.21);
         --brand: oklch(0.6676 0.1517 258.15);
