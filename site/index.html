@@ -53,8 +53,8 @@
       --bg: #fff;
       --text: #1c1c1e;
       --text-secondary: #6b6b70;
-      --brand: #3E7BE8;
-      --brand-hover: #2f6ad6;
+      --brand: #2563eb;
+      --brand-hover: #1d4ed8;
       --divider: #eaeaea;
       --button-secondary-hover: #f1f1f3;
       --modal-bg: #fff;
@@ -65,7 +65,7 @@
       --shadow-overlay: rgba(0, 0, 0, 0.4);
       --code-bg: #1c1c1e;
       --faq-row-even: rgba(0, 0, 0, 0.03);
-      --row-hover: rgba(62, 123, 232, 0.05);
+      --row-hover: rgba(37, 99, 235, 0.05);
       --cmp-cross: #d1d1d6;
       --cmp-dim: #aeaeb2;
       --text-on-brand: #fff;
@@ -77,8 +77,8 @@
       --bg: oklch(1 0 0);
       --text: oklch(0.2273 0.0038 286.09);
       --text-secondary: oklch(0.5295 0.0077 286.13);
-      --brand: oklch(0.6001 0.177 260.96);
-      --brand-hover: oklch(0.5467 0.1775 261.23);
+      --brand: oklch(0.546 0.238 264.1);
+      --brand-hover: oklch(0.492 0.232 264.2);
       --divider: oklch(0.937 0 0);
       --button-secondary-hover: oklch(0.9587 0.0027 286.35);
       --modal-bg: oklch(1 0 0);
@@ -89,7 +89,7 @@
       --shadow-overlay: oklch(0 0 0 / 0.4);
       --code-bg: oklch(0.2273 0.0038 286.09);
       --faq-row-even: oklch(0 0 0 / 0.03);
-      --row-hover: oklch(0.6001 0.177 260.96 / 0.05);
+      --row-hover: oklch(0.546 0.238 264.1 / 0.05);
       --cmp-cross: oklch(0.8622 0.0068 286.26);
       --cmp-dim: oklch(0.752 0.0057 286.26);
       --text-on-brand: oklch(1 0 0);
@@ -104,8 +104,8 @@
         --bg: #0e0e0f;
         --text: #f5f5f7;
         --text-secondary: #98989d;
-        --brand: #5694f0;
-        --brand-hover: #82b8ff;
+        --brand: #60a5fa;
+        --brand-hover: #93c5fd;
         --divider: #38383a;
         --button-secondary-hover: #2c2c2e;
         --modal-bg: #2c2c2e;
@@ -116,15 +116,15 @@
         --shadow-overlay: rgba(0, 0, 0, 0.6);
         --code-bg: #2c2c2e;
         --faq-row-even: rgba(255, 255, 255, 0.04);
-        --row-hover: rgba(86, 148, 240, 0.09);
+        --row-hover: rgba(96, 165, 250, 0.09);
         --cmp-cross: #48484a;
         --cmp-dim: #636366;
         /* OKLCH */
         --bg: oklch(0.1137 0.0019 286.09);
         --text: oklch(0.9707 0.0027 286.35);
         --text-secondary: oklch(0.6812 0.0073 286.21);
-        --brand: oklch(0.6676 0.1517 258.15);
-        --brand-hover: oklch(0.7732 0.1172 255.6);
+        --brand: oklch(0.707 0.21 258.5);
+        --brand-hover: oklch(0.79 0.165 255.7);
         --divider: oklch(0.3414 0.0034 286.22);
         --button-secondary-hover: oklch(0.2939 0.0036 286.18);
         --modal-bg: oklch(0.2939 0.0036 286.18);
@@ -135,7 +135,7 @@
         --shadow-overlay: oklch(0 0 0 / 0.6);
         --code-bg: oklch(0.2939 0.0036 286.18);
         --faq-row-even: oklch(1 0 0 / 0.04);
-        --row-hover: oklch(0.6676 0.1517 258.15 / 0.09);
+        --row-hover: oklch(0.707 0.21 258.5 / 0.09);
         --cmp-cross: oklch(0.4024 0.0033 286.25);
         --cmp-dim: oklch(0.5007 0.0047 286.23);
         /* Segmented control “pill” on dark gray track — distinct from page bg */
@@ -550,20 +550,33 @@
       margin-top: 10px;
     }
 
-    .install-link {
-      font-size: 13px;
+    .install-fallback {
+      display: block;
+      margin-top: 10px;
+      font-size: 12px;
       color: var(--text-secondary);
-      margin-top: 6px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-      font-family: inherit;
+      line-height: 1.45;
+    }
+    .install-fallback a {
+      color: inherit;
       text-decoration: underline;
       text-decoration-thickness: 1px;
       text-underline-offset: 2px;
     }
-    .install-link:hover { color: var(--text); }
+    .install-fallback a:hover { color: var(--text); }
+    .install-step-stack {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .install-step-stack p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+    }
 
     /* Modal */
     .modal-overlay {
@@ -655,20 +668,6 @@
       border-radius: 4px;
       padding: 1px 5px;
       white-space: nowrap;
-    }
-    .modal-divider {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 20px 0;
-      color: var(--text-secondary);
-      font-size: 12px;
-    }
-    .modal-divider::before, .modal-divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--divider);
     }
     .code-block {
       background: var(--code-bg);
@@ -1177,7 +1176,7 @@
     </p>
 
     <div class="buttons">
-      <a class="btn btn-primary" href="https://github.com/heyderekj/dinky/releases/download/v2.2.0/Dinky-2.2.0.dmg" onclick="fathom.trackEvent('Download macOS')">
+      <a class="btn btn-primary" href="https://github.com/heyderekj/dinky/releases/download/v2.2.0/Dinky-2.2.0.dmg" onclick="fathom.trackEvent('Download macOS'); document.getElementById('install-modal').classList.add('open')">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
           <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
         </svg>
@@ -1191,25 +1190,30 @@
       </a>
     </div>
     <p class="version">~16 MB · v2.2.0 · Requires macOS 15 Sequoia</p>
-    <button class="install-link" onclick="document.getElementById('install-modal').classList.add('open')">How to install →</button>
   </section>
 
   <!-- Install modal -->
   <div class="modal-overlay" id="install-modal" onclick="if(event.target===this)this.classList.remove('open')">
     <div class="modal">
       <button class="modal-close" onclick="document.getElementById('install-modal').classList.remove('open')" aria-label="Close">✕</button>
-      <h2>How to install</h2>
+      <h2>How to install Dinky</h2>
       <ol class="install-steps">
-        <li><span>Download the <strong>.dmg</strong> from the button above and open it.</span></li>
-        <li><span>Drag <strong>Dinky</strong> into your <strong>Applications</strong> folder.</span></li>
-        <li><span>Try to launch Dinky — macOS may block it on first run.</span></li>
-        <li><span>Go to <strong>System Settings → Privacy &amp; Security</strong>, scroll down, and click <strong>Open Anyway</strong>.</span></li>
+        <li>
+          <span>
+            Open the <strong>.dmg</strong> from your Downloads and drag <strong>Dinky</strong> into your <strong>Applications</strong> folder.
+            <span class="install-fallback">Download didn't start? <a href="https://github.com/heyderekj/dinky/releases/download/v2.2.0/Dinky-2.2.0.dmg" onclick="fathom.trackEvent('Download macOS')">Download again</a>.</span>
+          </span>
+        </li>
+        <li>
+          <div class="install-step-stack">
+            <p>Open <strong>Terminal</strong> and paste this command to skip the Gatekeeper warning:</p>
+            <div class="code-block">
+              <code id="xattr-cmd">xattr -dr com.apple.quarantine /Applications/Dinky.app</code>
+              <button class="copy-btn" onclick="copyCmd(this)">Copy</button>
+            </div>
+          </div>
+        </li>
       </ol>
-      <div class="modal-divider">or skip steps 3–4 with Terminal</div>
-      <div class="code-block">
-        <code id="xattr-cmd">xattr -dr com.apple.quarantine /Applications/Dinky.app</code>
-        <button class="copy-btn" onclick="copyCmd(this)">Copy</button>
-      </div>
     </div>
   </div>
 
@@ -1682,6 +1686,16 @@
       <div class="faq-item">
         <h3 class="faq-q">How does Dinky compare to Clop?</h3>
         <p class="faq-a"><a href="https://lowtechguys.com/clop/" target="_blank" rel="noopener">Clop</a> is the closest neighbor — same three file types, also Mac-native, genuinely good. Different shape: Clop is a menu-bar clipboard optimizer with hotkey crop/scale and a Pro tier (~$15) for watch folders. Dinky is a window-first drop zone, ~16 MB, MIT, free forever — watch folders included.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3 class="faq-q">Can I compress an image and keep it as JPEG (or the original format)?</h3>
+        <p class="faq-a">Dinky always outputs WebP, AVIF, or lossless PNG for images — it doesn’t re-encode to the same format. If you need a smaller JPEG out, pick AVIF (often smaller with better quality) or WebP. For a format-neutral “just make it smaller” workflow, AVIF is usually the best all-around choice.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3 class="faq-q">What if Dinky can’t hit my target file size?</h3>
+        <p class="faq-a">Dinky binary-searches quality down to a floor (quality 10) trying to fit under your cap. If even quality 10 produces a file that’s still too large, it keeps the quality-10 result — the smallest it can get. For images that truly won’t compress small enough (e.g. a heavily detailed photo with a very tight cap), consider also enabling Max Width to reduce resolution first.</p>
       </div>
 
       <div class="faq-item">
