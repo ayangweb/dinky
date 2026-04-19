@@ -100,12 +100,12 @@
 
     @media (prefers-color-scheme: dark) {
       :root {
-        /* Dark blue brand: slightly deeper than the old neon pass */
+        /* Brighter blue on dark bg = higher WCAG contrast vs #1c1c1e (links + eyebrow) */
         --bg: #1c1c1e;
         --text: #f5f5f7;
         --text-secondary: #98989d;
-        --brand: #4d89e5;
-        --brand-hover: #5f99f2;
+        --brand: #5694f0;
+        --brand-hover: #82b8ff;
         --divider: #38383a;
         --button-secondary-hover: #2c2c2e;
         --modal-bg: #2c2c2e;
@@ -116,15 +116,15 @@
         --shadow-overlay: rgba(0, 0, 0, 0.6);
         --code-bg: #2c2c2e;
         --faq-row-even: rgba(255, 255, 255, 0.04);
-        --row-hover: rgba(77, 137, 229, 0.09);
+        --row-hover: rgba(86, 148, 240, 0.09);
         --cmp-cross: #48484a;
         --cmp-dim: #636366;
         /* OKLCH */
         --bg: oklch(0.2273 0.0038 286.09);
         --text: oklch(0.9707 0.0027 286.35);
         --text-secondary: oklch(0.6812 0.0073 286.21);
-        --brand: oklch(0.6338 0.1524 258.72);
-        --brand-hover: oklch(0.6834 0.1456 258.7);
+        --brand: oklch(0.6676 0.1517 258.15);
+        --brand-hover: oklch(0.7732 0.1172 255.6);
         --divider: oklch(0.3414 0.0034 286.22);
         --button-secondary-hover: oklch(0.2939 0.0036 286.18);
         --modal-bg: oklch(0.2939 0.0036 286.18);
@@ -135,7 +135,7 @@
         --shadow-overlay: oklch(0 0 0 / 0.6);
         --code-bg: oklch(0.2939 0.0036 286.18);
         --faq-row-even: oklch(1 0 0 / 0.04);
-        --row-hover: oklch(0.6338 0.1524 258.72 / 0.09);
+        --row-hover: oklch(0.6676 0.1517 258.15 / 0.09);
         --cmp-cross: oklch(0.4024 0.0033 286.25);
         --cmp-dim: oklch(0.5007 0.0047 286.23);
         /* Segmented control “pill” on dark gray track — distinct from page bg */
