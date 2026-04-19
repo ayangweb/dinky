@@ -760,6 +760,28 @@
     .faq-a a:hover {
       color: var(--text);
     }
+    .faq-inline-link {
+      display: inline;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font: inherit;
+      color: var(--text-secondary);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+    .faq-inline-link:hover {
+      color: var(--text);
+    }
+    .gatekeeper-lead {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+      margin: 0 0 16px;
+    }
 
     @media (max-width: 700px) {
       .faq-grid { grid-template-columns: 1fr; }
@@ -1217,6 +1239,19 @@
     </div>
   </div>
 
+  <!-- Gatekeeper help (no download — for users who already installed) -->
+  <div class="modal-overlay" id="gatekeeper-modal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal">
+      <button class="modal-close" onclick="document.getElementById('gatekeeper-modal').classList.remove('open')" aria-label="Close">✕</button>
+      <h2>macOS blocked Dinky</h2>
+      <p class="gatekeeper-lead">Because Dinky isn't from the App Store, macOS quarantines it on first run. Paste this into Terminal to remove the flag:</p>
+      <div class="code-block">
+        <code id="xattr-cmd-gk">xattr -dr com.apple.quarantine /Applications/Dinky.app</code>
+        <button class="copy-btn" onclick="copyCmd(this)">Copy</button>
+      </div>
+    </div>
+  </div>
+
   <section class="screenshots">
     <!-- Row A: Drop zone screenshot + card (image left) -->
     <div class="ss-row">
@@ -1625,7 +1660,7 @@
     <div class="faq-grid">
       <div class="faq-item">
         <h3 class="faq-q">What input formats does Dinky support?</h3>
-        <p class="faq-a">Images: JPG, PNG, WebP, AVIF, TIFF, and BMP — output WebP, AVIF, or lossless PNG. Common video formats (MP4, MOV) export to MP4 with H.264 or HEVC. PDFs are supported with dedicated controls.</p>
+        <p class="faq-a">Images: JPG, PNG, WebP, AVIF, TIFF, BMP → WebP, AVIF, or lossless PNG. Video: MP4/MOV → MP4 (H.264 or HEVC). PDFs: supported.</p>
       </div>
 
       <div class="faq-item">
@@ -1645,7 +1680,7 @@
 
       <div class="faq-item">
         <h3 class="faq-q">What happens to my originals?</h3>
-        <p class="faq-a">Your call. In Settings → Originals pick <strong>Keep</strong> (left in place), <strong>Move to Trash</strong> (recoverable for 30 days), or <strong>Move to a backup folder</strong> you choose. Default is Keep — Dinky never overwrites by surprise.</p>
+        <p class="faq-a">In Settings → Originals, choose <strong>Keep</strong>, <strong>Move to Trash</strong>, or a backup folder. Default is Keep.</p>
       </div>
 
       <div class="faq-item">
@@ -1654,18 +1689,18 @@
       </div>
 
       <div class="faq-item">
-        <h3 class="faq-q">Why isn't it on the Mac App Store?</h3>
-        <p class="faq-a">App Store distribution requires sandboxing that would limit how Dinky shells out to its compression engines. The notarization warning on first launch is a one-time thing.</p>
+        <h3 class="faq-q">macOS says Dinky can't be opened — what do I do?</h3>
+        <p class="faq-a">That's Gatekeeper — macOS blocks first launch for apps outside the App Store. <button type="button" class="faq-inline-link" onclick="document.getElementById('gatekeeper-modal').classList.add('open')">How to fix it →</button></p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-q">Only Mac?</h3>
-        <p class="faq-a">Yes. Dinky is built in SwiftUI with AppKit and leans on macOS frameworks like Vision and Core Graphics. A Windows or Linux port would essentially be a different app.</p>
+        <p class="faq-a">Yes. It’s SwiftUI + macOS frameworks; a Windows or Linux port would be a different app.</p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-q">What are presets?</h3>
-        <p class="faq-a">A saved collection of settings — format, quality, max width, destination, watch folder, filename handling — applied in one click from the sidebar. Create them in Settings → Presets.</p>
+        <p class="faq-a">Saved settings (format, quality, destination, etc.) — one click from the sidebar. Create them in Settings → Presets.</p>
       </div>
 
       <div class="faq-item">
@@ -1675,32 +1710,32 @@
 
       <div class="faq-item">
         <h3 class="faq-q">Can Dinky compress something from a URL?</h3>
-        <p class="faq-a">Yes. Drag a direct media link (<code>https://…/photo.jpg</code>, <code>…/clip.mp4</code>, <code>…/file.pdf</code>) onto the window, or copy it and hit ⌘⇧V (Clipboard Compress). Direct links only — share pages get rejected — and 500 MB max per file.</p>
+        <p class="faq-a">Yes. Drag a direct media link (<code>https://…/photo.jpg</code>, etc.) onto the window, or copy it and hit ⌘⇧V (Clipboard Compress). Direct file URLs only — not web pages.</p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-q">Can I share a URL’s compressed version straight to Dropbox or Google Drive?</h3>
-        <p class="faq-a">Not directly, but two workflows cover it: point a preset’s destination at a cloud-synced folder (e.g. <code>~/Dropbox/Compressed/</code>) so the file syncs automatically, or pair Watch Folder with the <em>Compress Images</em> Apple Shortcut to upload or share programmatically.</p>
+        <p class="faq-a">Not directly. Set a preset’s destination to a cloud-synced folder (e.g. <code>~/Dropbox/Compressed/</code>) so outputs sync automatically.</p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-q">How does Dinky compare to Clop?</h3>
-        <p class="faq-a"><a href="https://lowtechguys.com/clop/" target="_blank" rel="noopener">Clop</a> is the closest neighbor — same three file types, also Mac-native, genuinely good. Different shape: Clop is a menu-bar clipboard optimizer with hotkey crop/scale and a Pro tier (~$15) for watch folders. Dinky is a window-first drop zone, ~16 MB, MIT, free forever — watch folders included.</p>
+        <p class="faq-a"><a href="https://lowtechguys.com/clop/" target="_blank" rel="noopener">Clop</a> is menu-bar clipboard–first with a Pro tier; Dinky is a free, MIT, window-first drop zone with watch folders included.</p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-q">Can I compress an image and keep it as JPEG (or the original format)?</h3>
-        <p class="faq-a">Dinky always outputs WebP, AVIF, or lossless PNG for images — it doesn’t re-encode to the same format. If you need a smaller JPEG out, pick AVIF (often smaller with better quality) or WebP. For a format-neutral “just make it smaller” workflow, AVIF is usually the best all-around choice.</p>
+        <p class="faq-a">Dinky outputs WebP, AVIF, or lossless PNG — not JPEG. For smallest files, try AVIF or WebP.</p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-q">What if Dinky can’t hit my target file size?</h3>
-        <p class="faq-a">Dinky binary-searches quality down to a floor (quality 10) trying to fit under your cap. If even quality 10 produces a file that’s still too large, it keeps the quality-10 result — the smallest it can get. For images that truly won’t compress small enough (e.g. a heavily detailed photo with a very tight cap), consider also enabling Max Width to reduce resolution first.</p>
+        <p class="faq-a">Dinky lowers quality as far as it can to hit your cap. If it’s still too large, you get the smallest result it could produce — try lowering Max Width too.</p>
       </div>
 
       <div class="faq-item">
         <h3 class="faq-q">Who made this and why?</h3>
-        <p class="faq-a"><a href="https://heyderekj.com" target="_blank">Derek Castelli</a>, a freelance web designer in Webflow and Figma. Image compression comes up on every build, Optimage crashed one day, and Dinky was the excuse to build his first Mac app.</p>
+        <p class="faq-a"><a href="https://heyderekj.com" target="_blank">Derek Castelli</a> — Webflow and Figma. Built Dinky after Optimage crashed mid-project.</p>
       </div>
     </div>
 
@@ -1748,7 +1783,8 @@
     })();
 
     function copyCmd(btn) {
-      const text = document.getElementById('xattr-cmd').textContent;
+      const code = btn.closest('.code-block').querySelector('code');
+      const text = code.textContent;
       navigator.clipboard.writeText(text).then(() => {
         btn.textContent = 'Copied!';
         btn.classList.add('copied');
@@ -1757,7 +1793,10 @@
     }
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') document.getElementById('install-modal').classList.remove('open');
+      if (e.key === 'Escape') {
+        document.getElementById('install-modal').classList.remove('open');
+        document.getElementById('gatekeeper-modal').classList.remove('open');
+      }
     });
 
 
