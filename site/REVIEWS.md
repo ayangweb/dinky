@@ -1,12 +1,15 @@
 # Publishing testimonials on dinkyfiles.com
 
-Quotes come from [GitHub Discussions — Reviews](https://github.com/heyderekj/dinky/discussions/categories/reviews). Only add entries where the author checked the consent box on the discussion form.
+Quotes come from [GitHub Discussions](https://github.com/heyderekj/dinky/discussions) (use a **Reviews** category once you create it). Only add entries where the author checked the consent box on the discussion form.
 
 ## One-time GitHub setup (repo maintainer)
 
 1. **Settings → General → Features** — enable **Discussions**.
-2. **Discussions → Categories** — create a category named **Reviews**, slug `reviews`, format **Open-ended discussion** (so it can use the template in `.github/DISCUSSION_TEMPLATE/review.yml`).
-3. Optionally pin a welcome post in that category with a short intro and link to [leave a review](https://github.com/heyderekj/dinky/discussions/new?category=reviews).
+2. **Discussions** (gear next to Categories) → **New category** — e.g. title **Reviews**, format **Open-ended discussion**, description explaining it’s for testimonials. GitHub derives the URL **slug** from the title (often `reviews` for “Reviews”, or `user-reviews` for “User reviews” — it is **not** a field you type separately).
+3. **Why “Sorry, we didn’t recognize that category!”?** Links like `discussions/new?category=reviews` only work after that category exists **and** the slug in the URL matches GitHub’s slug exactly. The app and site use plain [`discussions/new`](https://github.com/heyderekj/dinky/discussions/new) so people always get the category picker instead of an error.
+4. **Optional deep link:** After the category exists, open it in the sidebar and copy the slug from the address bar (`…/discussions/categories/<slug>`). You can then share `https://github.com/heyderekj/dinky/discussions/new?category=<slug>` in a pinned post or docs if you want one-click pre-selection.
+5. Optionally pin a welcome post in the Reviews category with a short intro and link to **New discussion** (same as [`discussions/new`](https://github.com/heyderekj/dinky/discussions/new)).
+6. Associate the form in `.github/DISCUSSION_TEMPLATE/review.yml` with the Reviews category in the GitHub UI if prompted (category-specific templates).
 
 ## Adding a quote to the site
 
