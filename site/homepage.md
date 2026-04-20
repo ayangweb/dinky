@@ -2,7 +2,7 @@
 
 **Tagline:** Dinky makes files smaller.
 
-A tiny macOS app for **images**, **videos**, and **PDFs**. Convert stills to WebP, AVIF, lossless PNG, or HEIC; export video to smaller MP4 with **H.264** or **HEVC**; **PDFs default to flatten** (real size wins) with an honest **preserve** mode (bundled **qpdf** + PDFKit, only when smaller). Drag and drop, get smaller files back. Free and open source.
+A tiny macOS app for **images**, **videos**, and **PDFs**. Convert stills to WebP, AVIF, lossless PNG, or HEIC; export video to smaller MP4 with **H.264** or **HEVC**; **PDFs** default to **flatten** (size wins) with an honest **preserve** mode (bundled **qpdf** + PDFKit, only when smaller), plus optional **Vision OCR** on scan-like PDFs before compress. Drag and drop, get smaller files back. Free and open source.
 
 - **Download:** [Dinky for macOS (DMG)](https://github.com/heyderekj/dinky/releases/download/v2.6.0/Dinky-2.6.0.dmg)
 - **Source:** [GitHub — heyderekj/dinky](https://github.com/heyderekj/dinky)
@@ -18,7 +18,7 @@ A tiny macOS app for **images**, **videos**, and **PDFs**. Convert stills to Web
 - **Compress from a URL** — drop or paste a direct media link and Dinky downloads it (max 500 MB) before compressing
 - **Images** — WebP, AVIF, lossless PNG, or HEIC; Smart Quality (photo vs. graphic); max width and target file size
 - **Videos** — MP4 export with codec and quality presets
-- **PDFs** — preserve structure or flatten pages for smaller output
+- **PDFs** — preserve or flatten; optional on-device OCR on scans, then compress
 - **Batch speed** — Fast / Faster / Fastest (parallel job caps)
 - **Watch folder** — auto-compress files dropped into a watched folder
 - **Originals** — keep, move to Trash, or move to a Backup folder per preset

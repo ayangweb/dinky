@@ -4,21 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dinky makes files smaller.</title>
-  <meta name="description" content="Dinky compresses images, videos &amp; PDFs on macOS — modern image formats, AVFoundation video, and honest PDF modes (flatten for size, qpdf + preserve for text). WebP, AVIF, HEIC, MP4, presets, watch folders. Free, open source, local." />
+  <meta name="description" content="Dinky compresses images, videos &amp; PDFs on macOS — modern image formats, AVFoundation video, PDF flatten/preserve, optional Vision OCR on scans. WebP, AVIF, HEIC, MP4, presets, watch folders. Free, open source, local." />
 
   <link rel="canonical" href="https://dinkyfiles.com" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="app-icon.webp" />
 
   <meta property="og:title" content="Dinky makes files smaller." />
-  <meta property="og:description" content="Dinky compresses images, videos &amp; PDFs on macOS — modern formats, native video export, and honest PDF tradeoffs (flatten vs qpdf preserve). Free, open source, runs on your Mac." />
+  <meta property="og:description" content="Dinky compresses images, videos &amp; PDFs on macOS — modern formats, native video, PDF flatten/preserve, optional scan OCR. Free, open source, runs on your Mac." />
   <meta property="og:image" content="https://dinkyfiles.com/screenshots/screenshot-drop-zone.webp" />
   <meta property="og:url" content="https://dinkyfiles.com" />
   <meta property="og:type" content="website" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Dinky makes files smaller." />
-  <meta name="twitter:description" content="Dinky compresses images, videos &amp; PDFs on macOS — modern formats, native video, honest PDF modes (flatten vs qpdf preserve). Free, open source, local." />
+  <meta name="twitter:description" content="Dinky compresses images, videos &amp; PDFs on macOS — modern formats, native video, PDF flatten/preserve, optional scan OCR. Free, open source, local." />
   <meta name="twitter:image" content="https://dinkyfiles.com/screenshots/screenshot-drop-zone.webp" />
 
   <script type="application/ld+json">
@@ -28,7 +28,7 @@
     "name": "Dinky",
     "operatingSystem": "macOS",
     "applicationCategory": "UtilitiesApplication",
-    "description": "Dinky compresses images, videos & PDFs on macOS — WebP, AVIF, HEIC, MP4, honest PDF modes (flatten for size, qpdf + preserve for text). Presets, watch folders, URL drop. Free, open source, local.",
+    "description": "Dinky compresses images, videos & PDFs on macOS — WebP, AVIF, HEIC, MP4, PDF flatten/preserve, optional Vision OCR on scans. Presets, watch folders, URL drop. Free, open source, local.",
     "url": "https://dinkyfiles.com",
     "downloadUrl": "https://github.com/heyderekj/dinky/releases/download/v2.6.0/Dinky-2.6.0.dmg",
     "softwareVersion": "2.6.0",
@@ -1279,7 +1279,7 @@
     <h1>Dinky</h1>
     <p class="tagline">Dinky makes files smaller.</p>
     <p class="description">
-      A tiny macOS app that shrinks images, videos, and PDFs. Drag, drop, get smaller files back. Free and open source.
+      A tiny macOS app that shrinks images, videos, and PDFs — optional on-device OCR on scan-like PDFs, then compress. Drag, drop, get smaller files back. Free and open source.
     </p>
 
     <div class="buttons">
@@ -1398,7 +1398,7 @@
               <path fill-rule="evenodd" d="M15.97 2.47a.75.75 0 0 1 1.06 0l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 1 1-1.06-1.06l3.22-3.22H7.5a.75.75 0 0 1 0-1.5h11.69l-3.22-3.22a.75.75 0 0 1 0-1.06Zm-7.94 9a.75.75 0 0 1 0 1.06l-3.22 3.22H16.5a.75.75 0 0 1 0 1.5H4.81l3.22 3.22a.75.75 0 1 1-1.06 1.06l-4.5-4.5a.75.75 0 0 1 0-1.06l4.5-4.5a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
             </svg>
             <h3>Format conversion</h3>
-            <p>Images: WebP, AVIF, lossless PNG, or HEIC (ImageIO) — oxipng handles transparency and format fidelity for PNG. Videos and PDFs get their own controls in the sidebar.</p>
+            <p>Images: WebP, AVIF, lossless PNG, or HEIC — oxipng for PNG fidelity. Video: H.264/HEVC export. PDF: flatten, preserve, target size; optional Vision OCR on scan-like pages before encoding.</p>
           </div>
           <div class="ss-card-feature">
             <!-- sparkles -->
@@ -1616,7 +1616,7 @@
     <div class="cmp-row">
       <div class="cmp-text-card">
         <h2 class="cmp-title">Dinky in size* only</h2>
-        <p class="cmp-desc">Most image tools don't do PDFs. Most PDF tools don't do video. Dinky covers all three on macOS — free, open source, and tiny.</p>
+        <p class="cmp-desc">Most image tools don't do PDFs. Most PDF tools don't do video. Dinky covers all three — includes optional scan OCR before PDF compression — free, open source, and tiny.</p>
         <p class="cmp-desc">Pick a category to see how Dinky stacks up against the popular tool in each space.</p>
         <p class="cmp-footnote">*We don't want you to give up quality for a smaller footprint — Dinky stays light without cutting corners on how your images, video, and PDFs look.</p>
       </div>
@@ -1793,7 +1793,7 @@
 
       <div class="faq-item">
         <h3 class="faq-q">What input formats does Dinky support?</h3>
-        <p class="faq-a">Images: JPG, PNG, WebP, AVIF, HEIC/HEIF, TIFF, BMP → WebP, AVIF, lossless PNG, or HEIC. Video: MP4/MOV → MP4 (H.264 or HEVC). PDFs: supported.</p>
+        <p class="faq-a">Images: JPG, PNG, WebP, AVIF, HEIC/HEIF, TIFF, BMP → WebP, AVIF, lossless PNG, or HEIC. Video: MP4/MOV → MP4 (H.264 or HEVC). PDFs: flatten, preserve, target size; scan-like PDFs can get OCR for search first.</p>
       </div>
 
       <div class="faq-item">

@@ -6,7 +6,7 @@
 
 - **Images** — JPG, PNG, WebP, AVIF, HEIC/HEIF, TIFF, BMP → WebP, AVIF, lossless PNG, or HEIC
 - **Videos** — common formats (e.g. MP4, MOV) → MP4 with H.264 or HEVC and quality presets
-- **PDFs** — **Flatten (default)** rasterizes pages (PDFKit + JPEG) for reliable size wins; **Preserve (best-effort)** uses bundled **qpdf** (with lossless stream coalescing + resource cleanup) then PDFKit — only keeps output when smaller. **Target file size**: set a ceiling (e.g. 10 MB) and Dinky steps down quality tiers until the output fits. **Image downsampling**: opt-in mixed-mode rasterizes image-heavy pages at 144 DPI while keeping text/link pages selectable — high-impact on 300 DPI scan PDFs
+- **PDFs** — **Flatten (default)** rasterizes pages (PDFKit + JPEG) for reliable size wins; **Preserve (best-effort)** uses bundled **qpdf** (with lossless stream coalescing + resource cleanup) then PDFKit — only keeps output when smaller. **Scan OCR (optional)**: Vision text layer on scan-like PDFs before flatten/preserve. **Target file size**: set a ceiling (e.g. 10 MB) and Dinky steps down quality tiers until the output fits. **Image downsampling**: opt-in mixed-mode rasterizes image-heavy pages at 144 DPI while keeping text/link pages selectable — high-impact on 300 DPI scan PDFs
 - Drag and drop or file picker; batch compression with live results
 - **URL drop** — drag or paste a direct `http(s)` link to an image, video, or PDF; Dinky downloads (max 500 MB), compresses, and cleans up the temp file
 - **Clipboard Compress** — system-wide hotkey (default ⌘⇧V) works even when Dinky isn't focused; pastes file URLs, raw image bytes, or media URLs from the clipboard
