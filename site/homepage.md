@@ -7,7 +7,7 @@ A tiny macOS app for **images**, **videos**, and **PDFs**. Convert stills to Web
 - **Download:** [Dinky for macOS (DMG)](https://github.com/heyderekj/dinky/releases/download/v2.6.0/Dinky-2.6.0.dmg)
 - **Source:** [GitHub — heyderekj/dinky](https://github.com/heyderekj/dinky)
 - **Support:** [help@dinkyfiles.com](mailto:help@dinkyfiles.com)
-- **Version:** ~28 MB · v2.6.0 · Requires macOS 15 Sequoia or later
+- **Version:** ~31 MB · v2.6.0 · Requires macOS 15 Sequoia or later
 - **Note:** 1.x (from 1.0) was images only; **2.0** added videos and PDFs. Older 1.x downloads stay on GitHub for archival use.
 
 ## Highlights
