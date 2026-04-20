@@ -48,6 +48,7 @@ enum FilenameHandling: String, CaseIterable, Identifiable {
 enum CollisionNamingStyle: String, CaseIterable, Identifiable {
     case finderDuplicate = "finderDuplicate"
     case finderNumbered = "finderNumbered"
+    case custom = "custom"
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -55,6 +56,8 @@ enum CollisionNamingStyle: String, CaseIterable, Identifiable {
             return String(localized: "“Copy”, “Copy 2”, …", comment: "Collision naming style: Finder duplicate.")
         case .finderNumbered:
             return String(localized: "“(1)”, “(2)”, …", comment: "Collision naming style: numbered parentheses.")
+        case .custom:
+            return String(localized: "Add my own text", comment: "Collision naming style: user-defined extra text in the filename.")
         }
     }
 }
@@ -117,6 +120,9 @@ final class DinkyPreferences: ObservableObject {
         get { CollisionNamingStyle(rawValue: collisionNamingStyleRaw) ?? .finderDuplicate }
         set { collisionNamingStyleRaw = newValue.rawValue }
     }
+    /// Appended to the output basename when `collisionNamingStyle` is `.custom`.
+    /// Include `{n}` for an incrementing number; without `{n}`, extra collisions get a space and trailing number (like Finder).
+    @AppStorage("collisionCustomPattern") var collisionCustomPattern: String = "_v{n}"
 
     // MARK: Format
     @AppStorage("defaultFormat")        var defaultFormatRaw: String = CompressionFormat.webp.rawValue

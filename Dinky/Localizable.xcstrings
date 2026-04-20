@@ -1635,7 +1635,7 @@
         }
       }
     },
-    "A temporary re-save was %@ than your file. That version was discarded — your original was not replaced.\n\nPreserve text and links first runs stream optimization (bundled qpdf), then a PDFKit rewrite if needed. Many modern PDFs are already tightly compressed, so this mode often cannot shrink them further. It is not a guaranteed size optimizer. For reliably smaller files, use “Smallest file (flatten pages)” in the sidebar, or the button below." : {
+    "A temporary re-save was %@ than your file. That version was discarded — your original was not replaced.\n\nPreserve text and links first runs stream optimization (bundled qpdf), then a PDFKit rewrite if needed. Many modern PDFs are already tightly compressed, so this mode often cannot shrink them further. It is not a guaranteed size optimizer. In the sidebar (or below), you can try Advanced (experimental) passes for a bit more shrink while staying in preserve mode. For reliably smaller files, use “Smallest file (flatten pages)”, or the flatten button below." : {
       "comment" : "Zero-gain sheet: preserve PDF; first format arg is size phrase."
     },
     "About as much as a handful of smartphone shots." : {
@@ -1887,6 +1887,9 @@
         }
       }
     },
+    "Add my own text" : {
+      "comment" : "Collision naming style: user-defined extra text in the filename."
+    },
     "Adds “-dinky” before the extension" : {
       "comment" : "Output summary: filename handling."
     },
@@ -2049,6 +2052,9 @@
           }
         }
       }
+    },
+    "Advanced (experimental)" : {
+      "comment" : "Settings UI: PDF experimental preserve.\nSidebar PDF: experimental preserve subsection."
     },
     "After compressing, originals:" : {
       "comment" : "Settings UI.",
@@ -3054,8 +3060,12 @@
         }
       }
     },
+    "Applies to images and video only. PDFs always keep the result when it is smaller than the original (even a small %), because PDF savings are often modest on preserve mode or threshold-sized on flatten." : {
+      "comment" : "Settings UI: minimum savings threshold scope."
+    },
     "Applies to images, videos, and PDFs. Skip files where savings fall below this threshold." : {
       "comment" : "Settings UI.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3374,6 +3384,9 @@
         }
       }
     },
+    "Auto-grayscale monochrome scans" : {
+      "comment" : "Settings UI: PDF Smart Quality."
+    },
     "AVIF" : {
       "comment" : "Image format name.",
       "localizations" : {
@@ -3450,6 +3463,9 @@
           }
         }
       }
+    },
+    "Balanced. ~120 DPI — good for most purposes." : {
+      "comment" : "PDF flatten quality tier description."
     },
     "Balances size and readability; you choose text vs flatten in All options." : {
       "comment" : "Outcome map friendly: PDFs smart."
@@ -8832,6 +8848,7 @@
     },
     "Dinky compressed this file but the result was only %.1f%% smaller — under your %d%% threshold, so the original was kept.\n\nLower the threshold in Settings → General → Skip if savings below to compress files like this automatically, or click Compress Anyway to force this one." : {
       "comment" : "Skipped detail body.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -8909,6 +8926,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dinky 壓縮了該文件，但結果僅小了 %.1f%% — 低於您的 %d%% 閾值，因此保留了原始文件。\n\n在「設定」→「常規」→「如果節省則跳過」中降低閾值以自動壓縮此類文件，或按一下「仍然壓縮」以強制執行此操作。"
+          }
+        }
+      }
+    },
+    "Dinky compressed this file but the result was only %.1f%% smaller — under your %d%% threshold, so the original was kept.\n\nLower the threshold in Settings → General → Skip if savings below to compress files like this automatically, or click Compress Anyway to force this one. (PDFs are not subject to this threshold.)" : {
+      "comment" : "Skipped detail body.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dinky compressed this file but the result was only %1$.1f%% smaller — under your %2$d%% threshold, so the original was kept.\n\nLower the threshold in Settings → General → Skip if savings below to compress files like this automatically, or click Compress Anyway to force this one. (PDFs are not subject to this threshold.)"
           }
         }
       }
@@ -9770,6 +9798,9 @@
         }
       }
     },
+    "Duplicate naming" : {
+      "comment" : "Settings UI: section for name collisions."
+    },
     "Duration" : {
       "comment" : "Tooltip for video duration chip.",
       "localizations" : {
@@ -10466,8 +10497,14 @@
         }
       }
     },
+    "Examples: _backup, holiday{n}" : {
+      "comment" : "Settings: placeholder for custom duplicate pattern field."
+    },
     "Expands friendly and technical details for each type." : {
       "comment" : "VoiceOver: What to expect header when collapsed."
+    },
+    "Experimental preserve pass" : {
+      "comment" : "Settings UI: PDF experimental picker accessibility.\nSidebar PDF: VoiceOver label for experimental picker."
     },
     "Feedback — Dinky v%@" : {
       "comment" : "Email subject for feedback. Argument is app version.",
@@ -13670,16 +13707,8 @@
         }
       }
     },
-    "If a file already exists" : {
-      "comment" : "Settings UI: name collision handling.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "If a file already exists"
-          }
-        }
-      }
+    "If that filename is already taken" : {
+      "comment" : "VoiceOver label for duplicate-naming style picker."
     },
     "image" : {
       "comment" : "Default filename stem for Shortcuts output when source has no name.\nResults row: generic image chip until Smart Quality classifies (photo / graphic / mixed).",
@@ -15349,6 +15378,9 @@
     },
     "Max width" : {
       "comment" : "Settings UI: Media image subsection."
+    },
+    "Maximum (both)" : {
+      "comment" : "Batch summary: experimental preserve retry.\nPDF experimental preserve preset name."
     },
     "Maybe later" : {
       "comment" : "Manual update alert.",
@@ -17216,6 +17248,9 @@
         }
       }
     },
+    "Off (default)" : {
+      "comment" : "PDF experimental preserve: disabled."
+    },
     "Off keeps source resolution and just re-encodes for size." : {
       "comment" : "Settings UI.",
       "localizations" : {
@@ -17446,6 +17481,9 @@
           }
         }
       }
+    },
+    "Only when a file with the same name is already in the save folder — Dinky picks the next free name." : {
+      "comment" : "Settings: duplicate naming section footer."
     },
     "Open Analytics & Improvements settings…" : {
       "comment" : "Settings UI.",
@@ -18152,6 +18190,12 @@
     },
     "Opens the output folder when finished." : {
       "comment" : "Simple outcome: open folder when done on."
+    },
+    "Optional extra qpdf steps for this preset when preserve finds little gain. May affect tags or image quality; leave Off unless you need it." : {
+      "comment" : "Settings UI: PDF experimental preserve helper."
+    },
+    "Optional extra qpdf steps when normal preserve isn’t enough. Can affect tagged PDF structure or image sharpness. Use Off unless you need more shrink while keeping text and links." : {
+      "comment" : "Sidebar PDF: experimental preserve risk copy."
     },
     "or click to browse" : {
       "comment" : "Drop zone idle hint.",
@@ -21381,6 +21425,9 @@
         }
       }
     },
+    "Recompresses embedded images more aggressively. Can introduce JPEG artifacts." : {
+      "comment" : "PDF experimental preserve description."
+    },
     "Redo" : {
       "comment" : "System shortcut name for conflict warning.",
       "localizations" : {
@@ -21845,6 +21892,9 @@
           }
         }
       }
+    },
+    "Removes the PDF structure tree (tagged PDF / markup). Smaller on some exports; screen readers may lose tags." : {
+      "comment" : "PDF experimental preserve description."
     },
     "Replace original" : {
       "comment" : "Settings UI.",
@@ -23807,6 +23857,9 @@
         }
       }
     },
+    "Sharper. ~160 DPI — better for print than Medium." : {
+      "comment" : "PDF flatten quality tier description."
+    },
     "Shortcuts" : {
       "comment" : "Settings UI.",
       "localizations" : {
@@ -25321,6 +25374,9 @@
         }
       }
     },
+    "Standard qpdf + PDFKit preserve path." : {
+      "comment" : "PDF experimental preserve description."
+    },
     "Start with largest files" : {
       "comment" : "Settings: toggle to schedule big files first in a batch.",
       "localizations" : {
@@ -25640,6 +25696,15 @@
           }
         }
       }
+    },
+    "Strip non-essential structure" : {
+      "comment" : "Batch summary: experimental preserve retry.\nPDF experimental preserve preset name."
+    },
+    "Stronger image recompression" : {
+      "comment" : "Batch summary: experimental preserve retry.\nPDF experimental preserve preset name."
+    },
+    "Structure strip + stronger JPEG. Highest chance of a smaller file; highest risk to fidelity." : {
+      "comment" : "PDF experimental preserve description."
     },
     "Suffix" : {
       "comment" : "Settings UI.",
@@ -26029,6 +26094,9 @@
           }
         }
       }
+    },
+    "Text to add" : {
+      "comment" : "Settings: label for custom duplicate filename text field."
     },
     "That file is already queued — drop something new or clear the list first." : {
       "comment" : "Alert message for duplicate paste.",
@@ -27147,6 +27215,9 @@
     "Try again" : {
       "comment" : "Batch summary row: retry zero-gain file."
     },
+    "Try experimental preserve…" : {
+      "comment" : "Batch summary: experimental preserve menu label.\nZero-gain sheet: menu to retry preserve with experimental qpdf options."
+    },
     "Try flatten (Smallest)" : {
       "comment" : "Batch summary row: PDF flatten retry."
     },
@@ -27857,6 +27928,9 @@
         }
       }
     },
+    "Use {n} where the number should go — holiday{n} becomes holiday1, holiday2 · Skip {n} and we only add a number if there’s still a clash" : {
+      "comment" : "Settings: caption under custom duplicate field."
+    },
     "Use default" : {
       "comment" : "Settings UI.",
       "localizations" : {
@@ -28491,6 +28565,9 @@
           }
         }
       }
+    },
+    "Very small. ~88 DPI — fine for screen viewing." : {
+      "comment" : "PDF flatten quality tier description."
     },
     "video" : {
       "comment" : "Default filename stem for Shortcuts video output when source has no name.\nResults row: generic video chip when content type was not classified (e.g. Smart Quality off)."
@@ -29604,6 +29681,9 @@
           }
         }
       }
+    },
+    "When Smart quality is on, flatten may use grayscale for PDFs that look like black-and-white office scans, even if Grayscale PDF is off." : {
+      "comment" : "Settings UI: PDF auto mono helper."
     },
     "Which sections appear here…" : {
       "comment" : "Sidebar section picker hint.",

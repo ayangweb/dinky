@@ -623,6 +623,13 @@ final class ContentViewModel: ObservableObject {
         return prefs.collisionNamingStyle
     }
 
+    private func collisionCustomPattern(for item: CompressionItem) -> String {
+        if let p = activePreset(for: item) {
+            return p.collisionCustomPattern
+        }
+        return prefs.collisionCustomPattern
+    }
+
     private func compressItem(_ item: CompressionItem) async {
         if Task.isCancelled { return }
         let goals = compressionGoals(for: item)
@@ -707,6 +714,7 @@ final class ContentViewModel: ObservableObject {
                 preclassifiedContent: preclassifiedForSmartQ,
                 parallelCompressionLimit: prefs.concurrentCompressionLimit,
                 collisionNamingStyle: collisionNamingStyle(for: item),
+                collisionCustomPattern: collisionCustomPattern(for: item),
                 progressHandler: progressHandler
             )
             let savings = result.originalSize > 0
@@ -828,7 +836,10 @@ final class ContentViewModel: ObservableObject {
 
         let collisionStyle = collisionNamingStyle(for: item)
         let finalURL = OutputPathUniqueness.uniqueOutputURL(
-            desired: intendedOutput, sourceURL: sourceURL, style: collisionStyle
+            desired: intendedOutput,
+            sourceURL: sourceURL,
+            style: collisionStyle,
+            customPattern: collisionCustomPattern(for: item)
         )
         let workURL: URL
         if sourceURL.path == finalURL.path {
@@ -1086,7 +1097,10 @@ final class ContentViewModel: ObservableObject {
 
         let collisionStyle = collisionNamingStyle(for: item)
         let finalURL = OutputPathUniqueness.uniqueOutputURL(
-            desired: intendedOutput, sourceURL: sourceURL, style: collisionStyle
+            desired: intendedOutput,
+            sourceURL: sourceURL,
+            style: collisionStyle,
+            customPattern: collisionCustomPattern(for: item)
         )
         let workURL: URL
         if sourceURL.path == finalURL.path {

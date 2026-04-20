@@ -59,6 +59,7 @@ struct CompressImagesIntent: AppIntent {
             let collisionRaw = UserDefaults.standard.string(forKey: "collisionNamingStyle")
                 ?? CollisionNamingStyle.finderDuplicate.rawValue
             let collisionStyle = CollisionNamingStyle(rawValue: collisionRaw) ?? .finderDuplicate
+            let collisionPattern = UserDefaults.standard.string(forKey: "collisionCustomPattern") ?? "_v{n}"
 
             let result = try await CompressionService.shared.compress(
                 source: tmpIn,
@@ -72,7 +73,8 @@ struct CompressImagesIntent: AppIntent {
                 smartQuality: settings.smartQuality,
                 contentTypeHint: settings.contentTypeHint,
                 parallelCompressionLimit: settings.parallelCompressionLimit,
-                collisionNamingStyle: collisionStyle
+                collisionNamingStyle: collisionStyle,
+                collisionCustomPattern: collisionPattern
             )
             defer { try? FileManager.default.removeItem(at: result.outputURL) }
 

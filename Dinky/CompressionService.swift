@@ -240,6 +240,7 @@ actor CompressionService {
         /// Matches Settings “Batch speed” so `avifenc --jobs` doesn’t oversubscribe when many files run at once.
         parallelCompressionLimit: Int = 3,
         collisionNamingStyle: CollisionNamingStyle = .finderDuplicate,
+        collisionCustomPattern: String = "",
         progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> CompressionResult {
         let tTotal = CFAbsoluteTimeGetCurrent()
@@ -252,7 +253,10 @@ actor CompressionService {
         }
 
         let outputURL = OutputPathUniqueness.uniqueOutputURL(
-            desired: outputURL, sourceURL: source, style: collisionNamingStyle
+            desired: outputURL,
+            sourceURL: source,
+            style: collisionNamingStyle,
+            customPattern: collisionCustomPattern
         )
 
         try FileManager.default.createDirectory(

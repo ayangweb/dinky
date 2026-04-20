@@ -16,8 +16,10 @@ struct CompressionPreset: Codable, Identifiable {
     var saveLocationRaw: String
     var filenameHandlingRaw: String
     var customSuffix: String
-    /// When the output basename is already taken (`finderDuplicate` vs `finderNumbered`).
+    /// When the output basename is already taken (`finderDuplicate` vs `finderNumbered` vs `custom`).
     var collisionNamingStyleRaw: String
+    /// Suffix or template when `collisionNamingStyleRaw` is `custom` (same rules as `DinkyPreferences.collisionCustomPattern`).
+    var collisionCustomPattern: String
     // Advanced
     var stripMetadata: Bool
     var sanitizeFilenames: Bool
@@ -67,6 +69,7 @@ struct CompressionPreset: Codable, Identifiable {
         self.filenameHandlingRaw = prefs.filenameHandlingRaw
         self.customSuffix = prefs.customSuffix
         self.collisionNamingStyleRaw = prefs.collisionNamingStyleRaw
+        self.collisionCustomPattern = prefs.collisionCustomPattern
         self.stripMetadata = prefs.stripMetadata
         self.sanitizeFilenames = prefs.sanitizeFilenames
         self.openFolderWhenDone = prefs.openFolderWhenDone
@@ -110,6 +113,7 @@ struct CompressionPreset: Codable, Identifiable {
         customSuffix = try c.decodeIfPresent(String.self, forKey: .customSuffix) ?? "-dinky"
         collisionNamingStyleRaw = try c.decodeIfPresent(String.self, forKey: .collisionNamingStyleRaw)
             ?? CollisionNamingStyle.finderDuplicate.rawValue
+        collisionCustomPattern = try c.decodeIfPresent(String.self, forKey: .collisionCustomPattern) ?? "_v{n}"
         stripMetadata = try c.decodeIfPresent(Bool.self, forKey: .stripMetadata) ?? false
         sanitizeFilenames = try c.decodeIfPresent(Bool.self, forKey: .sanitizeFilenames) ?? false
         openFolderWhenDone = try c.decodeIfPresent(Bool.self, forKey: .openFolderWhenDone) ?? false
@@ -150,6 +154,7 @@ struct CompressionPreset: Codable, Identifiable {
         prefs.filenameHandlingRaw = filenameHandlingRaw
         prefs.customSuffix = customSuffix
         prefs.collisionNamingStyleRaw = collisionNamingStyleRaw
+        prefs.collisionCustomPattern = collisionCustomPattern
         prefs.stripMetadata = stripMetadata
         prefs.sanitizeFilenames = sanitizeFilenames
         prefs.openFolderWhenDone = openFolderWhenDone

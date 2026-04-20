@@ -159,6 +159,24 @@ enum S {
     static var shortcutsConflictPrefix: String { String(localized: "Already used by", comment: "Prefix when shortcut conflicts; followed by action name.") }
     static var shortcutsSystemWarningPrefix: String { String(localized: "Overrides macOS:", comment: "Prefix when shortcut may override a system shortcut.") }
 
+    // Settings → Output (duplicate filenames when saving)
+    static var duplicateNamingPickerAccessibilityLabel: String {
+        String(localized: "If that filename is already taken", comment: "VoiceOver label for duplicate-naming style picker.")
+    }
+    static var duplicateNamingSectionFooter: String {
+        String(localized: "Only when a file with the same name is already in the save folder — Dinky picks the next free name.", comment: "Settings: duplicate naming section footer.")
+    }
+    static var duplicateNamingCustomFieldLabel: String {
+        String(localized: "Text to add", comment: "Settings: label for custom duplicate filename text field.")
+    }
+    static var duplicateNamingCustomPlaceholder: String {
+        String(localized: "Examples: _backup, holiday{n}", comment: "Settings: placeholder for custom duplicate pattern field.")
+    }
+    /// Explains `{n}` in plain language; middots match Shortcuts recorder hint rhythm.
+    static var duplicateNamingCustomHint: String {
+        String(localized: "Use {n} where the number should go — holiday{n} becomes holiday1, holiday2 · Skip {n} and we only add a number if there’s still a clash", comment: "Settings: caption under custom duplicate field.")
+    }
+
     /// Non-customizable menu items (matches `DinkyFixedShortcut` + system Settings).
     static var fixedMenuShortcutReference: [KeyboardShortcutReference] {
         DinkyFixedShortcut.allCases.map {

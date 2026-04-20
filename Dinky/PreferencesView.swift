@@ -524,8 +524,12 @@ private struct OutputTab: View {
                         .frame(width: 120)
                     }
                 }
+            } header: {
+                Text(String(localized: "Filename", comment: "Settings UI."))
+            }
 
-                Picker(String(localized: "If a file already exists", comment: "Settings UI: name collision handling."), selection: Binding(
+            Section {
+                Picker(S.duplicateNamingPickerAccessibilityLabel, selection: Binding(
                     get: { prefs.collisionNamingStyle },
                     set: { prefs.collisionNamingStyle = $0 }
                 )) {
@@ -535,8 +539,35 @@ private struct OutputTab: View {
                 }
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
+
+                if prefs.collisionNamingStyle == .custom {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(S.duplicateNamingCustomFieldLabel)
+                                .foregroundStyle(.secondary)
+                            TextField(
+                                S.duplicateNamingCustomPlaceholder,
+                                text: Binding(
+                                    get: { prefs.collisionCustomPattern },
+                                    set: { prefs.collisionCustomPattern = $0 }
+                                )
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(minWidth: 160)
+                            .accessibilityLabel(S.duplicateNamingCustomFieldLabel)
+                        }
+                        Text(S.duplicateNamingCustomHint)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
             } header: {
-                Text(String(localized: "Filename", comment: "Settings UI."))
+                Text(String(localized: "Duplicate naming", comment: "Settings UI: section for name collisions."))
+            } footer: {
+                Text(S.duplicateNamingSectionFooter)
+                    .font(.caption)
             }
         }
         .formStyle(.grouped)
@@ -829,16 +860,45 @@ private struct PresetsTab: View {
                     TextField(String(localized: "-dinky", comment: "Settings UI."), text: binding(\.customSuffix, snapshot: snapshot))
                 }
             }
-            Picker(String(localized: "If a file already exists", comment: "Settings UI: name collision handling."), selection: binding(\.collisionNamingStyleRaw, snapshot: snapshot)) {
-                ForEach(CollisionNamingStyle.allCases) { style in
-                    Text(style.displayName).tag(style.rawValue)
-                }
-            }
-            .labelsHidden()
         } header: {
             Text(String(localized: "Destination", comment: "Settings UI."))
         } footer: {
             PreferencesRelatedTabLink(title: String(localized: "Default Output settings…", comment: "Settings UI."), tab: .output)
+        }
+        Section {
+            let liveCollision = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+            Picker(S.duplicateNamingPickerAccessibilityLabel, selection: binding(\.collisionNamingStyleRaw, snapshot: snapshot)) {
+                ForEach(CollisionNamingStyle.allCases) { style in
+                    Text(style.displayName).tag(style.rawValue)
+                }
+            }
+            .pickerStyle(.radioGroup)
+            .labelsHidden()
+            if CollisionNamingStyle(rawValue: liveCollision.collisionNamingStyleRaw) == .custom {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(S.duplicateNamingCustomFieldLabel)
+                            .foregroundStyle(.secondary)
+                        TextField(
+                            S.duplicateNamingCustomPlaceholder,
+                            text: binding(\.collisionCustomPattern, snapshot: snapshot)
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .frame(minWidth: 160)
+                        .accessibilityLabel(S.duplicateNamingCustomFieldLabel)
+                    }
+                    Text(S.duplicateNamingCustomHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        } header: {
+            Text(String(localized: "Duplicate naming", comment: "Settings UI: section for name collisions."))
+        } footer: {
+            Text(S.duplicateNamingSectionFooter)
+                .font(.caption)
         }
         Section(String(localized: "Watch Folder", comment: "Settings UI.")) {
             let liveForWatch = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
