@@ -122,7 +122,7 @@ echo "→ Creating Dinky-$VERSION.dmg…"
 rm -f "Dinky-$VERSION.dmg"
 create-dmg \
   --volname "Dinky" \
-  --volicon "Dinky/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" \
+  --volicon "build/Build/Products/Release/Dinky.app/Contents/Resources/AppIcon.icns" \
   --background "dmg-background.tiff" \
   --window-pos 200 120 \
   --window-size 420 520 \
