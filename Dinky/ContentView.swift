@@ -735,6 +735,7 @@ final class ContentViewModel: ObservableObject {
                     if self.prefs.preserveTimestamps {
                         self.copyTimestamp(from: sourceSnapshot, to: result.outputURL)
                     }
+                    self.copyFinderCommentsIfSettingsAllow(from: sourceSnapshot, to: result.outputURL)
                     var mergedRecovery = result.originalRecoveryURL
                     if replaceOrigin {
                         if urlDL {
@@ -1010,6 +1011,7 @@ final class ContentViewModel: ObservableObject {
                         self.copyTimestamp(from: sourceURL, to: producedURL)
                     }
                 }
+                self.copyFinderCommentsIfSettingsAllow(from: sourceURL, to: producedURL)
                 item.undoSnapshot = CompressionUndoSnapshot(
                     sourceURL: sourceURL,
                     outputURL: producedURL,
@@ -1205,6 +1207,7 @@ final class ContentViewModel: ObservableObject {
                             self.copyTimestamp(from: sourceURL, to: producedURL)
                         }
                     }
+                    self.copyFinderCommentsIfSettingsAllow(from: sourceURL, to: producedURL)
                     item.undoSnapshot = CompressionUndoSnapshot(
                         sourceURL: sourceURL,
                         outputURL: producedURL,
@@ -1227,6 +1230,11 @@ final class ContentViewModel: ObservableObject {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: source.path),
               let date = attrs[.modificationDate] as? Date else { return }
         try? FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: dest.path)
+    }
+
+    private func copyFinderCommentsIfSettingsAllow(from source: URL, to destination: URL) {
+        guard prefs.preserveFinderComments else { return }
+        FinderCommentsCopier.copyFinderComment(from: source, to: destination)
     }
 
     private func sendNotification(count: Int, seconds: Double) {

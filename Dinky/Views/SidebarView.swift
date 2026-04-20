@@ -931,7 +931,18 @@ struct SidebarView: View {
             get: { prefs.stripMetadata }, set: { prefs.stripMetadata = $0 }
         )).font(.system(size: 11))
         if prefs.stripMetadata {
-            settingsHelperText("Removes EXIF, location, and camera data when supported.")
+            settingsHelperText(String(localized: "Removes embedded EXIF, location, camera info, and PDF properties when supported. Finder Get Info comments are separate — turn on Preserve Finder comments below.", comment: "Sidebar: strip metadata helper."))
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                    removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                ))
+        }
+
+        Toggle(String(localized: "Preserve Finder comments", comment: "Settings UI."), isOn: Binding(
+            get: { prefs.preserveFinderComments }, set: { prefs.preserveFinderComments = $0 }
+        )).font(.system(size: 11))
+        if prefs.preserveFinderComments {
+            settingsHelperText(String(localized: "Copies Finder Get Info → Comments to the compressed file.", comment: "Sidebar: preserve Finder comments helper."))
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))

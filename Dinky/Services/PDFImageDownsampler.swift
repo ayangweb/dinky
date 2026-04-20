@@ -21,7 +21,8 @@ enum PDFImageDownsampler {
     /// - Parameters:
     ///   - source:        Original PDF (used to render image pages at full fidelity then downsample).
     ///   - structureDoc:  qpdf-compressed document (used as-is for text pages).
-    static func downsample(source: URL, structureDoc: PDFDocument) -> PDFDocument? {
+    ///   - stripMetadata: When false, copies PDF document attributes from the source (except author/creator), matching ``PDFCompressor``.
+    static func downsample(source: URL, structureDoc: PDFDocument, stripMetadata: Bool) -> PDFDocument? {
         guard let sourceDoc = PDFDocument(url: source) else { return nil }
         let pageCount = sourceDoc.pageCount
         guard pageCount > 0, structureDoc.pageCount == pageCount else { return nil }
@@ -43,6 +44,12 @@ enum PDFImageDownsampler {
         }
 
         guard rasterizedCount > 0 else { return nil }
+        if !stripMetadata, let attrs = sourceDoc.documentAttributes {
+            var safeAttrs = attrs
+            safeAttrs.removeValue(forKey: PDFDocumentAttribute.authorAttribute)
+            safeAttrs.removeValue(forKey: PDFDocumentAttribute.creatorAttribute)
+            output.documentAttributes = safeAttrs
+        }
         return output
     }
 

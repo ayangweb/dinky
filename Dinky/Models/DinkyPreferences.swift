@@ -144,6 +144,8 @@ final class DinkyPreferences: ObservableObject {
 
     // MARK: Compression behavior
     @AppStorage("stripMetadata")        var stripMetadata: Bool = false
+    /// Finder **Get Info → Comments** (extended attributes), not embedded EXIF / PDF Info.
+    @AppStorage("preserveFinderComments") var preserveFinderComments: Bool = false
     @AppStorage("preserveTimestamps")   var preserveTimestamps: Bool = true
     @AppStorage("originalsAction") private var originalsActionRaw: String = OriginalsAction.keep.rawValue
     var originalsAction: OriginalsAction {

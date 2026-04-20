@@ -272,6 +272,13 @@ private struct GeneralTab: View {
                     get: { prefs.preserveTimestamps },
                     set: { prefs.preserveTimestamps = $0 }
                 ))
+                Toggle(String(localized: "Preserve Finder comments", comment: "Settings UI."), isOn: Binding(
+                    get: { prefs.preserveFinderComments },
+                    set: { prefs.preserveFinderComments = $0 }
+                ))
+                Text(String(localized: "Copies the Finder Get Info → Comments field onto the output file. Separate from Strip metadata, which removes embedded EXIF, GPS, camera info, and PDF properties.", comment: "Settings UI: Preserve Finder comments footnote."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Text(String(localized: "Compression", comment: "Settings UI."))
             } footer: {
@@ -934,7 +941,7 @@ private struct PresetsTab: View {
         }
         Section(String(localized: "Advanced", comment: "Settings UI.")) {
             Toggle(String(localized: "Strip metadata", comment: "Settings UI."), isOn: binding(\.stripMetadata, snapshot: snapshot))
-            Text(String(localized: "Removes EXIF, GPS, camera info, and color profiles. Reduces file size slightly.", comment: "Settings UI."))
+            Text(String(localized: "Removes embedded EXIF, GPS, camera info, PDF properties (title, subject, keywords), and color profiles when supported. Does not remove Finder’s Get Info → Comments; use Preserve Finder comments in Settings → General for that.", comment: "Settings UI: Strip metadata explanation."))
                     .font(.caption)
                 .foregroundStyle(.secondary)
             Toggle(String(localized: "Sanitize filenames", comment: "Settings UI."), isOn: binding(\.sanitizeFilenames, snapshot: snapshot))

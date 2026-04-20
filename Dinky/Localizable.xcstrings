@@ -5655,7 +5655,6 @@
       }
     },
     "Compress ${images} as ${format}" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5730,6 +5729,12 @@
           }
         }
       }
+    },
+    "Compress ${pdfs}" : {
+
+    },
+    "Compress ${videos}" : {
+
     },
     "Compress 1 file" : {
       "comment" : "Main window: primary action when one file is queued.",
@@ -7525,6 +7530,12 @@
     },
     "Continue" : {
       "comment" : "Bottom bar: resume queue after Stop."
+    },
+    "Copies Finder Get Info → Comments to the compressed file." : {
+      "comment" : "Sidebar: preserve Finder comments helper."
+    },
+    "Copies the Finder Get Info → Comments field onto the output file. Separate from Strip metadata, which removes embedded EXIF, GPS, camera info, and PDF properties." : {
+      "comment" : "Settings UI: Preserve Finder comments footnote."
     },
     "Copy" : {
       "comment" : "System shortcut name for conflict warning.",
@@ -19814,6 +19825,9 @@
     "Preserve" : {
       "comment" : "Preset list: PDF preserve links."
     },
+    "Preserve Finder comments" : {
+      "comment" : "Settings UI."
+    },
     "Preserve original timestamps" : {
       "comment" : "Settings UI.",
       "localizations" : {
@@ -21859,8 +21873,15 @@
         }
       }
     },
+    "Removes embedded EXIF, GPS, camera info, PDF properties (title, subject, keywords), and color profiles when supported. Does not remove Finder’s Get Info → Comments; use Preserve Finder comments in Settings → General for that." : {
+      "comment" : "Settings UI: Strip metadata explanation."
+    },
+    "Removes embedded EXIF, location, camera info, and PDF properties when supported. Finder Get Info comments are separate — turn on Preserve Finder comments below." : {
+      "comment" : "Sidebar: strip metadata helper."
+    },
     "Removes EXIF, GPS, camera info, and color profiles. Reduces file size slightly." : {
       "comment" : "Settings UI.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {

@@ -753,7 +753,7 @@ actor CompressionService {
             if resolutionDownsampling, fm.fileExists(atPath: outputURL.path),
                let structureDoc = PDFDocument(url: outputURL) {
                 let dsURL = fm.temporaryDirectory.appendingPathComponent("dinky_pdf_ds_\(UUID().uuidString).pdf")
-                if let mixed = PDFImageDownsampler.downsample(source: source, structureDoc: structureDoc),
+                if let mixed = PDFImageDownsampler.downsample(source: source, structureDoc: structureDoc, stripMetadata: stripMetadata),
                    mixed.write(to: dsURL) {
                     let dsSz = fileSize(dsURL)
                     if dsSz > 0 && dsSz < fileSize(outputURL) {
