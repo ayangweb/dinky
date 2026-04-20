@@ -127,6 +127,7 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.showPDFsSection)
         .animation(.easeInOut(duration: 0.2), value: prefs.showVideosSection)
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfGrayscale)
+        .animation(.easeInOut(duration: 0.2), value: prefs.pdfMaxFileSizeEnabled)
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfOutputModeRaw)
         .animation(.easeInOut(duration: 0.2), value: prefs.videoRemoveAudio)
         .animation(.easeInOut(duration: 0.2), value: prefs.videoCodecFamilyRaw)
@@ -179,24 +180,16 @@ struct SidebarView: View {
             VStack(alignment: .leading, spacing: 8) {
                 settingsSectionHeading(icon: "slider.horizontal.2.square.on.square", title: "Quick choices")
 
-                Toggle(String(localized: "Choose formats automatically", comment: "Sidebar simple mode: auto image format."), isOn: Binding(
-                    get: { prefs.autoFormat }, set: { prefs.autoFormat = $0 }
+                Toggle(String(localized: "Choose format and strength automatically", comment: "Sidebar simple mode: single automatic toggle; exits simple mode when turned off."), isOn: Binding(
+                    get: { true },
+                    set: { _ in
+                        prefs.smartQuality = true
+                        prefs.autoFormat = true
+                        prefs.applySidebarSimpleMode(false)
+                    }
                 ))
                 .font(.system(size: 11))
-
-                if !prefs.autoFormat {
-                    FormatChipPicker(
-                        autoFormat: Binding(get: { prefs.autoFormat }, set: { prefs.autoFormat = $0 }),
-                        selectedFormat: $selectedFormat,
-                        showActiveDescription: false
-                    )
-                }
-
-                Toggle(String(localized: "Pick strength automatically for each file", comment: "Sidebar simple mode: smart quality; applies to images, PDFs, and video."), isOn: Binding(
-                    get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
-                ))
-                .font(.system(size: 11))
-                .accessibilityHint(String(localized: "When on, Dinky sets compression for each image, PDF, and video. Turn off to use fixed tiers from the full sidebar.", comment: "VoiceOver: simple mode smart quality."))
+                .accessibilityHint(String(localized: "Dinky picks format and compression for each file automatically. Turn off to configure each setting manually.", comment: "VoiceOver: simple mode automatic toggle."))
 
                 simpleModeOutcomeMap
 
@@ -494,19 +487,37 @@ struct SidebarView: View {
     }
 
     private var sidebarSectionsFooter: some View {
-        Button {
-            openPreferences(.appearance)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 12, weight: .medium))
-                Text(String(localized: "Which sections appear here…", comment: "Sidebar section picker hint."))
-                    .font(.system(size: 11, weight: .medium))
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                prefs.smartQuality = true
+                prefs.autoFormat = true
+                prefs.applySidebarSimpleMode(true)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "slider.horizontal.2.square.on.square")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(String(localized: "Use simple sidebar", comment: "Sidebar footer: switch back to simple mode."))
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.accentColor)
+
+            Button {
+                openPreferences(.appearance)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(String(localized: "Which sections appear here…", comment: "Sidebar section picker hint."))
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.accentColor)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(Color.accentColor)
     }
 
     private func settingsShortcutRow(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
@@ -592,15 +603,41 @@ struct SidebarView: View {
             get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
         )).font(.system(size: 11))
         if prefs.smartQuality {
-            settingsHelperText(String(localized: "Picks encoder strength per image from content (photo vs. graphic). The same switch tunes PDF tiers and video strength — use the PDF and Video tabs for related options.", comment: "Sidebar Images: smart quality on helper."))
+            settingsHelperText(String(localized: "Picks encoder strength per image from content (photo vs. graphic). The same switch tunes PDF tiers and video strength.", comment: "Sidebar Images: smart quality on helper."))
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
                 ))
         } else {
-            ContentTypeChipPicker(contentTypeHintRaw: Binding(
-                get: { prefs.contentTypeHintRaw }, set: { prefs.contentTypeHintRaw = $0 }
-            ))
+            VStack(alignment: .leading, spacing: 8) {
+                Text(String(localized: "Images", comment: "Sidebar quality subsection label."))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                ContentTypeChipPicker(contentTypeHintRaw: Binding(
+                    get: { prefs.contentTypeHintRaw }, set: { prefs.contentTypeHintRaw = $0 }
+                ))
+                if prefs.pdfOutputMode == .flattenPages {
+                    Text(String(localized: "PDF", comment: "Sidebar quality subsection label."))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                        .padding(.top, 2)
+                    QualityChipPicker(
+                        options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                        selected: Binding(get: { prefs.pdfQualityRaw }, set: { prefs.pdfQualityRaw = $0 })
+                    )
+                }
+                Text(String(localized: "Video", comment: "Sidebar quality subsection label."))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .padding(.top, 2)
+                QualityChipPicker(
+                    options: VideoQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                    selected: Binding(get: { prefs.videoQualityRaw }, set: { prefs.videoQualityRaw = $0 })
+                )
+            }
             .transition(.asymmetric(
                 insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                 removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -732,6 +769,14 @@ struct SidebarView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     settingsHelperText(String(localized: "Optional extra qpdf steps when normal preserve isn’t enough. Can affect tagged PDF structure or image sharpness. Use Off unless you need more shrink while keeping text and links.", comment: "Sidebar PDF: experimental preserve risk copy."))
+
+                    SettingsSectionDivider()
+
+                    settingsSubHeader(icon: "arrow.down.left.and.arrow.up.right", String(localized: "Image resolution", comment: "Sidebar PDF: image downsampling subsection."))
+                    Toggle(String(localized: "Downsample embedded images", comment: "Sidebar PDF: downsampling toggle."), isOn: Binding(
+                        get: { prefs.pdfResolutionDownsampling }, set: { prefs.pdfResolutionDownsampling = $0 }
+                    )).toggleStyle(.switch).font(.system(size: 11))
+                    settingsHelperText(String(localized: "Rasterizes image-heavy pages at 144 DPI while keeping text pages selectable. Biggest gain on 300/600 DPI scans. Text pages are unchanged.", comment: "Sidebar PDF: downsampling helper."))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .transition(.asymmetric(
@@ -769,6 +814,30 @@ struct SidebarView: View {
                             insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                             removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
                         ))
+                }
+
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "gauge.with.dots.needle.67percent", String(localized: "Max file size", comment: "Sidebar PDF: max file size subsection header."))
+                Toggle(String(localized: "Target a smaller file size", comment: "Sidebar PDF: max file size toggle."), isOn: Binding(
+                    get: { prefs.pdfMaxFileSizeEnabled }, set: { prefs.pdfMaxFileSizeEnabled = $0 }
+                )).toggleStyle(.switch).font(.system(size: 11))
+                if prefs.pdfMaxFileSizeEnabled {
+                    VStack(alignment: .leading, spacing: 8) {
+                        settingsChipGrid(presets: settingsSizePresets, current: prefs.pdfMaxFileSizeKB) { prefs.pdfMaxFileSizeKB = $0 }
+                        HStack(spacing: 6) {
+                            TextField("10", value: Binding(
+                                get: { prefs.pdfMaxFileSizeMB }, set: { prefs.pdfMaxFileSizeMB = $0 }
+                            ), format: .number)
+                            .textFieldStyle(.roundedBorder).frame(width: 70)
+                            Text(String(localized: "MB", comment: "Unit: megabytes.")).font(.system(size: 10)).foregroundStyle(.secondary)
+                        }
+                        settingsHelperText(String(localized: "Steps down quality tiers until under the target. Exact size varies by content.", comment: "Sidebar PDF: max file size helper."))
+                    }
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                        removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                    ))
                 }
             }
         }

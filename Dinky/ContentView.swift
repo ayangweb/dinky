@@ -851,6 +851,12 @@ final class ContentViewModel: ObservableObject {
         let replaceOrigin = (preset.map { FilenameHandling(rawValue: $0.filenameHandlingRaw) } ?? prefs.filenameHandling) == .replaceOrigin
         let strip = preset?.stripMetadata ?? prefs.stripMetadata
         let grayscalePref = preset?.pdfGrayscale ?? prefs.pdfGrayscale
+        let pdfMaxFSEnabled = preset?.pdfMaxFileSizeEnabled ?? prefs.pdfMaxFileSizeEnabled
+        let pdfTargetBytes: Int64? = pdfMaxFSEnabled
+            ? Int64((preset?.pdfMaxFileSizeKB ?? prefs.pdfMaxFileSizeKB) * 1024)
+            : nil
+        let pdfResolutionDownsampling = outputMode == .preserveStructure
+            && (preset?.pdfResolutionDownsampling ?? prefs.pdfResolutionDownsampling)
         let effectiveGrayscale: Bool = {
             guard outputMode == .flattenPages else { return grayscalePref }
             if grayscalePref { return true }
@@ -885,6 +891,8 @@ final class ContentViewModel: ObservableObject {
                     stripMetadata: strip,
                     outputURL: workURL,
                     preserveQpdfSteps: preserveQpdfSteps,
+                    targetBytes: pdfTargetBytes,
+                    resolutionDownsampling: pdfResolutionDownsampling,
                     progressHandler: pdfProgress
                 )
                 let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
@@ -894,9 +902,14 @@ final class ContentViewModel: ObservableObject {
                     continue
                 }
                 // Any smaller output counts for PDF — “Skip if savings below” is for images/video only (PDF wins are often small but real on preserve, or meaningful on flatten).
-                chosenResult = result
-                chosenOutSize = outSize
-                break
+                if chosenResult == nil || outSize < chosenOutSize {
+                    chosenResult = result
+                    chosenOutSize = outSize
+                }
+                // Without a size target, first improvement is good enough.
+                // With a target, keep stepping down quality until we're under it.
+                let targetMet = pdfTargetBytes.map { outSize <= $0 } ?? true
+                if targetMet { break }
             }
 
             if chosenResult == nil, outputMode == .flattenPages {
@@ -906,7 +919,9 @@ final class ContentViewModel: ObservableObject {
                     (false, true),
                 ]
                 for pass in bailouts {
-                    guard chosenResult == nil else { break }
+                    // With a size target: continue even after a successful result if not under target yet.
+                    let bailoutTargetMet = pdfTargetBytes.map { (chosenOutSize) <= $0 } ?? false
+                    guard chosenResult == nil || (!bailoutTargetMet && pdfTargetBytes != nil) else { break }
                     do {
                         let lr = try await CompressionService.shared.compressPDF(
                             source: item.sourceURL,
@@ -923,7 +938,7 @@ final class ContentViewModel: ObservableObject {
                         let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
                             ?? lr.outputSize
                         lastAttemptedOutSize = outSize
-                        if outSize < lr.originalSize {
+                        if outSize < lr.originalSize, chosenResult == nil || outSize < chosenOutSize {
                             chosenResult = lr
                             chosenOutSize = outSize
                         }

@@ -265,6 +265,14 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("pdfAutoGrayscaleMonoScans") var pdfAutoGrayscaleMonoScans: Bool = true
     /// Experimental qpdf options for preserve-text mode (see `PDFPreserveExperimentalMode`).
     @AppStorage("pdfPreserveExperimental") var pdfPreserveExperimentalRaw: String = PDFPreserveExperimentalMode.none.rawValue
+    @AppStorage("pdfMaxFileSizeEnabled") var pdfMaxFileSizeEnabled: Bool = false
+    @AppStorage("pdfMaxFileSizeKB") var pdfMaxFileSizeKB: Int = 10240  // 10 MB default
+    var pdfMaxFileSizeMB: Double {
+        get { Double(pdfMaxFileSizeKB) / 1024.0 }
+        set { pdfMaxFileSizeKB = max(1, Int(newValue * 1024)) }
+    }
+    /// Preserve mode: rasterize image-heavy pages at 144 DPI while keeping text pages selectable.
+    @AppStorage("pdfResolutionDownsampling") var pdfResolutionDownsampling: Bool = false
     var pdfPreserveExperimental: PDFPreserveExperimentalMode {
         get { PDFPreserveExperimentalMode(rawValue: pdfPreserveExperimentalRaw) ?? .none }
         set { pdfPreserveExperimentalRaw = newValue.rawValue }

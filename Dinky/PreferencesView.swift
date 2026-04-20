@@ -1068,6 +1068,12 @@ private struct PresetsTab: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 settingsHelperText(String(localized: "Optional extra qpdf steps for this preset when preserve finds little gain. May affect tags or image quality; leave Off unless you need it.", comment: "Settings UI: PDF experimental preserve helper."))
+
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "arrow.down.left.and.arrow.up.right", String(localized: "Image resolution", comment: "Settings UI: PDF image downsampling."))
+                Toggle(String(localized: "Downsample embedded images", comment: "Settings UI: PDF downsampling toggle."), isOn: binding(\.pdfResolutionDownsampling, snapshot: snapshot))
+                settingsHelperText(String(localized: "Rasterizes image-heavy pages at 144 DPI while keeping text pages selectable. Best for 300/600 DPI scans; no effect on vector or text-only PDFs.", comment: "Settings UI: PDF downsampling helper."))
             }
 
             if PDFOutputMode(rawValue: livePDF.pdfOutputModeRaw) == .flattenPages {
@@ -1093,6 +1099,24 @@ private struct PresetsTab: View {
                 Toggle(String(localized: "Auto-grayscale monochrome scans", comment: "Settings UI: PDF Smart Quality."), isOn: binding(\.pdfAutoGrayscaleMonoScans, snapshot: snapshot))
                 if livePDF.smartQuality, livePDF.pdfAutoGrayscaleMonoScans {
                     settingsHelperText(String(localized: "When Smart quality is on, flatten may use grayscale for PDFs that look like black-and-white office scans, even if Grayscale PDF is off.", comment: "Settings UI: PDF auto mono helper."))
+                }
+
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "gauge.with.dots.needle.67percent", String(localized: "Max file size", comment: "Settings UI: Media PDF subsection."))
+                Toggle(String(localized: "Target a smaller file size", comment: "Settings UI: PDF max file size toggle."), isOn: binding(\.pdfMaxFileSizeEnabled, snapshot: snapshot))
+                if livePDF.pdfMaxFileSizeEnabled {
+                    settingsChipGrid(
+                        presets: settingsSizePresets,
+                        current: livePDF.pdfMaxFileSizeKB
+                    ) { set(\.pdfMaxFileSizeKB, to: $0, for: snapshot) }
+                    HStack(spacing: 6) {
+                        TextField("", value: pdfMbBinding(for: snapshot), format: .number)
+                            .textFieldStyle(.roundedBorder).frame(width: 80)
+                            .labelsHidden()
+                        Text(String(localized: "MB", comment: "Unit abbreviation for megabytes.")).foregroundStyle(.secondary)
+                    }
+                    settingsHelperText(String(localized: "Steps down quality tiers until under the target. Exact size varies by content.", comment: "Settings UI: PDF max file size helper."))
                 }
             }
         }
@@ -1212,6 +1236,16 @@ private struct PresetsTab: View {
                 return Double(live.maxFileSizeKB) / 1024.0
             },
             set: { set(\.maxFileSizeKB, to: max(1, Int($0 * 1024)), for: snapshot) }
+        )
+    }
+
+    private func pdfMbBinding(for snapshot: CompressionPreset) -> Binding<Double> {
+        Binding(
+            get: {
+                let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+                return Double(live.pdfMaxFileSizeKB) / 1024.0
+            },
+            set: { set(\.pdfMaxFileSizeKB, to: max(1, Int($0 * 1024)), for: snapshot) }
         )
     }
 

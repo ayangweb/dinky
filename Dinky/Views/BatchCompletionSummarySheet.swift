@@ -450,50 +450,54 @@ struct BatchCompletionSummarySheet: View {
             help: sourcePath
         ) {
             if supportsUndo {
-                HStack(spacing: 6) {
-                    Button(String(localized: "Try again", comment: "Batch summary row: retry zero-gain file.")) {
-                        onQueueCompress(id)
-                    }
-                    .buttonStyle(.plain)
-                    .font(.caption.weight(.medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+                VStack(alignment: .leading, spacing: 4) {
                     if isPDF, mode == .preserveStructure || mode == nil {
-                        Menu {
-                            Button(String(localized: "Strip non-essential structure", comment: "Batch summary: experimental preserve retry.")) {
-                                onPDFPreserveExperimental(id, .stripNonEssentialStructure)
+                        HStack(spacing: 6) {
+                            Menu {
+                                Button(String(localized: "Strip non-essential structure", comment: "Batch summary: experimental preserve retry.")) {
+                                    onPDFPreserveExperimental(id, .stripNonEssentialStructure)
+                                }
+                                Button(String(localized: "Stronger image recompression", comment: "Batch summary: experimental preserve retry.")) {
+                                    onPDFPreserveExperimental(id, .strongerImageRecompression)
+                                }
+                                Button(String(localized: "Maximum (both)", comment: "Batch summary: experimental preserve retry.")) {
+                                    onPDFPreserveExperimental(id, .maximum)
+                                }
+                            } label: {
+                                Text(String(localized: "Experimental preserve…", comment: "Batch summary: experimental preserve menu label."))
                             }
-                            Button(String(localized: "Stronger image recompression", comment: "Batch summary: experimental preserve retry.")) {
-                                onPDFPreserveExperimental(id, .strongerImageRecompression)
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                            .font(.caption.weight(.medium))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+                            Button(String(localized: "Flatten (Smallest)", comment: "Batch summary row: PDF flatten retry.")) {
+                                onPDFFlattenSmallest(id)
                             }
-                            Button(String(localized: "Maximum (both)", comment: "Batch summary: experimental preserve retry.")) {
-                                onPDFPreserveExperimental(id, .maximum)
-                            }
-                        } label: {
-                            Text(String(localized: "Try experimental preserve…", comment: "Batch summary: experimental preserve menu label."))
+                            .buttonStyle(.plain)
+                            .font(.caption.weight(.medium))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
                         }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
-                        Button(String(localized: "Try flatten (Smallest)", comment: "Batch summary row: PDF flatten retry.")) {
-                            onPDFFlattenSmallest(id)
+                    }
+                    HStack(spacing: 6) {
+                        Button(String(localized: "Try again", comment: "Batch summary row: retry zero-gain file.")) {
+                            onQueueCompress(id)
                         }
                         .buttonStyle(.plain)
                         .font(.caption.weight(.medium))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
+                        Button(String(localized: "Details…", comment: "Batch summary row: open zero-gain explanation.")) {
+                            onOpenZeroGainDetail(id)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.accentColor)
                     }
-                    Button(String(localized: "Details…", comment: "Batch summary row: open zero-gain explanation.")) {
-                        onOpenZeroGainDetail(id)
-                    }
-                    .buttonStyle(.plain)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(Color.accentColor)
                 }
             }
         }

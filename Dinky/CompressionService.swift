@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import CoreGraphics
 import ImageIO
+import PDFKit
 import UniformTypeIdentifiers
 
 struct CompressionGoals {
@@ -595,6 +596,8 @@ actor CompressionService {
             "--compress-streams=y",
             "--recompress-flate",
             "--compression-level=9",
+            "--remove-unreferenced-resources=yes",
+            "--coalesce-contents",
             "--optimize-images",
         ]
         args.append(contentsOf: extraQpdfArgs)
@@ -612,6 +615,8 @@ actor CompressionService {
                 "--compress-streams=y",
                 "--recompress-flate",
                 "--compression-level=9",
+                "--remove-unreferenced-resources=yes",
+                "--coalesce-contents",
             ]
             fallback.append(contentsOf: withoutJpeg)
             if stripMetadata {
@@ -631,6 +636,8 @@ actor CompressionService {
         flattenLastResort: Bool = false,
         flattenUltra: Bool = false,
         preserveQpdfSteps: [PDFPreserveQpdfStep] = [.base],
+        targetBytes: Int64? = nil,
+        resolutionDownsampling: Bool = false,
         progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> CompressionResult {
         let tPDF = CFAbsoluteTimeGetCurrent()
@@ -650,9 +657,10 @@ actor CompressionService {
             if let qpdfBin = qpdfBinaryURL() {
                 let steps = preserveQpdfSteps.isEmpty ? [PDFPreserveQpdfStep.base] : preserveQpdfSteps
                 let n = max(steps.count, 1)
+                var bestQpdfURL: URL? = nil
+                var bestQpdfSize: Int64 = originalSize
                 for (idx, step) in steps.enumerated() {
                     let qpdfTmp = fm.temporaryDirectory.appendingPathComponent("dinky_qpdf_\(UUID().uuidString).pdf")
-                    defer { try? fm.removeItem(at: qpdfTmp) }
                     progressHandler?(0.06 + 0.08 * Float(idx + 1) / Float(n))
                     do {
                         try await runQpdfPreserve(
@@ -663,18 +671,27 @@ actor CompressionService {
                             extraQpdfArgs: step.extraArgs
                         )
                         let qSz = fileSize(qpdfTmp)
-                        if qSz > 0 && qSz < originalSize {
-                            if fm.fileExists(atPath: outputURL.path) {
-                                try fm.removeItem(at: outputURL)
-                            }
-                            try fm.moveItem(at: qpdfTmp, to: outputURL)
-                            usedQpdf = true
+                        if qSz > 0 && qSz < bestQpdfSize {
+                            if let prev = bestQpdfURL { try? fm.removeItem(at: prev) }
+                            bestQpdfURL = qpdfTmp
+                            bestQpdfSize = qSz
                             winningPreserveQpdfStepId = step.id
-                            break
+                            // Without a size target, first improvement is good enough.
+                            // With a target, keep trying steps until we're under it.
+                            let targetMet = targetBytes.map { qSz <= $0 } ?? true
+                            if targetMet { break }
+                        } else {
+                            try? fm.removeItem(at: qpdfTmp)
                         }
                     } catch {
+                        try? fm.removeItem(at: qpdfTmp)
                         continue
                     }
+                }
+                if let best = bestQpdfURL {
+                    if fm.fileExists(atPath: outputURL.path) { try fm.removeItem(at: outputURL) }
+                    try fm.moveItem(at: best, to: outputURL)
+                    usedQpdf = true
                 }
             }
             if !usedQpdf {
@@ -689,6 +706,21 @@ actor CompressionService {
                 }.value
             } else {
                 progressHandler?(1)
+            }
+
+            if resolutionDownsampling, fm.fileExists(atPath: outputURL.path),
+               let structureDoc = PDFDocument(url: outputURL) {
+                let dsURL = fm.temporaryDirectory.appendingPathComponent("dinky_pdf_ds_\(UUID().uuidString).pdf")
+                if let mixed = PDFImageDownsampler.downsample(source: source, structureDoc: structureDoc),
+                   mixed.write(to: dsURL) {
+                    let dsSz = fileSize(dsURL)
+                    if dsSz > 0 && dsSz < fileSize(outputURL) {
+                        try? fm.removeItem(at: outputURL)
+                        try? fm.moveItem(at: dsURL, to: outputURL)
+                    } else {
+                        try? fm.removeItem(at: dsURL)
+                    }
+                }
             }
         case .flattenPages:
             let ph = progressHandler

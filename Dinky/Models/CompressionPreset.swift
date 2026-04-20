@@ -48,6 +48,9 @@ struct CompressionPreset: Codable, Identifiable {
     var pdfAutoGrayscaleMonoScans: Bool
     /// Experimental qpdf passes when PDF output is preserve (mirrors `DinkyPreferences.pdfPreserveExperimental`).
     var pdfPreserveExperimentalRaw: String
+    var pdfMaxFileSizeEnabled: Bool
+    var pdfMaxFileSizeKB: Int
+    var pdfResolutionDownsampling: Bool
     var videoRemoveAudio: Bool
     /// Mirrors images' Max width: opt-in cap on output video height.
     var videoMaxResolutionEnabled: Bool
@@ -89,6 +92,9 @@ struct CompressionPreset: Codable, Identifiable {
         self.pdfGrayscale = prefs.pdfGrayscale
         self.pdfAutoGrayscaleMonoScans = prefs.pdfAutoGrayscaleMonoScans
         self.pdfPreserveExperimentalRaw = prefs.pdfPreserveExperimentalRaw
+        self.pdfMaxFileSizeEnabled = prefs.pdfMaxFileSizeEnabled
+        self.pdfMaxFileSizeKB = prefs.pdfMaxFileSizeKB
+        self.pdfResolutionDownsampling = prefs.pdfResolutionDownsampling
         self.videoRemoveAudio = prefs.videoRemoveAudio
         self.videoMaxResolutionEnabled = prefs.videoMaxResolutionEnabled
         self.videoMaxResolutionLines = prefs.videoMaxResolutionLines
@@ -137,6 +143,9 @@ struct CompressionPreset: Codable, Identifiable {
         pdfAutoGrayscaleMonoScans = try c.decodeIfPresent(Bool.self, forKey: .pdfAutoGrayscaleMonoScans) ?? true
         pdfPreserveExperimentalRaw = try c.decodeIfPresent(String.self, forKey: .pdfPreserveExperimentalRaw)
             ?? PDFPreserveExperimentalMode.none.rawValue
+        pdfMaxFileSizeEnabled = try c.decodeIfPresent(Bool.self, forKey: .pdfMaxFileSizeEnabled) ?? false
+        pdfMaxFileSizeKB = try c.decodeIfPresent(Int.self, forKey: .pdfMaxFileSizeKB) ?? 10240
+        pdfResolutionDownsampling = try c.decodeIfPresent(Bool.self, forKey: .pdfResolutionDownsampling) ?? false
         videoRemoveAudio = try c.decodeIfPresent(Bool.self, forKey: .videoRemoveAudio) ?? false
         videoMaxResolutionEnabled = try c.decodeIfPresent(Bool.self, forKey: .videoMaxResolutionEnabled) ?? false
         videoMaxResolutionLines = try c.decodeIfPresent(Int.self, forKey: .videoMaxResolutionLines) ?? 1080
@@ -175,6 +184,9 @@ struct CompressionPreset: Codable, Identifiable {
         prefs.pdfGrayscale = pdfGrayscale
         prefs.pdfAutoGrayscaleMonoScans = pdfAutoGrayscaleMonoScans
         prefs.pdfPreserveExperimentalRaw = pdfPreserveExperimentalRaw
+        prefs.pdfMaxFileSizeEnabled = pdfMaxFileSizeEnabled
+        prefs.pdfMaxFileSizeKB = pdfMaxFileSizeKB
+        prefs.pdfResolutionDownsampling = pdfResolutionDownsampling
         prefs.videoRemoveAudio = videoRemoveAudio
         prefs.videoMaxResolutionEnabled = videoMaxResolutionEnabled
         prefs.videoMaxResolutionLines = videoMaxResolutionLines

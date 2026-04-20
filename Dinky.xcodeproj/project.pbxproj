@@ -69,6 +69,7 @@
 		DR000001000000000000001 /* DiagnosticsReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DR100001000000000000001 /* DiagnosticsReporter.swift */; };
 		CT000001000000000000001 /* CompressionTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = CT100001000000000000001 /* CompressionTiming.swift */; };
 		PM000001000000000000001 /* PDFCompressionMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = PM100001000000000000001 /* PDFCompressionMetrics.swift */; };
+		PI000001000000000000001 /* PDFImageDownsampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = PI100001000000000000001 /* PDFImageDownsampler.swift */; };
 		OP000001000000000000001 /* OutputPathUniqueness.swift in Sources */ = {isa = PBXBuildFile; fileRef = OP100001000000000000001 /* OutputPathUniqueness.swift */; };
 		SP000001000000000000001 /* SavingsPerspective.swift in Sources */ = {isa = PBXBuildFile; fileRef = SP100001000000000000001 /* SavingsPerspective.swift */; };
 /* End PBXBuildFile section */
@@ -172,6 +173,7 @@
 		DR100001000000000000001 /* DiagnosticsReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsReporter.swift; sourceTree = "<group>"; };
 		CT100001000000000000001 /* CompressionTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompressionTiming.swift; sourceTree = "<group>"; };
 		PM100001000000000000001 /* PDFCompressionMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFCompressionMetrics.swift; sourceTree = "<group>"; };
+		PI100001000000000000001 /* PDFImageDownsampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFImageDownsampler.swift; sourceTree = "<group>"; };
 		OP100001000000000000001 /* OutputPathUniqueness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPathUniqueness.swift; sourceTree = "<group>"; };
 		SP100001000000000000001 /* SavingsPerspective.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsPerspective.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -245,6 +247,7 @@
 				DR100001000000000000001 /* DiagnosticsReporter.swift */,
 				CT100001000000000000001 /* CompressionTiming.swift */,
 				PM100001000000000000001 /* PDFCompressionMetrics.swift */,
+				PI100001000000000000001 /* PDFImageDownsampler.swift */,
 				OP100001000000000000001 /* OutputPathUniqueness.swift */,
 				SP100001000000000000001 /* SavingsPerspective.swift */,
 			);
@@ -476,6 +479,7 @@
 				DR000001000000000000001 /* DiagnosticsReporter.swift in Sources */,
 				CT000001000000000000001 /* CompressionTiming.swift in Sources */,
 				PM000001000000000000001 /* PDFCompressionMetrics.swift in Sources */,
+				PI000001000000000000001 /* PDFImageDownsampler.swift in Sources */,
 				OP000001000000000000001 /* OutputPathUniqueness.swift in Sources */,
 				SP000001000000000000001 /* SavingsPerspective.swift in Sources */,
 			);
