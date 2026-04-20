@@ -45,14 +45,31 @@ struct CompressPDFIntent: AppIntent {
             try pdf.data.write(to: tmpIn)
             defer { try? FileManager.default.removeItem(at: tmpIn) }
 
+            let steps = PDFPreserveQpdfStepsResolver.steps(
+                sourceURL: tmpIn,
+                preserveExperimental: settings.preserveExperimental,
+                smartQuality: settings.smartQuality
+            )
+            let (quality, mono): (PDFQuality, Double) = {
+                if settings.outputMode == .flattenPages && settings.smartQuality {
+                    return PDFSmartQuality.inferFlattenQualityAndMono(
+                        url: tmpIn,
+                        fallback: settings.quality,
+                        autoGrayscaleMonoScans: settings.pdfAutoGrayscaleMonoScans
+                    )
+                }
+                return (settings.quality, 0)
+            }()
+            let effectiveGrayscale = settings.grayscale
+                || (settings.smartQuality && settings.pdfAutoGrayscaleMonoScans && settings.outputMode == .flattenPages && mono >= 0.5)
             let result = try await CompressionService.shared.compressPDF(
                 source: tmpIn,
                 outputMode: settings.outputMode,
-                quality: settings.quality,
-                grayscale: settings.grayscale,
+                quality: quality,
+                grayscale: effectiveGrayscale,
                 stripMetadata: settings.stripMetadata,
                 outputURL: tmpOut,
-                preserveExperimental: settings.preserveExperimental
+                preserveQpdfSteps: steps
             )
             defer { try? FileManager.default.removeItem(at: result.outputURL) }
 

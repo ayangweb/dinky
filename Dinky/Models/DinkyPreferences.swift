@@ -255,6 +255,8 @@ final class DinkyPreferences: ObservableObject {
         set { videoCodecFamilyRaw = newValue.rawValue }
     }
     @AppStorage("pdfGrayscale")    var pdfGrayscale:    Bool = false
+    /// When Smart Quality is on, use grayscale flatten for PDFs that look like monochrome office scans (in addition to Grayscale PDFs).
+    @AppStorage("pdfAutoGrayscaleMonoScans") var pdfAutoGrayscaleMonoScans: Bool = true
     /// Experimental qpdf options for preserve-text mode (see `PDFPreserveExperimentalMode`).
     @AppStorage("pdfPreserveExperimental") var pdfPreserveExperimentalRaw: String = PDFPreserveExperimentalMode.none.rawValue
     var pdfPreserveExperimental: PDFPreserveExperimentalMode {
@@ -601,7 +603,9 @@ final class DinkyPreferences: ObservableObject {
         quality: PDFQuality,
         grayscale: Bool,
         stripMetadata: Bool,
-        preserveExperimental: PDFPreserveExperimentalMode
+        preserveExperimental: PDFPreserveExperimentalMode,
+        smartQuality: Bool,
+        pdfAutoGrayscaleMonoScans: Bool
     ) {
         let d = UserDefaults.standard
         let modeRaw = d.string(forKey: "pdfOutputMode") ?? PDFOutputMode.flattenPages.rawValue
@@ -612,7 +616,9 @@ final class DinkyPreferences: ObservableObject {
         let strip = d.object(forKey: "stripMetadata") as? Bool ?? false
         let expRaw = d.string(forKey: "pdfPreserveExperimental") ?? PDFPreserveExperimentalMode.none.rawValue
         let experimental = PDFPreserveExperimentalMode(rawValue: expRaw) ?? .none
-        return (mode, quality, grayscale, strip, experimental)
+        let smart = d.object(forKey: "smartQuality") as? Bool ?? true
+        let autoMono = d.object(forKey: "pdfAutoGrayscaleMonoScans") as? Bool ?? true
+        return (mode, quality, grayscale, strip, experimental, smart, autoMono)
     }
 
     /// Video compression defaults for Shortcuts — same keys as `@AppStorage` on this type.

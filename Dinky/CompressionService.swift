@@ -582,7 +582,7 @@ actor CompressionService {
         output: URL,
         stripMetadata: Bool,
         binary: URL,
-        experimental: PDFPreserveExperimentalMode
+        extraQpdfArgs: [String]
     ) async throws {
         var args: [String] = [
             source.path,
@@ -593,13 +593,14 @@ actor CompressionService {
             "--compression-level=9",
             "--optimize-images",
         ]
-        args.append(contentsOf: experimental.extraQpdfArgs)
+        args.append(contentsOf: extraQpdfArgs)
         if stripMetadata {
             args.append(contentsOf: ["--remove-metadata", "--remove-info"])
         }
         do {
             try await run(binary, args: args)
         } catch {
+            let withoutJpeg = extraQpdfArgs.filter { !$0.hasPrefix("--jpeg-quality=") }
             var fallback = [
                 source.path,
                 output.path,
@@ -608,7 +609,7 @@ actor CompressionService {
                 "--recompress-flate",
                 "--compression-level=9",
             ]
-            fallback.append(contentsOf: experimental.qpdfExtrasWithoutJPEGQuality)
+            fallback.append(contentsOf: withoutJpeg)
             if stripMetadata {
                 fallback.append(contentsOf: ["--remove-metadata", "--remove-info"])
             }
@@ -625,7 +626,7 @@ actor CompressionService {
         outputURL: URL,
         flattenLastResort: Bool = false,
         flattenUltra: Bool = false,
-        preserveExperimental: PDFPreserveExperimentalMode = .none,
+        preserveQpdfSteps: [PDFPreserveQpdfStep] = [.base],
         progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> CompressionResult {
         let tPDF = CFAbsoluteTimeGetCurrent()
@@ -636,34 +637,40 @@ actor CompressionService {
             withIntermediateDirectories: true
         )
 
+        var winningPreserveQpdfStepId: String? = nil
         switch outputMode {
         case .preserveStructure:
             progressHandler?(0.06)
             let fm = FileManager.default
-            let qpdfTmp = fm.temporaryDirectory.appendingPathComponent("dinky_qpdf_\(UUID().uuidString).pdf")
             var usedQpdf = false
             if let qpdfBin = qpdfBinaryURL() {
-                do {
-                    try await runQpdfPreserve(
-                        source: source,
-                        output: qpdfTmp,
-                        stripMetadata: stripMetadata,
-                        binary: qpdfBin,
-                        experimental: preserveExperimental
-                    )
-                    let qSz = fileSize(qpdfTmp)
-                    if qSz > 0 && qSz < originalSize {
-                        if fm.fileExists(atPath: outputURL.path) {
-                            try fm.removeItem(at: outputURL)
+                let steps = preserveQpdfSteps.isEmpty ? [PDFPreserveQpdfStep.base] : preserveQpdfSteps
+                let n = max(steps.count, 1)
+                for (idx, step) in steps.enumerated() {
+                    let qpdfTmp = fm.temporaryDirectory.appendingPathComponent("dinky_qpdf_\(UUID().uuidString).pdf")
+                    defer { try? fm.removeItem(at: qpdfTmp) }
+                    progressHandler?(0.06 + 0.08 * Float(idx + 1) / Float(n))
+                    do {
+                        try await runQpdfPreserve(
+                            source: source,
+                            output: qpdfTmp,
+                            stripMetadata: stripMetadata,
+                            binary: qpdfBin,
+                            extraQpdfArgs: step.extraArgs
+                        )
+                        let qSz = fileSize(qpdfTmp)
+                        if qSz > 0 && qSz < originalSize {
+                            if fm.fileExists(atPath: outputURL.path) {
+                                try fm.removeItem(at: outputURL)
+                            }
+                            try fm.moveItem(at: qpdfTmp, to: outputURL)
+                            usedQpdf = true
+                            winningPreserveQpdfStepId = step.id
+                            break
                         }
-                        try fm.moveItem(at: qpdfTmp, to: outputURL)
-                        usedQpdf = true
+                    } catch {
+                        continue
                     }
-                } catch {
-                    try? fm.removeItem(at: qpdfTmp)
-                }
-                if !usedQpdf {
-                    try? fm.removeItem(at: qpdfTmp)
                 }
             }
             if !usedQpdf {
@@ -700,12 +707,15 @@ actor CompressionService {
         }
 
         let outSz = fileSize(outputURL)
+        let chainIds = preserveQpdfSteps.isEmpty ? "base" : preserveQpdfSteps.map(\.id).joined(separator: ">")
         PDFCompressionMetrics.logOutcome(
             outputMode: outputMode,
             originalBytes: originalSize,
             outputBytes: outSz,
             flattenLastResort: flattenLastResort,
-            flattenUltra: flattenUltra
+            flattenUltra: flattenUltra,
+            preserveQpdfChain: outputMode == .preserveStructure ? chainIds : nil,
+            preserveQpdfWinningStep: winningPreserveQpdfStepId
         )
 
         return CompressionResult(outputURL: outputURL,

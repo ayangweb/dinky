@@ -73,7 +73,7 @@ When **Smart quality** is on (default for new presets), Dinky inspects each file
 
 - Images get an encoder tuned to their content (busy photo vs. graphic — UI, illustration, logo, screenshot).
 - Videos get a tier based on resolution and source bitrate, then nudged for content type — screen recordings and animation / motion graphics move up a tier so text and edges stay readable. Camera footage is identified from EXIF make/model so it isn't over-protected. HDR sources (Dolby Vision, HDR10, HLG) are exported with HEVC to preserve color and highlight detail; H.264 would silently flatten them to SDR.
-- PDFs get a tier based on document complexity and whether they're text-first or image-heavy.
+- PDFs get a tier based on document complexity and whether they're text-first or image-heavy. **Preserve text** uses Smart quality to try several **qpdf** passes when Experimental preserve is off, then PDFKit if needed. **Smallest file (flatten)** can turn on **Auto-grayscale monochrome scans** (in the preset) so black-and-white scans use grayscale without enabling **Grayscale PDF** for everything.
 
 Turn it off in any preset under **Compression** when you want a fixed quality tier (Balanced / High for video, Low / Medium / High for PDFs) — useful for batches that need predictable results.
 

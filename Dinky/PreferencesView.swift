@@ -1030,6 +1030,10 @@ private struct PresetsTab: View {
                 if livePDF.pdfGrayscale {
                     settingsHelperText(String(localized: "Smaller files when color isn’t needed.", comment: "Settings UI."))
                 }
+                Toggle(String(localized: "Auto-grayscale monochrome scans", comment: "Settings UI: PDF Smart Quality."), isOn: binding(\.pdfAutoGrayscaleMonoScans, snapshot: snapshot))
+                if livePDF.smartQuality, livePDF.pdfAutoGrayscaleMonoScans {
+                    settingsHelperText(String(localized: "When Smart quality is on, flatten may use grayscale for PDFs that look like black-and-white office scans, even if Grayscale PDF is off.", comment: "Settings UI: PDF auto mono helper."))
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

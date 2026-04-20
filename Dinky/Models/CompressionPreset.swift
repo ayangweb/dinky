@@ -42,6 +42,8 @@ struct CompressionPreset: Codable, Identifiable {
     var videoQualityRaw: String
     var videoCodecFamilyRaw: String
     var pdfGrayscale: Bool
+    /// Smart Quality: auto-grayscale flatten for detected monochrome scans (mirrors `DinkyPreferences.pdfAutoGrayscaleMonoScans`).
+    var pdfAutoGrayscaleMonoScans: Bool
     /// Experimental qpdf passes when PDF output is preserve (mirrors `DinkyPreferences.pdfPreserveExperimental`).
     var pdfPreserveExperimentalRaw: String
     var videoRemoveAudio: Bool
@@ -82,6 +84,7 @@ struct CompressionPreset: Codable, Identifiable {
         self.videoQualityRaw = prefs.videoQualityRaw
         self.videoCodecFamilyRaw = prefs.videoCodecFamilyRaw
         self.pdfGrayscale = prefs.pdfGrayscale
+        self.pdfAutoGrayscaleMonoScans = prefs.pdfAutoGrayscaleMonoScans
         self.pdfPreserveExperimentalRaw = prefs.pdfPreserveExperimentalRaw
         self.videoRemoveAudio = prefs.videoRemoveAudio
         self.videoMaxResolutionEnabled = prefs.videoMaxResolutionEnabled
@@ -127,6 +130,7 @@ struct CompressionPreset: Codable, Identifiable {
         videoQualityRaw = VideoQuality.resolve(storedVideoQuality).rawValue
         videoCodecFamilyRaw = try c.decodeIfPresent(String.self, forKey: .videoCodecFamilyRaw) ?? VideoCodecFamily.h264.rawValue
         pdfGrayscale = try c.decodeIfPresent(Bool.self, forKey: .pdfGrayscale) ?? false
+        pdfAutoGrayscaleMonoScans = try c.decodeIfPresent(Bool.self, forKey: .pdfAutoGrayscaleMonoScans) ?? true
         pdfPreserveExperimentalRaw = try c.decodeIfPresent(String.self, forKey: .pdfPreserveExperimentalRaw)
             ?? PDFPreserveExperimentalMode.none.rawValue
         videoRemoveAudio = try c.decodeIfPresent(Bool.self, forKey: .videoRemoveAudio) ?? false
@@ -164,6 +168,7 @@ struct CompressionPreset: Codable, Identifiable {
         prefs.videoQualityRaw = videoQualityRaw
         prefs.videoCodecFamilyRaw = videoCodecFamilyRaw
         prefs.pdfGrayscale = pdfGrayscale
+        prefs.pdfAutoGrayscaleMonoScans = pdfAutoGrayscaleMonoScans
         prefs.pdfPreserveExperimentalRaw = pdfPreserveExperimentalRaw
         prefs.videoRemoveAudio = videoRemoveAudio
         prefs.videoMaxResolutionEnabled = videoMaxResolutionEnabled

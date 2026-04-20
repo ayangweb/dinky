@@ -53,6 +53,8 @@
 		PC000001000000000000001 /* PDFCompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = PC100001000000000000001 /* PDFCompressor.swift */; };
 		VC000001000000000000001 /* VideoCompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VC100001000000000000001 /* VideoCompressor.swift */; };
 		PQ000001000000000000001 /* PDFSmartQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = PQ100001000000000000001 /* PDFSmartQuality.swift */; };
+		DS000001000000000000001 /* PDFDocumentSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS100001000000000000001 /* PDFDocumentSampler.swift */; };
+		PH000001000000000000001 /* PDFPreserveHeuristics.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH100001000000000000001 /* PDFPreserveHeuristics.swift */; };
 		VQ000001000000000000001 /* VideoSmartQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = VQ100001000000000000001 /* VideoSmartQuality.swift */; };
 		VCC0001000000000000001 /* VideoContentClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = VCC1001000000000000001 /* VideoContentClassifier.swift */; };
 		WR000001000000000000001 /* WatchRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = WR100001000000000000001 /* WatchRegistry.swift */; };
@@ -121,6 +123,8 @@
 		PC100001000000000000001 /* PDFCompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFCompressor.swift; sourceTree = "<group>"; };
 		VC100001000000000000001 /* VideoCompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCompressor.swift; sourceTree = "<group>"; };
 		PQ100001000000000000001 /* PDFSmartQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFSmartQuality.swift; sourceTree = "<group>"; };
+		DS100001000000000000001 /* PDFDocumentSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentSampler.swift; sourceTree = "<group>"; };
+		PH100001000000000000001 /* PDFPreserveHeuristics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFPreserveHeuristics.swift; sourceTree = "<group>"; };
 		VQ100001000000000000001 /* VideoSmartQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoSmartQuality.swift; sourceTree = "<group>"; };
 		VCC1001000000000000001 /* VideoContentClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoContentClassifier.swift; sourceTree = "<group>"; };
 		WR100001000000000000001 /* WatchRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRegistry.swift; sourceTree = "<group>"; };
@@ -229,6 +233,8 @@
 				PC100001000000000000001 /* PDFCompressor.swift */,
 				VC100001000000000000001 /* VideoCompressor.swift */,
 				PQ100001000000000000001 /* PDFSmartQuality.swift */,
+				DS100001000000000000001 /* PDFDocumentSampler.swift */,
+				PH100001000000000000001 /* PDFPreserveHeuristics.swift */,
 				VQ100001000000000000001 /* VideoSmartQuality.swift */,
 				VCC1001000000000000001 /* VideoContentClassifier.swift */,
 				WR100001000000000000001 /* WatchRegistry.swift */,
@@ -454,6 +460,8 @@
 				PC000001000000000000001 /* PDFCompressor.swift in Sources */,
 				VC000001000000000000001 /* VideoCompressor.swift in Sources */,
 				PQ000001000000000000001 /* PDFSmartQuality.swift in Sources */,
+				DS000001000000000000001 /* PDFDocumentSampler.swift in Sources */,
+				PH000001000000000000001 /* PDFPreserveHeuristics.swift in Sources */,
 				VQ000001000000000000001 /* VideoSmartQuality.swift in Sources */,
 				VCC0001000000000000001 /* VideoContentClassifier.swift in Sources */,
 				WR000001000000000000001 /* WatchRegistry.swift in Sources */,

@@ -26,12 +26,20 @@ enum PDFCompressionMetrics {
         originalBytes: Int64,
         outputBytes: Int64,
         flattenLastResort: Bool,
-        flattenUltra: Bool
+        flattenUltra: Bool,
+        preserveQpdfChain: String? = nil,
+        preserveQpdfWinningStep: String? = nil
     ) {
         let saved = originalBytes - outputBytes
         let pct = originalBytes > 0 ? Double(saved) / Double(originalBytes) * 100.0 : 0
         let bailout = flattenUltra ? "ultra" : (flattenLastResort ? "lastResort" : "none")
-        log.debug("\(Self.eventPrefix, privacy: .public) outcome mode=\(outputMode.rawValue, privacy: .public) in=\(originalBytes, privacy: .public) out=\(outputBytes, privacy: .public) savedBytes=\(saved, privacy: .public) savedPct=\(String(format: "%.2f", pct), privacy: .public) bailout=\(bailout, privacy: .public)")
+        if let chain = preserveQpdfChain, let win = preserveQpdfWinningStep {
+            log.debug("\(Self.eventPrefix, privacy: .public) outcome mode=\(outputMode.rawValue, privacy: .public) in=\(originalBytes, privacy: .public) out=\(outputBytes, privacy: .public) savedBytes=\(saved, privacy: .public) savedPct=\(String(format: "%.2f", pct), privacy: .public) bailout=\(bailout, privacy: .public) preserveChain=\(chain, privacy: .public) preserveWin=\(win, privacy: .public)")
+        } else if let chain = preserveQpdfChain {
+            log.debug("\(Self.eventPrefix, privacy: .public) outcome mode=\(outputMode.rawValue, privacy: .public) in=\(originalBytes, privacy: .public) out=\(outputBytes, privacy: .public) savedBytes=\(saved, privacy: .public) savedPct=\(String(format: "%.2f", pct), privacy: .public) bailout=\(bailout, privacy: .public) preserveChain=\(chain, privacy: .public) preserveWin=pdfkit")
+        } else {
+            log.debug("\(Self.eventPrefix, privacy: .public) outcome mode=\(outputMode.rawValue, privacy: .public) in=\(originalBytes, privacy: .public) out=\(outputBytes, privacy: .public) savedBytes=\(saved, privacy: .public) savedPct=\(String(format: "%.2f", pct), privacy: .public) bailout=\(bailout, privacy: .public)")
+        }
     }
 
     static func logRejectedOutput(

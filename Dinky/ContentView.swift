@@ -785,21 +785,36 @@ final class ContentViewModel: ObservableObject {
         let pdfFallback = preset.map { PDFQuality(rawValue: $0.pdfQualityRaw) ?? .medium } ?? prefs.pdfQuality
         let sourceURL = item.sourceURL
         let outputMode = pdfModeOverride ?? preset.map { PDFOutputMode(rawValue: $0.pdfOutputModeRaw) ?? .flattenPages } ?? prefs.pdfOutputMode
-        let preserveExperimental: PDFPreserveExperimentalMode = {
-            guard outputMode == .preserveStructure else { return .none }
-            let fromStored = preset.map { PDFPreserveExperimentalMode(rawValue: $0.pdfPreserveExperimentalRaw) ?? .none }
-                ?? prefs.pdfPreserveExperimental
-            return pdfExperimentalOverride ?? fromStored
-        }()
         let smartQ = preset?.smartQuality ?? prefs.smartQuality
+        let preserveQpdfSteps: [PDFPreserveQpdfStep] = {
+            guard outputMode == .preserveStructure else { return [.base] }
+            if let o = pdfExperimentalOverride {
+                return [PDFPreserveQpdfStep.from(experimental: o)]
+            }
+            let exp = preset.map { PDFPreserveExperimentalMode(rawValue: $0.pdfPreserveExperimentalRaw) ?? .none }
+                ?? prefs.pdfPreserveExperimental
+            return PDFPreserveQpdfStepsResolver.steps(
+                sourceURL: sourceURL,
+                preserveExperimental: exp,
+                smartQuality: smartQ
+            )
+        }()
+        var monoLikelihoodForFlatten: Double = 0
         let pdfQuality: PDFQuality
+        let autoMonoScans = preset?.pdfAutoGrayscaleMonoScans ?? prefs.pdfAutoGrayscaleMonoScans
         if let o = pdfOverride, outputMode == .flattenPages {
             pdfQuality = o
         } else if outputMode == .flattenPages, smartQ {
             let tInfer = CFAbsoluteTimeGetCurrent()
-            pdfQuality = await Task.detached {
-                PDFSmartQuality.inferQuality(url: sourceURL, fallback: pdfFallback)
+            let (q, mono) = await Task.detached {
+                PDFSmartQuality.inferFlattenQualityAndMono(
+                    url: sourceURL,
+                    fallback: pdfFallback,
+                    autoGrayscaleMonoScans: autoMonoScans
+                )
             }.value
+            pdfQuality = q
+            monoLikelihoodForFlatten = mono
             CompressionTiming.logPhase("pdf.smartQuality.infer", startedAt: tInfer)
         } else {
             pdfQuality = pdfFallback
@@ -824,7 +839,13 @@ final class ContentViewModel: ObservableObject {
         }
         let replaceOrigin = (preset.map { FilenameHandling(rawValue: $0.filenameHandlingRaw) } ?? prefs.filenameHandling) == .replaceOrigin
         let strip = preset?.stripMetadata ?? prefs.stripMetadata
-        let grayscale = preset?.pdfGrayscale ?? prefs.pdfGrayscale
+        let grayscalePref = preset?.pdfGrayscale ?? prefs.pdfGrayscale
+        let effectiveGrayscale: Bool = {
+            guard outputMode == .flattenPages else { return grayscalePref }
+            if grayscalePref { return true }
+            if smartQ, autoMonoScans, monoLikelihoodForFlatten >= 0.5 { return true }
+            return false
+        }()
         var preservedModDate: Date?
         if workURL.path != finalURL.path, prefs.preserveTimestamps {
             preservedModDate = (try? FileManager.default.attributesOfItem(atPath: sourceURL.path)[.modificationDate]) as? Date
@@ -849,10 +870,10 @@ final class ContentViewModel: ObservableObject {
                     source: item.sourceURL,
                     outputMode: outputMode,
                     quality: q,
-                    grayscale: grayscale,
+                    grayscale: effectiveGrayscale,
                     stripMetadata: strip,
                     outputURL: workURL,
-                    preserveExperimental: preserveExperimental,
+                    preserveQpdfSteps: preserveQpdfSteps,
                     progressHandler: pdfProgress
                 )
                 let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
@@ -880,12 +901,12 @@ final class ContentViewModel: ObservableObject {
                             source: item.sourceURL,
                             outputMode: outputMode,
                             quality: pdfQuality,
-                            grayscale: grayscale,
+                            grayscale: effectiveGrayscale,
                             stripMetadata: strip,
                             outputURL: workURL,
                             flattenLastResort: pass.lastResort,
                             flattenUltra: pass.ultra,
-                            preserveExperimental: preserveExperimental,
+                            preserveQpdfSteps: preserveQpdfSteps,
                             progressHandler: pdfProgress
                         )
                         let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }

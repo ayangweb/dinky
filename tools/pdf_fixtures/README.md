@@ -18,6 +18,17 @@ Keep 3–5 local PDFs (do not commit copyrighted files to the repo):
 3. Filter: `pdf_metrics`.
 4. Compress each PDF with **default sidebar settings** (flatten + Smart Quality on).
 5. Note `savedPct` on `outcome` lines. For failures, read `rejected` with `reason=zero_gain_no_smaller_output`.
+6. For **preserve** mode regressions, `outcome` lines may include `preserveChain` and `preserveWin` (which qpdf step won, or `pdfkit` if only PDFKit beat the source).
+
+## Comparing qpdf vs pdfcpu (optional)
+
+To compare bundled **qpdf** behavior with **pdfcpu** on your own files (nothing is uploaded), install Homebrew’s `qpdf` and `pdfcpu` and run:
+
+```bash
+./tools/benchmark_pdf_optimizers.sh /path/to/your/pdfs
+```
+
+See `docs/PDF_COMPRESSION.md` for how this relates to shipping features.
 
 ## Baseline interpretation
 
