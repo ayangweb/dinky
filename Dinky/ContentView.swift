@@ -1724,6 +1724,9 @@ struct ContentView: View {
                             Button { vm.compressItems(targets, format: .png) } label: {
                                 Label(String(localized: "Compress as PNG", comment: "Context menu."), systemImage: "photo")
                             }
+                            Button { vm.compressItems(targets, format: .heic) } label: {
+                                Label(String(localized: "Compress as HEIC", comment: "Context menu."), systemImage: "photo")
+                            }
                             Divider()
                         }
                         if item.mediaType == .pdf, vm.effectivePDFOutputMode(for: item) == .flattenPages {
@@ -1769,6 +1772,9 @@ struct ContentView: View {
                             }
                             Button { vm.recompress(item, as: .png) } label: {
                                 Label(String(localized: "Re-compress as PNG", comment: "Context menu."), systemImage: "photo")
+                            }
+                            Button { vm.recompress(item, as: .heic) } label: {
+                                Label(String(localized: "Re-compress as HEIC", comment: "Context menu."), systemImage: "photo")
                             }
                             Divider()
                         }

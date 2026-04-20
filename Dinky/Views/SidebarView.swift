@@ -1108,6 +1108,7 @@ struct FormatChipPicker: View {
         ("WebP",  .webp, "Broad support and solid compression."),
         ("AVIF",  .avif, "Smallest files; encoding takes longer."),
         ("PNG",   .png,  "Lossless; best for screenshots and graphics."),
+        ("HEIC",  .heic, "Apple-friendly stills; good for Photos and iCloud sharing."),
     ]
 
     var body: some View {
@@ -1115,7 +1116,7 @@ struct FormatChipPicker: View {
             opt.format == nil ? autoFormat : (!autoFormat && selectedFormat == opt.format)
         })?.description ?? ""
 
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 4) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 5), spacing: 4) {
             ForEach(options, id: \.label) { opt in
                 let active: Bool = opt.format == nil
                     ? autoFormat

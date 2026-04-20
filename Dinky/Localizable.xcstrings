@@ -6039,6 +6039,9 @@
         }
       }
     },
+    "Compress as HEIC" : {
+      "comment" : "Context menu."
+    },
     "Compress as PNG" : {
       "comment" : "Context menu.",
       "localizations" : {
@@ -7673,6 +7676,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Finder 中複製支援的文件，或複製映像（PNG 或 TIFF），然後重試。"
+          }
+        }
+      }
+    },
+    "Could not encode this image as HEIC." : {
+      "comment" : "Error when HEIC export fails.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not encode this image as HEIC."
           }
         }
       }
@@ -12872,6 +12887,83 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "HDR 來源 — 使用 HEVC 保存，因此高光和顏色保持完整。"
+          }
+        }
+      }
+    },
+    "HEIC" : {
+      "comment" : "Image format name.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
           }
         }
       }
@@ -20910,6 +21002,9 @@
           }
         }
       }
+    },
+    "Re-compress as HEIC" : {
+      "comment" : "Context menu."
     },
     "Re-compress as PNG" : {
       "comment" : "Context menu.",

@@ -38,6 +38,7 @@ enum CompressionError: LocalizedError {
     case videoExportFailed(String)
     case videoExportSessionUnavailable
     case heicTranscodeFailed
+    case heicEncodeFailed
     case imageResizeFailed
 
     var errorDescription: String? {
@@ -50,6 +51,8 @@ enum CompressionError: LocalizedError {
         case .videoExportFailed(let msg): return "Video export failed: \(msg)"
         case .videoExportSessionUnavailable: return "Could not create export session for this video."
         case .heicTranscodeFailed: return "Could not read or convert this HEIC/HEIF image."
+        case .heicEncodeFailed:
+            return String(localized: "Could not encode this image as HEIC.", comment: "Error when HEIC export fails.")
         case .imageResizeFailed: return "Could not resize this image for the width limit."
         }
     }
@@ -59,15 +62,16 @@ enum CompressionError: LocalizedError {
 private let defaultQuality: [CompressionFormat: Int] = [
     .webp: 82,
     .avif: 75,
+    .heic: 78,
 ]
 
 // Smart Quality: per-content-type quality for each format.
 // Graphics (UI, screenshots, illustrations, logos) get higher quality to keep
 // edges crisp. Photos stay at our tuned defaults. Mixed lands in between.
 private let qualityByContent: [ContentType: [CompressionFormat: Int]] = [
-    .photo:   [.webp: 82, .avif: 75],
-    .graphic: [.webp: 92, .avif: 88],
-    .mixed:   [.webp: 87, .avif: 82],
+    .photo:   [.webp: 82, .avif: 75, .heic: 78],
+    .graphic: [.webp: 92, .avif: 88, .heic: 88],
+    .mixed:   [.webp: 87, .avif: 82, .heic: 83],
 ]
 
 // Floor for the binary-search target-size mode. Graphics shouldn't
@@ -130,6 +134,15 @@ private func orientedPixelSize(url: URL) -> CGSize? {
 private func imageSourceHasMultipleFrames(url: URL) -> Bool {
     guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return false }
     return CGImageSourceGetCount(src) > 1
+}
+
+/// HEIC/HEIF → PNG when bundled CLI encoders need a readable path; skip when output is HEIC (ImageIO reads HEIC directly).
+private func encoderInputURLForImageCompression(source: URL, outputFormat: CompressionFormat) throws -> URL {
+    let ext = source.pathExtension.lowercased()
+    if outputFormat == .heic, ext == "heic" || ext == "heif" {
+        return source
+    }
+    return try heicTranscodeToPNGIfNeeded(source: source)
 }
 
 /// Lossless pixel decode to PNG so `cwebp` / `avifenc` / `oxipng` can read the file.
@@ -212,6 +225,31 @@ private func resizeImageMaxWidthUsingImageIO(source: URL, maxWidth: Int) throws 
     return tmpURL
 }
 
+/// HEIC output via ImageIO (decoded pixels only; no EXIF/XMP copied from source).
+private func runHeicEncode(source: URL, quality: Int, output: URL) throws {
+    let cgImage: CGImage
+    do {
+        cgImage = try cgImageDecodedOrientedFullSize(url: source)
+    } catch {
+        throw CompressionError.heicEncodeFailed
+    }
+    if FileManager.default.fileExists(atPath: output.path) {
+        try? FileManager.default.removeItem(at: output)
+    }
+    guard let dest = CGImageDestinationCreateWithURL(output as CFURL, UTType.heic.identifier as CFString, 1, nil) else {
+        throw CompressionError.heicEncodeFailed
+    }
+    let q = max(0, min(100, quality))
+    let props: [CFString: Any] = [
+        kCGImageDestinationLossyCompressionQuality: Double(q) / 100.0,
+    ]
+    CGImageDestinationAddImage(dest, cgImage, props as CFDictionary)
+    guard CGImageDestinationFinalize(dest) else {
+        try? FileManager.default.removeItem(at: output)
+        throw CompressionError.heicEncodeFailed
+    }
+}
+
 actor CompressionService {
 
     static let shared = CompressionService()
@@ -265,10 +303,10 @@ actor CompressionService {
             withIntermediateDirectories: true
         )
 
-        // Step 1: HEIC/HEIF → PNG (encoders don't read HEIC; Smart Quality still uses `source` below).
+        // Step 1: HEIC/HEIF → PNG when needed for CLI encoders; HEIC output uses the source file when already HEIC/HEIF.
         let tHeic = CFAbsoluteTimeGetCurrent()
         let encoderInputURL = try await Task.detached {
-            try heicTranscodeToPNGIfNeeded(source: source)
+            try encoderInputURLForImageCompression(source: source, outputFormat: format)
         }.value
         CompressionTiming.logPhase("image.heicTranscodeOrPassthrough", startedAt: tHeic)
         report(0.12)
@@ -483,6 +521,10 @@ actor CompressionService {
         case .webp: try await runCwebp(source: source, quality: quality, strip: strip, output: output, content: content, nearLossless: nearLossless)
         case .avif: try await runAvifenc(source: source, quality: quality, strip: strip, output: output, content: content, avifJobs: avifJobs)
         case .png:  try await runOxipng(source: source, strip: strip, output: output)
+        case .heic:
+            try await Task.detached {
+                try runHeicEncode(source: source, quality: quality, output: output)
+            }.value
         }
     }
 

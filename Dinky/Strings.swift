@@ -121,6 +121,7 @@ enum S {
     static let webp = "WebP"
     static let avif = "AVIF"
     static let png  = "PNG"
+    static let heic = "HEIC"
 
     /// Shown in About, Settings, and linked with `mailto:`.
     static let supportEmail = "help@dinkyfiles.com"

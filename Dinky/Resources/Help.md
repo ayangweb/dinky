@@ -2,7 +2,7 @@
 
 Dinky makes files dinky. Drop something in, get a smaller version out — same look, less weight.
 
-It works on **images** (JPEG, PNG, WebP, AVIF, TIFF, BMP), **videos** (MP4, MOV, M4V), and **PDFs**.
+It works on **images** (JPEG, PNG, WebP, AVIF, HEIC/HEIF, TIFF, BMP), **videos** (MP4, MOV, M4V), and **PDFs**.
 
 Everything happens on your Mac. Nothing is uploaded.
 
@@ -61,7 +61,7 @@ Three plain-language choices: **Image**, **Video**, **PDF**. Pick one per catego
 
 Toggle **Settings → General → Use simple sidebar** off (or flip individual sections on) to expose every control:
 
-- **Images** — format, content hint (photo / illustration / screenshot), max width, max file size.
+- **Images** — format (Auto, WebP, AVIF, lossless PNG, or HEIC), content hint (photo / illustration / screenshot), max width, max file size.
 - **Videos** — codec family (H.264 / HEVC / AV1), quality tier, strip audio.
 - **PDFs** — **Smallest file (flatten pages)** is the default for real size savings; **Preserve text (best-effort size)** keeps structure when qpdf/PDFKit can actually shrink the file.
 
