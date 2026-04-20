@@ -2,7 +2,7 @@
 
 **Tagline:** Dinky makes files smaller.
 
-A tiny macOS app for **images**, **videos**, and **PDFs**. Convert stills to WebP, AVIF, lossless PNG, or HEIC; export video to smaller MP4 with **H.264** or **HEVC**; **PDFs** default to **flatten** (size wins) with an honest **preserve** mode (bundled **qpdf** + PDFKit, only when smaller), plus optional **Vision OCR** on scan-like PDFs before compress. Drag and drop, get smaller files back. Free and open source.
+A tiny macOS app that shrinks images, videos, and PDFs. Drag, drop, get smaller files back. Free and open source.
 
 - **Download:** [Dinky for macOS (DMG)](https://github.com/heyderekj/dinky/releases/download/v2.6.0/Dinky-2.6.0.dmg)
 - **Source:** [GitHub — heyderekj/dinky](https://github.com/heyderekj/dinky)
