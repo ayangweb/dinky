@@ -47,6 +47,40 @@ struct DropZoneView: View {
         .onChange(of: phase) { _, new in
             if new == .done { doneFlash.toggle(); triggerSparkles() }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(dropZoneAccessibilityLabel)
+        .accessibilityHint(dropZoneAccessibilityHint)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var dropZoneAccessibilityLabel: String {
+        switch phase {
+        case .idle:
+            let head = String(localized: "Drop files here", comment: "Drop zone idle hint.")
+            let browse = String(localized: "or click to browse", comment: "Drop zone idle hint.")
+            let pasteKey = prefs.shortcut(for: .pasteClipboard).displayString
+            let paste = String(localized: "or paste (\(pasteKey))", comment: "Drop zone; argument is paste shortcut.")
+            return "\(head) \(browse) \(paste)"
+        case .hovering:
+            return String(localized: "Release to compress", comment: "Drop zone while dragging files.")
+        case .processing:
+            return String(localized: "Compressing…", comment: "Drop zone during compression.")
+        case .done:
+            return String(localized: "All done!", comment: "Drop zone when batch completes.")
+        }
+    }
+
+    private var dropZoneAccessibilityHint: String {
+        switch phase {
+        case .idle:
+            return String(localized: "Activate to open the file picker. You can also paste when the clipboard has a compressible item.", comment: "VoiceOver hint for main drop zone when idle.")
+        case .hovering:
+            return String(localized: "Release the dragged items to add them to the queue.", comment: "VoiceOver hint for drop zone while dragging.")
+        case .processing:
+            return String(localized: "Compression is in progress.", comment: "VoiceOver hint while compressing.")
+        case .done:
+            return String(localized: "Activate to choose more files.", comment: "VoiceOver hint for drop zone when a batch finished.")
+        }
     }
 
     @ViewBuilder

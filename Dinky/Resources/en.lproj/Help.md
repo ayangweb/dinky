@@ -168,7 +168,7 @@ Either it was already very small (under your *Skip if savings below* threshold),
 Video re-encoding is CPU-heavy. The *Batch speed* setting in **Settings → General** controls how many files run at once — drop it to **Fast** if your Mac is doing other things.
 
 **My PDF lost text selection / hyperlinks.**
-You used *Flatten (smallest)*. Switch the preset's PDF output to *Preserve text & links* and re-run. Flatten always wins on size; preserve always wins on usefulness.
+You used *Smallest file (flatten pages)*. Switch the preset's PDF output to *Preserve text (best-effort size)* and re-run. Flatten is for reliable smaller files; preserve keeps text and links when optimization actually reduces size.
 
 **Right-click "Compress with Dinky" isn't showing up.**
 Open Dinky once after installing so macOS registers the Service. If it still doesn't appear, enable it in **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders**.

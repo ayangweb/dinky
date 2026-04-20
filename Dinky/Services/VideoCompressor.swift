@@ -168,6 +168,9 @@ enum VideoCompressor {
         outputURL: URL,
         progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> ResolvedExport {
+        let tExport = CFAbsoluteTimeGetCurrent()
+        defer { CompressionTiming.logPhase("video.export", startedAt: tExport) }
+
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
         guard let videoTrack = videoTracks.first else {
             throw VideoCompressionError.exportSessionUnavailable

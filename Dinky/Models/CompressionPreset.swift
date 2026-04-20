@@ -16,6 +16,8 @@ struct CompressionPreset: Codable, Identifiable {
     var saveLocationRaw: String
     var filenameHandlingRaw: String
     var customSuffix: String
+    /// When the output basename is already taken (`finderDuplicate` vs `finderNumbered`).
+    var collisionNamingStyleRaw: String
     // Advanced
     var stripMetadata: Bool
     var sanitizeFilenames: Bool
@@ -40,6 +42,8 @@ struct CompressionPreset: Codable, Identifiable {
     var videoQualityRaw: String
     var videoCodecFamilyRaw: String
     var pdfGrayscale: Bool
+    /// Experimental qpdf passes when PDF output is preserve (mirrors `DinkyPreferences.pdfPreserveExperimental`).
+    var pdfPreserveExperimentalRaw: String
     var videoRemoveAudio: Bool
     /// Mirrors images' Max width: opt-in cap on output video height.
     var videoMaxResolutionEnabled: Bool
@@ -60,6 +64,7 @@ struct CompressionPreset: Codable, Identifiable {
         self.saveLocationRaw = "sameFolder"
         self.filenameHandlingRaw = prefs.filenameHandlingRaw
         self.customSuffix = prefs.customSuffix
+        self.collisionNamingStyleRaw = prefs.collisionNamingStyleRaw
         self.stripMetadata = prefs.stripMetadata
         self.sanitizeFilenames = prefs.sanitizeFilenames
         self.openFolderWhenDone = prefs.openFolderWhenDone
@@ -77,6 +82,7 @@ struct CompressionPreset: Codable, Identifiable {
         self.videoQualityRaw = prefs.videoQualityRaw
         self.videoCodecFamilyRaw = prefs.videoCodecFamilyRaw
         self.pdfGrayscale = prefs.pdfGrayscale
+        self.pdfPreserveExperimentalRaw = prefs.pdfPreserveExperimentalRaw
         self.videoRemoveAudio = prefs.videoRemoveAudio
         self.videoMaxResolutionEnabled = prefs.videoMaxResolutionEnabled
         self.videoMaxResolutionLines = prefs.videoMaxResolutionLines
@@ -99,6 +105,8 @@ struct CompressionPreset: Codable, Identifiable {
         saveLocationRaw = try c.decodeIfPresent(String.self, forKey: .saveLocationRaw) ?? "sameFolder"
         filenameHandlingRaw = try c.decodeIfPresent(String.self, forKey: .filenameHandlingRaw) ?? "appendSuffix"
         customSuffix = try c.decodeIfPresent(String.self, forKey: .customSuffix) ?? "-dinky"
+        collisionNamingStyleRaw = try c.decodeIfPresent(String.self, forKey: .collisionNamingStyleRaw)
+            ?? CollisionNamingStyle.finderDuplicate.rawValue
         stripMetadata = try c.decodeIfPresent(Bool.self, forKey: .stripMetadata) ?? false
         sanitizeFilenames = try c.decodeIfPresent(Bool.self, forKey: .sanitizeFilenames) ?? false
         openFolderWhenDone = try c.decodeIfPresent(Bool.self, forKey: .openFolderWhenDone) ?? false
@@ -112,13 +120,15 @@ struct CompressionPreset: Codable, Identifiable {
         presetCustomFolderBookmark = try c.decodeIfPresent(Data.self, forKey: .presetCustomFolderBookmark) ?? Data()
         contentTypeHintRaw = try c.decodeIfPresent(String.self, forKey: .contentTypeHintRaw) ?? "auto"
         presetMediaScopeRaw = try c.decodeIfPresent(String.self, forKey: .presetMediaScopeRaw) ?? PresetMediaScope.all.rawValue
-        pdfOutputModeRaw = try c.decodeIfPresent(String.self, forKey: .pdfOutputModeRaw) ?? PDFOutputMode.preserveStructure.rawValue
+        pdfOutputModeRaw = try c.decodeIfPresent(String.self, forKey: .pdfOutputModeRaw) ?? PDFOutputMode.flattenPages.rawValue
         pdfQualityRaw = try c.decodeIfPresent(String.self, forKey: .pdfQualityRaw) ?? PDFQuality.medium.rawValue
         let storedVideoQuality = try c.decodeIfPresent(String.self, forKey: .videoQualityRaw) ?? VideoQuality.high.rawValue
         // Migrates a persisted `"low"` (removed tier) to the closest remaining tier (`.medium`).
         videoQualityRaw = VideoQuality.resolve(storedVideoQuality).rawValue
         videoCodecFamilyRaw = try c.decodeIfPresent(String.self, forKey: .videoCodecFamilyRaw) ?? VideoCodecFamily.h264.rawValue
         pdfGrayscale = try c.decodeIfPresent(Bool.self, forKey: .pdfGrayscale) ?? false
+        pdfPreserveExperimentalRaw = try c.decodeIfPresent(String.self, forKey: .pdfPreserveExperimentalRaw)
+            ?? PDFPreserveExperimentalMode.none.rawValue
         videoRemoveAudio = try c.decodeIfPresent(Bool.self, forKey: .videoRemoveAudio) ?? false
         videoMaxResolutionEnabled = try c.decodeIfPresent(Bool.self, forKey: .videoMaxResolutionEnabled) ?? false
         videoMaxResolutionLines = try c.decodeIfPresent(Int.self, forKey: .videoMaxResolutionLines) ?? 1080
@@ -135,6 +145,7 @@ struct CompressionPreset: Codable, Identifiable {
         prefs.saveLocationRaw = saveLocationRaw
         prefs.filenameHandlingRaw = filenameHandlingRaw
         prefs.customSuffix = customSuffix
+        prefs.collisionNamingStyleRaw = collisionNamingStyleRaw
         prefs.stripMetadata = stripMetadata
         prefs.sanitizeFilenames = sanitizeFilenames
         prefs.openFolderWhenDone = openFolderWhenDone
@@ -153,6 +164,7 @@ struct CompressionPreset: Codable, Identifiable {
         prefs.videoQualityRaw = videoQualityRaw
         prefs.videoCodecFamilyRaw = videoCodecFamilyRaw
         prefs.pdfGrayscale = pdfGrayscale
+        prefs.pdfPreserveExperimentalRaw = pdfPreserveExperimentalRaw
         prefs.videoRemoveAudio = videoRemoveAudio
         prefs.videoMaxResolutionEnabled = videoMaxResolutionEnabled
         prefs.videoMaxResolutionLines = videoMaxResolutionLines

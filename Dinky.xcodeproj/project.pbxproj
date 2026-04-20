@@ -17,6 +17,7 @@
 		AA000004000000000000004 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89ED8C350A5D404EA5F1CCF6 /* PreferencesView.swift */; };
 		AA000005000000000000005 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE17DC818E44D3F88D6F88A /* Strings.swift */; };
 		AA000006000000000000006 /* ImageItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FFDD8F0AED14F8CA2C3F9A7 /* ImageItem.swift */; };
+		PE000001000000000000001 /* PDFPreserveExperimentalMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = PE100001000000000000001 /* PDFPreserveExperimentalMode.swift */; };
 		AA000007000000000000007 /* CompressionFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC05EE39C6DE4195A1EF551B /* CompressionFormat.swift */; };
 		AA000008000000000000008 /* DinkyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D3DAE858994431BC84C13F /* DinkyPreferences.swift */; };
 		AA000009000000000000009 /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D9DE1C999B470FBB27E454 /* DropZoneView.swift */; };
@@ -74,6 +75,7 @@
 		1983E259BC5A494A9D936B63 /* DinkyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DinkyApp.swift; sourceTree = "<group>"; };
 		4FE17DC818E44D3F88D6F88A /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
 		4FFDD8F0AED14F8CA2C3F9A7 /* ImageItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageItem.swift; sourceTree = "<group>"; };
+		PE100001000000000000001 /* PDFPreserveExperimentalMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFPreserveExperimentalMode.swift; sourceTree = "<group>"; };
 		56D9DE1C999B470FBB27E454 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
 		5B63EBD7088E4C9BAB7A45DC /* ResultsRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsRowView.swift; sourceTree = "<group>"; };
 		5BC7D00FC2B14EF09CB7F833 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -183,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				4FFDD8F0AED14F8CA2C3F9A7 /* ImageItem.swift */,
+				PE100001000000000000001 /* PDFPreserveExperimentalMode.swift */,
 				AC05EE39C6DE4195A1EF551B /* CompressionFormat.swift */,
 				F5D3DAE858994431BC84C13F /* DinkyPreferences.swift */,
 				CP100001000000000000001 /* CompressionPreset.swift */,
@@ -419,6 +422,7 @@
 				AA000004000000000000004 /* PreferencesView.swift in Sources */,
 				AA000005000000000000005 /* Strings.swift in Sources */,
 				AA000006000000000000006 /* ImageItem.swift in Sources */,
+				PE000001000000000000001 /* PDFPreserveExperimentalMode.swift in Sources */,
 				AA000007000000000000007 /* CompressionFormat.swift in Sources */,
 				AA000008000000000000008 /* DinkyPreferences.swift in Sources */,
 				AA000009000000000000009 /* DropZoneView.swift in Sources */,
@@ -614,7 +618,7 @@
 				CODE_SIGN_ENTITLEMENTS = Dinky/Dinky.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.4.0;
+				CURRENT_PROJECT_VERSION = 2.4.1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -627,7 +631,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.4.0;
+				MARKETING_VERSION = 2.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dinky.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -644,7 +648,7 @@
 				CODE_SIGN_ENTITLEMENTS = Dinky/Dinky.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.4.0;
+				CURRENT_PROJECT_VERSION = 2.4.1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -657,7 +661,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.4.0;
+				MARKETING_VERSION = 2.4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dinky.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

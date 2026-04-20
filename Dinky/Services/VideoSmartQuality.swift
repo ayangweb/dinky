@@ -1,8 +1,14 @@
 import Foundation
 import AVFoundation
+import os
 
 /// Heuristic video export tier from track metadata + content type.
 enum VideoSmartQuality {
+
+    private static let timingLog = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "dinky",
+        category: "VideoSmartQuality"
+    )
 
     /// What we picked + why. Surfaced in `CompressionResult` so the UI can show a chip.
     struct Decision: Sendable {
@@ -21,6 +27,12 @@ enum VideoSmartQuality {
 
     /// Same as ``decide(source:fallback:)`` but reuses a loaded ``AVURLAsset`` (avoids a second file open).
     static func decide(asset: AVURLAsset, fallback: VideoQuality) async -> Decision {
+        let t0 = CFAbsoluteTimeGetCurrent()
+        defer {
+            let elapsed = CFAbsoluteTimeGetCurrent() - t0
+            timingLog.debug("video.smartQuality.decide \(String(format: "%.3f", elapsed))s")
+        }
+
         let contentType = await VideoContentClassifier.classify(asset: asset)
         let isHDR = await detectHDR(asset: asset)
 

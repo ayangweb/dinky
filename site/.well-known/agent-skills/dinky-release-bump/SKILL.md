@@ -5,7 +5,9 @@ description: Checklist for keeping Dinky release strings in sync across repo and
 
 # Dinky — release string bump
 
-When shipping a new **X.Y.Z** DMG to GitHub Releases, update every pinned reference together:
+Use **`./release.sh X.Y.Z --bump-only`** to sync `project.pbxproj` + site URLs in one step (no build/git). Full ship: **`./release.sh X.Y.Z`** (Release build, DMG, zip, commit, tag, `gh release create`).
+
+When shipping a new **X.Y.Z** DMG to GitHub Releases, pinned references must match:
 
 1. **site/index.html** — `<title>`, meta descriptions, JSON-LD `downloadUrl` / `softwareVersion`, download button `href`, visible version line.
 2. **site/llms.txt** — “Download v…” link.

@@ -136,12 +136,12 @@ RU = {
     "This does not clear the per-session list in History.":
         "При этом список сеансов в «Истории» не очищается.",
     # PDF compression labels
-    "Compress at High": "Сжать с высоким качеством",
-    "Compress at Medium": "Сжать со средним качеством",
-    "Compress at Low": "Сжать с низким качеством",
-    "Re-compress at High": "Пересжать с высоким качеством",
-    "Re-compress at Medium": "Пересжать со средним качеством",
-    "Re-compress at Low": "Пересжать с низким качеством",
+    "Compress PDF at High": "Сжать PDF с высоким качеством",
+    "Compress PDF at Medium": "Сжать PDF со средним качеством",
+    "Compress PDF at Low": "Сжать PDF с низким качеством",
+    "Re-compress PDF at High": "Пересжать PDF с высоким качеством",
+    "Re-compress PDF at Medium": "Пересжать PDF со средним качеством",
+    "Re-compress PDF at Low": "Пересжать PDF с низким качеством",
     # Help-menu line
     "Dinky Help": "Справка Dinky",
     "Crash report — Dinky": "Отчёт о сбое — Dinky",
@@ -241,12 +241,12 @@ JA = {
     "Move to Trash": "ゴミ箱に入れる",
     "Permanent once the trash is emptied.": "ゴミ箱を空にすると元に戻せません。",
     # PDF compress phrasing
-    "Compress at High": "高で圧縮",
-    "Compress at Medium": "中で圧縮",
-    "Compress at Low": "低で圧縮",
-    "Re-compress at High": "高で再圧縮",
-    "Re-compress at Medium": "中で再圧縮",
-    "Re-compress at Low": "低で再圧縮",
+    "Compress PDF at High": "PDF を高で圧縮",
+    "Compress PDF at Medium": "PDF を中で圧縮",
+    "Compress PDF at Low": "PDF を低で圧縮",
+    "Re-compress PDF at High": "PDF を高で再圧縮",
+    "Re-compress PDF at Medium": "PDF を中で再圧縮",
+    "Re-compress PDF at Low": "PDF を低で再圧縮",
     # Help/window
     "Dinky Help": "Dinky ヘルプ",
     "Crash report — Dinky": "クラッシュレポート — Dinky",

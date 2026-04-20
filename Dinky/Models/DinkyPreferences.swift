@@ -44,6 +44,21 @@ enum FilenameHandling: String, CaseIterable, Identifiable {
     }
 }
 
+/// How to pick a new filename when the computed output path is already occupied.
+enum CollisionNamingStyle: String, CaseIterable, Identifiable {
+    case finderDuplicate = "finderDuplicate"
+    case finderNumbered = "finderNumbered"
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .finderDuplicate:
+            return String(localized: "“Copy”, “Copy 2”, …", comment: "Collision naming style: Finder duplicate.")
+        case .finderNumbered:
+            return String(localized: "“(1)”, “(2)”, …", comment: "Collision naming style: numbered parentheses.")
+        }
+    }
+}
+
 final class DinkyPreferences: ObservableObject {
 
     /// Stored `concurrentTasks` values allowed in Settings (legacy ints snap to these).
@@ -97,6 +112,11 @@ final class DinkyPreferences: ObservableObject {
         set { filenameHandlingRaw = newValue.rawValue }
     }
     @AppStorage("customSuffix")         var customSuffix: String = "-dinky"
+    @AppStorage("collisionNamingStyle") var collisionNamingStyleRaw: String = CollisionNamingStyle.finderDuplicate.rawValue
+    var collisionNamingStyle: CollisionNamingStyle {
+        get { CollisionNamingStyle(rawValue: collisionNamingStyleRaw) ?? .finderDuplicate }
+        set { collisionNamingStyleRaw = newValue.rawValue }
+    }
 
     // MARK: Format
     @AppStorage("defaultFormat")        var defaultFormatRaw: String = CompressionFormat.webp.rawValue
@@ -131,10 +151,14 @@ final class DinkyPreferences: ObservableObject {
 
     /// Parallel compression cap — always one of `concurrentCompressionTiers` (legacy values snap).
     var concurrentCompressionLimit: Int { Self.normalizedConcurrentTasks(concurrentTasks) }
+
+    /// When true, pending files are compressed largest-first so the batch tends to finish sooner (vs. smallest-first for quick early wins).
+    @AppStorage("batchLargestFirst") var batchLargestFirst: Bool = false
     @AppStorage("playSoundEffects")     var playSoundEffects: Bool = true
 
     // MARK: Finish
-    @AppStorage("openFolderWhenDone")   var openFolderWhenDone: Bool = false
+    @AppStorage("openFolderWhenDone")   var openFolderWhenDone: Bool = true
+    @AppStorage("showBatchSummaryDialog") var showBatchSummaryDialog: Bool = true
     @AppStorage("notifyWhenDone")       var notifyWhenDone: Bool = false
     @AppStorage("sanitizeFilenames")    var sanitizeFilenames: Bool = false
     @AppStorage("manualMode")           var manualMode: Bool = false
@@ -207,9 +231,9 @@ final class DinkyPreferences: ObservableObject {
     }
 
     // MARK: PDF / Video quality + options
-    @AppStorage("pdfOutputMode")  var pdfOutputModeRaw: String = PDFOutputMode.preserveStructure.rawValue
+    @AppStorage("pdfOutputMode")  var pdfOutputModeRaw: String = PDFOutputMode.flattenPages.rawValue
     var pdfOutputMode: PDFOutputMode {
-        get { PDFOutputMode(rawValue: pdfOutputModeRaw) ?? .preserveStructure }
+        get { PDFOutputMode(rawValue: pdfOutputModeRaw) ?? .flattenPages }
         set { pdfOutputModeRaw = newValue.rawValue }
     }
     @AppStorage("pdfQuality")     var pdfQualityRaw: String  = PDFQuality.medium.rawValue
@@ -231,6 +255,12 @@ final class DinkyPreferences: ObservableObject {
         set { videoCodecFamilyRaw = newValue.rawValue }
     }
     @AppStorage("pdfGrayscale")    var pdfGrayscale:    Bool = false
+    /// Experimental qpdf options for preserve-text mode (see `PDFPreserveExperimentalMode`).
+    @AppStorage("pdfPreserveExperimental") var pdfPreserveExperimentalRaw: String = PDFPreserveExperimentalMode.none.rawValue
+    var pdfPreserveExperimental: PDFPreserveExperimentalMode {
+        get { PDFPreserveExperimentalMode(rawValue: pdfPreserveExperimentalRaw) ?? .none }
+        set { pdfPreserveExperimentalRaw = newValue.rawValue }
+    }
     @AppStorage("videoRemoveAudio") var videoRemoveAudio: Bool = false
 
     /// Optional video downscale (mirrors images' Max width). Off → keeps source resolution.
@@ -549,7 +579,8 @@ final class DinkyPreferences: ObservableObject {
         stripMetadata: Bool,
         smartQuality: Bool,
         contentTypeHint: String,
-        goals: CompressionGoals
+        goals: CompressionGoals,
+        parallelCompressionLimit: Int
     ) {
         let d = UserDefaults.standard
         let strip = d.object(forKey: "stripMetadata") as? Bool ?? false
@@ -559,6 +590,47 @@ final class DinkyPreferences: ObservableObject {
         let maxW = maxWOn ? (d.object(forKey: "maxWidth") as? Int ?? 1920) : nil
         let maxFSOn = d.object(forKey: "maxFileSizeEnabled") as? Bool ?? false
         let maxFS = maxFSOn ? (d.object(forKey: "maxFileSizeKB") as? Int ?? 2048) : nil
-        return (strip, smart, hint, CompressionGoals(maxWidth: maxW, maxFileSizeKB: maxFS))
+        let concurrentRaw = d.object(forKey: "concurrentTasks") as? Int ?? 3
+        let parallelLimit = normalizedConcurrentTasks(concurrentRaw)
+        return (strip, smart, hint, CompressionGoals(maxWidth: maxW, maxFileSizeKB: maxFS), parallelLimit)
+    }
+
+    /// PDF compression defaults for Shortcuts — same keys as `@AppStorage` on this type.
+    static func pdfCompressionSettingsForIntent() -> (
+        outputMode: PDFOutputMode,
+        quality: PDFQuality,
+        grayscale: Bool,
+        stripMetadata: Bool,
+        preserveExperimental: PDFPreserveExperimentalMode
+    ) {
+        let d = UserDefaults.standard
+        let modeRaw = d.string(forKey: "pdfOutputMode") ?? PDFOutputMode.flattenPages.rawValue
+        let mode = PDFOutputMode(rawValue: modeRaw) ?? .flattenPages
+        let qRaw = d.string(forKey: "pdfQuality") ?? PDFQuality.medium.rawValue
+        let quality = PDFQuality(rawValue: qRaw) ?? .medium
+        let grayscale = d.object(forKey: "pdfGrayscale") as? Bool ?? false
+        let strip = d.object(forKey: "stripMetadata") as? Bool ?? false
+        let expRaw = d.string(forKey: "pdfPreserveExperimental") ?? PDFPreserveExperimentalMode.none.rawValue
+        let experimental = PDFPreserveExperimentalMode(rawValue: expRaw) ?? .none
+        return (mode, quality, grayscale, strip, experimental)
+    }
+
+    /// Video compression defaults for Shortcuts — same keys as `@AppStorage` on this type.
+    static func videoCompressionSettingsForIntent() -> (
+        quality: VideoQuality,
+        codec: VideoCodecFamily,
+        removeAudio: Bool,
+        maxResolutionLines: Int?
+    ) {
+        let d = UserDefaults.standard
+        let vqRaw = d.string(forKey: "videoQuality") ?? VideoQuality.high.rawValue
+        let quality = VideoQuality.resolve(vqRaw)
+        let codecRaw = d.string(forKey: "videoCodecFamily") ?? VideoCodecFamily.h264.rawValue
+        let codec = VideoCodecFamily(rawValue: codecRaw) ?? .h264
+        let removeAudio = d.object(forKey: "videoRemoveAudio") as? Bool ?? false
+        let maxOn = d.object(forKey: "videoMaxResolutionEnabled") as? Bool ?? false
+        let lines = d.object(forKey: "videoMaxResolutionLines") as? Int ?? 1080
+        let maxRes: Int? = maxOn ? lines : nil
+        return (quality, codec, removeAudio, maxRes)
     }
 }

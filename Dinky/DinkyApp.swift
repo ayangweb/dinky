@@ -53,6 +53,7 @@ struct DinkyApp: App {
                 Button(String(localized: "History…", comment: "Application menu: open compression history.")) {
                     NotificationCenter.default.post(name: .dinkyShowHistory, object: nil)
                 }
+                LastBatchSummaryCommands(vm: root.contentVM)
             }
             // Replace the default Help menu (which triggers the unhelpful
             // "Help isn't available for Dinky" alert because we don't ship
@@ -76,6 +77,20 @@ struct DinkyApp: App {
         }
         .defaultSize(width: 820, height: 600)
         .commandsRemoved()
+    }
+}
+
+// MARK: - Last batch summary (fixed shortcut)
+
+private struct LastBatchSummaryCommands: View {
+    @ObservedObject var vm: ContentViewModel
+
+    var body: some View {
+        Button(String(localized: "Last Batch Summary…", comment: "Application menu: reopen the last batch completion dialog.")) {
+            NotificationCenter.default.post(name: .dinkyShowLastBatchSummary, object: nil)
+        }
+        .disabled(vm.lastBatchSummary == nil)
+        .keyboardShortcut(DinkyFixedShortcut.showLastBatchSummary.shortcut.swiftUIKeyboardShortcut)
     }
 }
 
@@ -107,7 +122,7 @@ private struct DinkyShortcutCommands: View {
         }
         .keyboardShortcut(prefs.shortcut(for: .clearAll).swiftUIKeyboardShortcut)
 
-        Button(String(localized: "Toggle Sidebar", comment: "File menu: toggle format sidebar.")) {
+        Button(String(localized: "Format & Options Sidebar", comment: "File menu: toggle compression sidebar.")) {
             NotificationCenter.default.post(name: .dinkyToggleSidebar, object: nil)
         }
         .keyboardShortcut("\\", modifiers: [.command, .shift])

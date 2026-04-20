@@ -2,35 +2,69 @@ import AppKit
 import SwiftUI
 
 struct ResultsRowView: View {
+    /// Fixed blue for progress UI (bar + spinner) so it never picks up multicolor accent or system tint hues.
+    private static let progressBarTint = Color(red: 0.28, green: 0.56, blue: 1)
+    /// Matches prior `listRowSeparatorTint` — full-width line drawn in-row because AppKit list separators stop short of trailing actions.
+    private static let rowDividerColor = Color.primary.opacity(0.08)
+
     @ObservedObject var item: CompressionItem
     let selectedFormat: CompressionFormat
+    /// When false, omit the bottom hairline (used for the last row in the queue list).
+    var showBottomDivider: Bool = true
     var onForceCompress: () -> Void = {}
     var onCancelDownload: () -> Void = {}
+    var onPDFFlattenSmallestRetry: () -> Void = {}
+    var onPDFPreserveExperimentalRetry: (PDFPreserveExperimentalMode) -> Void = { _ in }
     @EnvironmentObject var prefs: DinkyPreferences
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    /// Matches drop zone “compressing” treatment; respects system + in-app Reduce Motion.
+    private var shouldReduceMotion: Bool { prefs.reduceMotion || accessibilityReduceMotion }
+    private var rowProgressAnimation: Animation {
+        shouldReduceMotion ? .linear(duration: 0.18) : .spring(response: 0.42, dampingFraction: 0.86)
+    }
     @State private var showingError = false
     @State private var showingPreview = false
     @State private var showingSkippedInfo = false
     @State private var showingZeroGainInfo = false
-    @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 6) {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
                 // Content-type / media-type chip
-                if item.mediaType == .image, let type = item.detectedContentType {
-                    contentTypeChip(type)
-                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                        .fixedSize()
-                        .help(type.tooltipLabel)
-                } else if item.mediaType == .pdf, let pages = item.pageCount {
-                    mediaChip("\(pages)p")
-                        .help(String(localized: "\(pages) pages", comment: "Tooltip: PDF page count."))
+                if item.mediaType == .image {
+                    if let type = item.detectedContentType {
+                        contentTypeChip(type)
+                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                            .fixedSize()
+                            .help(type.tooltipLabel)
+                    } else {
+                        mediaChip(String(localized: "image", comment: "Results row: generic image chip until Smart Quality classifies (photo / graphic / mixed)."))
+                            .help(String(localized: "Image file", comment: "Tooltip for generic image type chip."))
+                    }
+                    if item.usedFirstFrameOnly, case .done = item.status {
+                        mediaChip(String(localized: "First frame", comment: "Results row: multi-frame source was compressed as a single frame."))
+                            .fixedSize()
+                            .help(String(localized: "Animation or other frames were omitted; only the first frame was compressed.", comment: "Tooltip: first-frame-only chip."))
+                            .accessibilityLabel(String(localized: "First frame only", comment: "VoiceOver: first-frame-only chip."))
+                    }
+                } else if item.mediaType == .pdf {
+                    if let pages = item.pageCount {
+                        mediaChip("\(pages)p")
+                            .help(String(localized: "\(pages) pages", comment: "Tooltip: PDF page count."))
+                    } else {
+                        mediaChip(String(localized: "pdf", comment: "Results row: generic PDF chip until page count is known."))
+                            .help(String(localized: "PDF document", comment: "Tooltip for generic PDF type chip."))
+                    }
                 } else if item.mediaType == .video {
                     if let type = item.detectedVideoContentType {
                         videoContentTypeChip(type)
                             .transition(.opacity.combined(with: .scale(scale: 0.9)))
                             .fixedSize()
                             .help(type.tooltipLabel)
+                    } else {
+                        mediaChip(String(localized: "video", comment: "Results row: generic video chip when content type was not classified (e.g. Smart Quality off)."))
+                            .help(String(localized: "Video file", comment: "Tooltip for generic video type chip."))
                     }
                     if item.videoIsHDR {
                         hdrBadge
@@ -45,9 +79,15 @@ struct ResultsRowView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(rowTitle)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(rowTitle)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                        if let preset = appliedPreset {
+                            presetBadge(preset).fixedSize(horizontal: true, vertical: false)
+                        }
+                    }
                     if case .pending = item.status {
                         Text(pendingOutputLastPathComponent())
                             .font(.system(size: 9, design: .monospaced))
@@ -62,24 +102,34 @@ struct ResultsRowView: View {
                             .truncationMode(.middle)
                     }
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .animation(.easeInOut(duration: 0.2), value: item.detectedContentType)
-            .animation(.easeInOut(duration: 0.2), value: item.detectedVideoContentType)
-            .animation(.easeInOut(duration: 0.2), value: item.videoIsHDR)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(.easeInOut(duration: 0.2), value: item.detectedContentType)
+                .animation(.easeInOut(duration: 0.2), value: item.pageCount)
+                .animation(.easeInOut(duration: 0.2), value: item.detectedVideoContentType)
+                .animation(.easeInOut(duration: 0.2), value: item.videoIsHDR)
+                .animation(.easeInOut(duration: 0.2), value: item.usedFirstFrameOnly)
 
-            sizeInfo
-            statusChip
+                sizeInfo
+                statusChip
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+
+            if showBottomDivider {
+                Rectangle()
+                    .fill(Self.rowDividerColor)
+                    .frame(height: 1)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityRowLabel)
         .accessibilityHint(String(localized: "Double-click to open in the default app. Drag the row to move the file.", comment: "VoiceOver hint for result row."))
-        .onHover { isHovering = $0 }
         .sheet(isPresented: $showingError) {
             if case .failed(let error) = item.status {
-                ErrorDetailView(filename: item.filename, error: error)
+                CompressionErrorDetailView(filename: item.filename, error: error)
             }
         }
         .sheet(isPresented: $showingPreview) {
@@ -87,7 +137,7 @@ struct ResultsRowView: View {
         }
         .sheet(isPresented: $showingSkippedInfo) {
             if case .skipped(let savedPercent, let threshold) = item.status {
-                SkippedDetailView(
+                CompressionSkippedDetailView(
                     filename: item.filename,
                     savedPercent: savedPercent,
                     threshold: threshold,
@@ -97,10 +147,16 @@ struct ResultsRowView: View {
         }
         .sheet(isPresented: $showingZeroGainInfo) {
             if case .zeroGain(let attemptedSize) = item.status {
-                ZeroGainDetailView(
+                CompressionZeroGainDetailView(
                     filename: item.filename,
                     originalSize: item.originalSize,
-                    attemptedSize: attemptedSize
+                    attemptedSize: attemptedSize,
+                    isPDF: item.mediaType == .pdf,
+                    pdfOutputMode: item.zeroGainPDFOutputMode,
+                    onTryFlattenSmallest: item.mediaType == .pdf ? onPDFFlattenSmallestRetry : nil,
+                    onTryPreserveExperimental: (item.mediaType == .pdf && (item.zeroGainPDFOutputMode == .preserveStructure || item.zeroGainPDFOutputMode == nil))
+                        ? onPDFPreserveExperimentalRetry
+                        : nil
                 )
             }
         }
@@ -113,8 +169,37 @@ struct ResultsRowView: View {
         return item.filename
     }
 
+    /// Row was queued with a preset when non-nil.
+    private var appliedPreset: CompressionPreset? {
+        guard let id = item.presetID else { return nil }
+        return prefs.savedPresets.first(where: { $0.id == id })
+    }
+
+    private func presetBadge(_ preset: CompressionPreset) -> some View {
+        let matchesActive = (prefs.activePresetID == preset.id.uuidString)
+        return Text(preset.name)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(matchesActive ? Color.accentColor : Color.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(matchesActive ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.06))
+            )
+            .help(String(localized: "Preset: \(preset.name)", comment: "Tooltip: row uses this preset; argument is preset name."))
+            .accessibilityLabel(String(localized: "Preset \(preset.name)", comment: "VoiceOver: preset badge; argument is name."))
+    }
+
     private var accessibilityRowLabel: String {
-        "\(rowTitle), \(item.statusLabel)"
+        var base = "\(rowTitle), \(item.statusLabel)"
+        if let p = appliedPreset {
+            base += ", " + String(localized: "Preset \(p.name)", comment: "VoiceOver preset suffix; argument is preset name.")
+        }
+        if item.mediaType == .image, item.usedFirstFrameOnly, case .done = item.status {
+            base += ", " + String(localized: "First frame only", comment: "VoiceOver: first-frame-only chip.")
+        }
+        return base
     }
 
     /// Expected output filename while the row is still queued (matches `CompressionPreset` / `DinkyPreferences` URL rules).
@@ -186,15 +271,38 @@ struct ResultsRowView: View {
         case .downloading(let progress, _, let totalBytes, let displayHost):
             HStack(spacing: 8) {
                 if let t = totalBytes, t > 0 {
-                    ProgressView(value: progress, total: 1)
-                        .scaleEffect(0.72)
-                        .frame(width: 52)
+                    HStack(spacing: 5) {
+                        if !shouldReduceMotion {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11, weight: .semibold))
+                                .symbolRenderingMode(.monochrome)
+                                .foregroundStyle(Self.progressBarTint.opacity(0.95))
+                                .symbolEffect(.rotate, options: .repeating)
+                                .accessibilityHidden(true)
+                        }
+                        ProgressView(value: progress, total: 1)
+                            .scaleEffect(0.72)
+                            .frame(width: 52)
+                            .tint(Self.progressBarTint)
+                    }
+                    .animation(rowProgressAnimation, value: progress)
                     Text("\(Int((progress * 100).rounded(.towardZero)))%")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                 } else {
-                    ProgressView()
-                        .scaleEffect(0.65)
+                    HStack(spacing: 5) {
+                        if !shouldReduceMotion {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11, weight: .semibold))
+                                .symbolRenderingMode(.monochrome)
+                                .foregroundStyle(Self.progressBarTint.opacity(0.95))
+                                .symbolEffect(.rotate, options: .repeating)
+                                .accessibilityHidden(true)
+                        }
+                        ProgressView()
+                            .scaleEffect(0.65)
+                            .tint(Self.progressBarTint)
+                    }
                     Text(String(localized: "Fetching", comment: "Download status indeterminate size."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -213,19 +321,43 @@ struct ResultsRowView: View {
 
         case .processing:
             Group {
-                if item.mediaType == .video, let p = item.videoExportProgress {
+                if let p = item.compressionProgress {
                     HStack(spacing: 6) {
-                        ProgressView(value: p, total: 1)
-                            .scaleEffect(0.72)
-                            .frame(width: 52)
+                        HStack(spacing: 5) {
+                            if !shouldReduceMotion {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .symbolRenderingMode(.monochrome)
+                                    .foregroundStyle(Self.progressBarTint.opacity(0.95))
+                                    .symbolEffect(.rotate, options: .repeating)
+                                    .accessibilityHidden(true)
+                            }
+                            ProgressView(value: p, total: 1)
+                                .scaleEffect(0.72)
+                                .frame(width: 52)
+                                .tint(Self.progressBarTint)
+                        }
+                        .animation(rowProgressAnimation, value: p)
                         Text("\(Int((p * 100).rounded(.towardZero)))%")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
+                            .contentTransition(.numericText())
+                            .animation(rowProgressAnimation, value: p)
                     }
-                    .help(String(localized: "Encoding video — \(Int((p * 100).rounded(.towardZero))) percent", comment: "Tooltip; argument is percent."))
+                    .help(String(localized: "Compressing — \(Int((p * 100).rounded(.towardZero))) percent", comment: "Tooltip; argument is percent."))
                 } else {
                     HStack(spacing: 5) {
-                        ProgressView().scaleEffect(0.65)
+                        if !shouldReduceMotion {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11, weight: .semibold))
+                                .symbolRenderingMode(.monochrome)
+                                .foregroundStyle(Self.progressBarTint.opacity(0.95))
+                                .symbolEffect(.rotate, options: .repeating)
+                                .accessibilityHidden(true)
+                        }
+                        ProgressView()
+                            .scaleEffect(0.65)
+                            .tint(Self.progressBarTint)
                         Text(String(localized: "Working", comment: "Compression in progress label."))
                     }
                     .help(String(localized: "Compression in progress", comment: "Tooltip for processing row."))
@@ -268,38 +400,22 @@ struct ResultsRowView: View {
             }
 
         case .skipped(let savedPercent, let threshold):
-            Group {
-                if isHovering {
-                    Button { onForceCompress() } label: {
-                        Text(String(localized: "Compress anyway", comment: "Force compress skipped file."))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .fixedSize()
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.08)))
-                    }
-                    .buttonStyle(.plain)
-                    .help(String(localized: "Force compress even if savings are minimal", comment: "Tooltip."))
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                } else {
-                    Button { showingSkippedInfo = true } label: {
-                        chip(String(localized: "Skipped", comment: "Status chip."), color: .secondary.opacity(0.35), fg: .primary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(skippedTooltip(savedPercent: savedPercent, threshold: threshold))
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
+            Button { showingSkippedInfo = true } label: {
+                infoStatusChip(String(localized: "Skipped", comment: "Status chip."))
             }
-            .animation(.easeInOut(duration: 0.15), value: isHovering)
+            .buttonStyle(.plain)
+            .help(skippedTooltip(savedPercent: savedPercent, threshold: threshold))
 
         case .zeroGain(let attemptedSize):
             Button { showingZeroGainInfo = true } label: {
-                chip(String(localized: "No gain", comment: "Status chip: no size reduction."), color: .secondary.opacity(0.35), fg: .primary)
+                infoStatusChip(String(localized: "No gain", comment: "Status chip: no size reduction."))
             }
             .buttonStyle(.plain)
-            .help(zeroGainTooltip(originalSize: item.originalSize, attemptedSize: attemptedSize))
+            .help(zeroGainTooltip(
+                originalSize: item.originalSize,
+                attemptedSize: attemptedSize,
+                pdfOutputMode: item.mediaType == .pdf ? item.zeroGainPDFOutputMode : nil
+            ))
 
         case .failed:
             Button { showingError = true } label: {
@@ -329,6 +445,20 @@ struct ResultsRowView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(color))
+    }
+
+    /// Skipped / no-gain status: same capsule as `chip`, with an info affordance like the error row’s icon + label.
+    private func infoStatusChip(_ title: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "info.circle.fill")
+                .imageScale(.small)
+            Text(title)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.secondary.opacity(0.35)))
     }
 
     private func mediaChip(_ label: String) -> some View {
@@ -401,8 +531,12 @@ private func bytes(_ n: Int64) -> String {
         return String(localized: "Already optimized — encoder couldn't make it smaller. Click for details.", comment: "Skipped tooltip.")
     }
 
-    private func zeroGainTooltip(originalSize: Int64, attemptedSize: Int64) -> String {
+    private func zeroGainTooltip(originalSize: Int64, attemptedSize: Int64, pdfOutputMode: PDFOutputMode?) -> String {
         let diff = attemptedSize - originalSize
+        if pdfOutputMode == .preserveStructure, diff > 0 {
+            return String(format: String(localized: "System PDF rewrite would have been %.2f MB larger (not saved). Click for details.", comment: "Zero-gain tooltip: preserve PDF."),
+                          Double(diff) / 1_048_576)
+        }
         if diff > 0 {
             return String(format: String(localized: "Compressed version was %.2f MB larger. Original kept. Click for details.", comment: "Zero-gain tooltip."),
                           Double(diff) / 1_048_576)
@@ -442,293 +576,5 @@ private struct FileTypeIcon: View {
                 .foregroundStyle(color)
         }
         .frame(width: 28, height: 24)
-    }
-}
-
-// MARK: - Error detail sheet
-
-private struct ErrorDetailView: View {
-    let filename: String
-    let error: Error
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.red.opacity(0.12))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(Color.red)
-                        .font(.system(size: 18))
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Compression Failed", comment: "Error sheet title."))
-                        .font(.headline)
-                    Text(filename)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                Spacer()
-
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .symbolRenderingMode(.hierarchical)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(20)
-
-            Divider()
-
-            // Error message
-            ScrollView {
-                Text(error.localizedDescription)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
-                    .textSelection(.enabled)
-            }
-            .frame(maxHeight: 220)
-
-            Divider()
-
-            // Footer
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Button(String(localized: "Email Error…", comment: "Send error by email.")) {
-                        NSWorkspace.shared.open(
-                            DiagnosticsReporter.emailURL(
-                                subject: String(localized: "Error — \(filename)", comment: "Email subject; argument is filename."),
-                                extraBody: error.localizedDescription
-                            )
-                        )
-                    }
-                    Button(String(localized: "GitHub Issue…", comment: "Open GitHub issue for error.")) {
-                        NSWorkspace.shared.open(
-                            DiagnosticsReporter.githubIssueURL(
-                                title: String(localized: "Error: \(filename)", comment: "Issue title; argument is filename."),
-                                extraBody: error.localizedDescription
-                            )
-                        )
-                    }
-                    Spacer()
-                    Button(String(localized: "Dismiss", comment: "Close sheet.")) { dismiss() }
-                        .keyboardShortcut(.defaultAction)
-                }
-                Text(String(localized: "Tip: check that cwebp / avifenc are present in the app bundle.", comment: "Error sheet footer."))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-        }
-        .frame(width: 420)
-        .background(.ultraThinMaterial)
-    }
-}
-
-// MARK: - Skipped detail sheet
-
-private struct SkippedDetailView: View {
-    let filename: String
-    let savedPercent: Double?
-    let threshold: Int
-    let onForceCompress: () -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    private var headlineText: String {
-        if let p = savedPercent {
-            return String(format: String(localized: "Would only save %.1f%%", comment: "Skipped detail headline."), p)
-        }
-        return String(localized: "Already at minimum size", comment: "Skipped detail headline.")
-    }
-
-    private var bodyText: String {
-        if let p = savedPercent {
-            return String(format:
-                String(localized: "Dinky compressed this file but the result was only %.1f%% smaller — under your %d%% threshold, so the original was kept.\n\nLower the threshold in Settings → General → Skip if savings below to compress files like this automatically, or click Compress Anyway to force this one.", comment: "Skipped detail body."),
-                p, threshold)
-        }
-        return String(localized: "The encoder couldn't make this file any smaller. It's likely already optimized for its format.\n\nForcing compression won't help here, but you can try a different format (e.g. WebP or AVIF) from the sidebar.", comment: "Skipped detail body.")
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.18))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 18))
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(headlineText).font(.headline)
-                    Text(filename)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                Spacer()
-
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .symbolRenderingMode(.hierarchical)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(20)
-
-            Divider()
-
-            ScrollView {
-                Text(bodyText)
-                    .font(.system(.body))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxHeight: 220)
-
-            Divider()
-
-            HStack {
-                if savedPercent != nil {
-                    Button(String(localized: "Compress Anyway", comment: "Force compress from sheet.")) { onForceCompress() }
-                }
-                Spacer()
-                Button(String(localized: "Dismiss", comment: "Close sheet.")) { dismiss() }
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-        }
-        .frame(width: 420)
-        .background(.ultraThinMaterial)
-    }
-}
-
-// MARK: - Zero-gain detail sheet
-
-private struct ZeroGainDetailView: View {
-    let filename: String
-    let originalSize: Int64
-    let attemptedSize: Int64
-    @Environment(\.dismiss) private var dismiss
-
-    private var diffText: String {
-        let diff = attemptedSize - originalSize
-        let mb = Double(abs(diff)) / 1_048_576
-        if diff > 0 {
-            return String(format: String(localized: "%.2f MB larger", comment: "Comparison: output larger than original."), mb)
-        }
-        return String(localized: "the same size", comment: "Comparison: file sizes equal.")
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.18))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "arrow.uturn.backward.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 18))
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "No size gain", comment: "Zero-gain sheet title.")).font(.headline)
-                    Text(filename)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                Spacer()
-
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .symbolRenderingMode(.hierarchical)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(20)
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    sizePill(String(localized: "Original", comment: "Size pill label."), value: bytes(originalSize))
-                    Image(systemName: "arrow.right").foregroundStyle(.tertiary)
-                    sizePill(String(localized: "Compressed", comment: "Size pill label."), value: bytes(attemptedSize), highlight: true)
-                }
-
-                Text(String(localized: "The compressed version was \(diffText) than the original, so Dinky kept the original.\n\nThis usually happens with files that are already heavily optimized, or when re-encoding to a format that doesn't suit the content (e.g. lossy → lossless). Try a different format from the sidebar, or leave this file as-is.", comment: "Zero-gain explanation; argument describes size relationship phrase."))
-                    .font(.system(.body))
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(20)
-
-            Divider()
-
-            HStack {
-                Spacer()
-                Button(String(localized: "Dismiss", comment: "Close sheet.")) { dismiss() }
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-        }
-        .frame(width: 420)
-        .background(.ultraThinMaterial)
-    }
-
-    private func bytes(_ n: Int64) -> String {
-        String(format: String(localized: "%.2f MB", comment: "File size with megabytes unit."), Double(n) / 1_048_576)
-    }
-
-    private func sizePill(_ label: String, value: String, highlight: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            Text(value)
-                .font(.system(.body, design: .monospaced))
-                .foregroundStyle(highlight ? .primary : .secondary)
-                .fontWeight(highlight ? .semibold : .regular)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
-        )
     }
 }

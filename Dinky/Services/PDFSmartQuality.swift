@@ -31,6 +31,16 @@ enum PDFSmartQuality {
         let avgSpread = spreads.reduce(0, +) / Double(spreads.count)
         let avgFill = fills.reduce(0, +) / Double(fills.count)
 
+        // Colorful decks (capabilities, portfolios): Medium/High flatten often loses to already-tuned JPEGs — default to strongest tiers.
+        if bytesPerPage >= 85_000, bytesPerPage < 560_000 {
+            if avgSpread > 0.065 || avgFill > 0.11 {
+                return .smallest
+            }
+            if avgSpread > 0.045 {
+                return .low
+            }
+        }
+
         return mapSignals(bytesPerPage: bytesPerPage, avgChromaSpread: avgSpread, avgNonWhiteFill: avgFill)
     }
 
@@ -112,21 +122,46 @@ enum PDFSmartQuality {
     }
 
     private static func mapSignals(bytesPerPage: Double, avgChromaSpread: Double, avgNonWhiteFill: Double) -> PDFQuality {
-        if bytesPerPage > 1_400_000 {
+        // Low bytes/page usually means efficient embedded images or vector text — Medium/High flatten often bloats.
+        if bytesPerPage < 260_000 {
+            if avgChromaSpread < 0.035, avgNonWhiteFill < 0.07 {
+                return .smallest
+            }
+            if avgChromaSpread < 0.055, avgNonWhiteFill < 0.12 {
+                return .low
+            }
+            return .low
+        }
+        // Large per-page byte counts: embedded images are often already efficient — avoid High/Medium flatten that bloats.
+        if bytesPerPage > 520_000 {
+            if avgChromaSpread > 0.14 || avgNonWhiteFill > 0.32 {
+                return .low
+            }
+            return .smallest
+        }
+        // Reserve High for very large, visually heavy pages only (flatten is expensive and easy to oversize).
+        if bytesPerPage > 2_300_000, avgChromaSpread > 0.10 || avgNonWhiteFill > 0.25 {
             return .high
         }
-        if bytesPerPage > 650_000, avgNonWhiteFill > 0.18 {
+        if bytesPerPage > 1_350_000, avgChromaSpread > 0.115, avgNonWhiteFill > 0.27 {
+            return .high
+        }
+        if bytesPerPage > 880_000, avgNonWhiteFill > 0.20, avgChromaSpread > 0.09 {
             return .high
         }
         if avgChromaSpread > 0.11, avgNonWhiteFill > 0.28 {
-            return .medium
+            // Bias toward smaller flatten tiers when pages are already byte-heavy to avoid JPEG bloat vs source.
+            return bytesPerPage > 240_000 ? .low : .medium
         }
-        if bytesPerPage > 320_000, avgNonWhiteFill > 0.14 {
-            return .medium
+        if bytesPerPage > 380_000, avgNonWhiteFill > 0.14 {
+            return .low
+        }
+        if avgChromaSpread < 0.035, avgNonWhiteFill < 0.07, bytesPerPage < 95_000 {
+            return .smallest
         }
         if avgChromaSpread < 0.045, avgNonWhiteFill < 0.11, bytesPerPage < 180_000 {
             return .low
         }
-        return .medium
+        return .low
     }
 }

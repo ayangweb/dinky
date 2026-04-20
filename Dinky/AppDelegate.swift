@@ -59,8 +59,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let acceptedUTIs = [
         "public.jpeg", "public.png", "org.webmproject.webp",
         "public.avif", "public.tiff", "com.microsoft.bmp",
+        "public.heic", "public.heif",
+        "public.gif", "com.compuserve.gif",
         "com.adobe.pdf",
-        "public.mpeg-4", "com.apple.quicktime-movie", "public.m4v-video"
+        "public.mpeg-4", "com.apple.quicktime-movie", "public.m4v-video",
+        "public.avi",
     ]
 
     private func acceptedURLs(from urls: [URL]) -> [URL] {

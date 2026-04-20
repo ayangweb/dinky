@@ -15,6 +15,8 @@ extension Notification.Name {
     static let dinkyCheckUpdates  = Notification.Name("dinkyCheckUpdates")
     static let dinkyPasteClipboard  = Notification.Name("dinkyPasteClipboard")
     static let dinkyShowHistory     = Notification.Name("dinkyShowHistory")
+    /// Re-present the last completed batch summary (menu / shortcut).
+    static let dinkyShowLastBatchSummary = Notification.Name("dinkyShowLastBatchSummary")
     /// `object` is `PreferencesTab.rawValue` (Int)
     static let dinkySelectPreferencesTab = Notification.Name("dinkySelectPreferencesTab")
     static let dinkyClearAll            = Notification.Name("dinkyClearAll")
@@ -84,6 +86,14 @@ enum S {
         String(localized: "How many files crunch at once — not image, video, or PDF quality. Fast is gentle; Fastest clears the queue sooner if your Mac is up for it.", comment: "Settings: explains batch parallelism tiers.")
     }
 
+    /// Settings › General › Compression — optional largest-first batch order.
+    static var batchLargestFirstLabel: String {
+        String(localized: "Start with largest files", comment: "Settings: toggle to schedule big files first in a batch.")
+    }
+    static var batchLargestFirstFootnote: String {
+        String(localized: "When enabled, the longest jobs run first so the batch tends to finish sooner. The default is smallest first for faster early feedback.", comment: "Settings: explains batch ordering toggle.")
+    }
+
     static func concurrentCompressionTierOption(limit: Int) -> String {
         switch limit {
         case 1: return "Fast — one at a time, dinky zen"
@@ -133,7 +143,7 @@ enum S {
         String(localized: "For watch folders, presets, and full troubleshooting, open Dinky Help from the Help menu (\(helpMenuShortcut)).", comment: "Settings Shortcuts tab footer; argument is help shortcut.")
     }
     static var shortcutsAppDescription: String {
-        String(localized: "Dinky exposes a Compress Images action to the Shortcuts app. Use it to pipe files from Finder or other actions through Dinky with a chosen format — same engine as in-app compression (Smart quality, resize, and metadata follow Settings).", comment: "Settings: Shortcuts app integration description.")
+        String(localized: "Dinky exposes Compress Images, Compress PDFs, and Compress Videos actions in the Shortcuts app. Pipe files from Finder or other actions through Dinky — same engines as in-app compression (images: format + Smart quality + resize + metadata; PDF and video follow Settings for those types).", comment: "Settings: Shortcuts app integration description.")
     }
 
     static var shortcutsCustomizableHeader: String { String(localized: "Customize", comment: "Settings Shortcuts section header.") }

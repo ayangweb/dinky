@@ -59,20 +59,9 @@ struct SidebarView: View {
     @State private var contentHeight: CGFloat? = nil
 
     @AppStorage("sidebar.expanded.presets") private var expandedPresets = false
+    /// Simple-mode “What to expect” detail map; default off so new sessions start collapsed.
+    @AppStorage("sidebar.expandedOutcomeMap") private var expandedOutcomeMap = false
     @AppStorage("sidebar.selectedScope") private var scopeRaw: String = SidebarScope.images.rawValue
-
-    private let widthPresets: [(String, Int)] = [
-        ("640 px", 640), ("1080 px", 1080), ("1280 px", 1280),
-        ("1920 px", 1920), ("2560 px", 2560), ("3840 px", 3840)
-    ]
-    private let sizePresets: [(String, Int)] = [
-        ("0.5 MB", 512), ("1 MB", 1024), ("2 MB", 2048),
-        ("5 MB", 5120), ("10 MB", 10240)
-    ]
-    /// Output-height options for video downscale (matches Apple's available `AVAssetExportPreset…` heights).
-    private let videoResolutionPresets: [(String, Int)] = [
-        ("480p", 480), ("720p", 720), ("1080p", 1080), ("2160p", 2160)
-    ]
 
     private var presetActive: Bool { !prefs.activePresetID.isEmpty }
 
@@ -103,7 +92,7 @@ struct SidebarView: View {
                     fullSidebarChrome
                 }
             }
-            .padding(10)
+            .padding(12)
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             // ScrollView proposes unbounded vertical space; without this the stack stretches and the
             // height preference / glass panel match the window instead of the real content.
@@ -188,9 +177,9 @@ struct SidebarView: View {
     private var simpleModeExtras: some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
-                sidebarSectionHeading(icon: "slider.horizontal.2.square.on.square", title: "Quick choices")
+                settingsSectionHeading(icon: "slider.horizontal.2.square.on.square", title: "Quick choices")
 
-                Toggle("Choose formats automatically", isOn: Binding(
+                Toggle(String(localized: "Choose formats automatically", comment: "Sidebar simple mode: auto image format."), isOn: Binding(
                     get: { prefs.autoFormat }, set: { prefs.autoFormat = $0 }
                 ))
                 .font(.system(size: 11))
@@ -201,39 +190,27 @@ struct SidebarView: View {
                         selectedFormat: $selectedFormat,
                         showActiveDescription: false
                     )
-
-                    // The chips above only affect images. Videos and PDFs each have their own
-                    // format story — call it out so the picker isn't read as a global setting.
-                    // Only shown when chips are visible; with auto on, picking a format isn't a
-                    // question the user is asking, so the clarifier would just be noise.
-                    VStack(alignment: .leading, spacing: 3) {
-                        formatNoteRow(icon: "film", text: "Videos always export as MP4 — pick H.264 or HEVC in All options.")
-                        formatNoteRow(icon: "doc.text", text: "PDFs stay as PDFs — preserve text or flatten under All options.")
-                    }
-                    .padding(.top, 2)
                 }
 
-                Toggle("Tune compression from content", isOn: Binding(
+                Toggle(String(localized: "Pick strength automatically for each file", comment: "Sidebar simple mode: smart quality; applies to images, PDFs, and video."), isOn: Binding(
                     get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
                 ))
                 .font(.system(size: 11))
+                .accessibilityHint(String(localized: "When on, Dinky sets compression for each image, PDF, and video. Turn off to use fixed tiers from the full sidebar.", comment: "VoiceOver: simple mode smart quality."))
 
-                Text(simpleQuickSummary)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                simpleModeOutcomeMap
 
                 Toggle("Open the folder when finished", isOn: Binding(
                     get: { prefs.openFolderWhenDone }, set: { prefs.openFolderWhenDone = $0 }
                 ))
                 .font(.system(size: 11))
             }
-            .padding(.vertical, 10)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.primary.opacity(0.05)))
 
             VStack(alignment: .leading, spacing: 6) {
-                sidebarSectionHeading(icon: "folder", title: "Where files go")
+                settingsSectionHeading(icon: "folder", title: "Where files go")
                 Text(outputDestinationLine)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -249,12 +226,12 @@ struct SidebarView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(Color.accentColor)
             }
-            .padding(.vertical, 10)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.primary.opacity(0.05)))
 
             VStack(alignment: .leading, spacing: 4) {
-                sidebarSectionHeading(icon: "arrow.up.right.square", title: "Shortcuts")
+                settingsSectionHeading(icon: "arrow.up.right.square", title: "Shortcuts")
                 settingsShortcutRow(title: "Presets", systemImage: "slider.horizontal.3") {
                     openPreferences(.presets)
                 }
@@ -265,7 +242,7 @@ struct SidebarView: View {
                     openPreferences(.general)
                 }
             }
-            .padding(.vertical, 10)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.primary.opacity(0.05)))
 
@@ -286,18 +263,196 @@ struct SidebarView: View {
         }
     }
 
-    /// One short line under the simple-mode toggles (full detail lives in All options).
-    private var simpleQuickSummary: String {
+    /// Per–file-type outcomes for Quick choices — collapsible; friendly line + technical detail.
+    private var simpleModeOutcomeMap: some View {
+        Group {
+            if expandedOutcomeMap {
+                simpleModeOutcomeMapStack
+                    .accessibilityElement(children: .contain)
+            } else {
+                simpleModeOutcomeMapStack
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        String(
+                            localized: "What to expect, collapsed. How Dinky handles photos, documents, video, and saved files. Activate the header to show friendly and technical details.",
+                            comment: "VoiceOver: collapsed What to expect block."
+                        )
+                    )
+            }
+        }
+    }
+
+    private var simpleModeOutcomeMapStack: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { expandedOutcomeMap.toggle() }
+            } label: {
+                HStack(alignment: .center, spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(expandedOutcomeMap ? 90 : 0))
+                        .animation(.easeInOut(duration: 0.2), value: expandedOutcomeMap)
+                    Text(String(localized: "What to expect", comment: "Heading above simple-mode outcome rows."))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(String(localized: "What to expect", comment: "Heading above simple-mode outcome rows."))
+            .accessibilityHint(
+                expandedOutcomeMap
+                    ? String(localized: "Collapses the list of details.", comment: "VoiceOver: What to expect header when expanded.")
+                    : String(localized: "Expands friendly and technical details for each type.", comment: "VoiceOver: What to expect header when collapsed.")
+            )
+
+            if !expandedOutcomeMap {
+                Text(String(localized: "How Dinky handles photos, documents, video, and saved files — expand for details.", comment: "Collapsed teaser under What to expect header."))
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityHidden(true)
+            }
+
+            if expandedOutcomeMap {
+                VStack(alignment: .leading, spacing: 8) {
+                    simpleModeOutcomeRow(
+                        icon: "photo",
+                        title: String(localized: "Images", comment: "Outcome map row title."),
+                        friendly: simpleModeImageOutcomeFriendly(),
+                        technical: simpleModeImageOutcomeTechnical()
+                    )
+                    simpleModeOutcomeRow(
+                        icon: "doc.text",
+                        title: String(localized: "PDFs", comment: "Outcome map row title."),
+                        friendly: simpleModePDFFriendly(),
+                        technical: simpleModePDFTechnical()
+                    )
+                    simpleModeOutcomeRow(
+                        icon: "film",
+                        title: String(localized: "Videos", comment: "Outcome map row title."),
+                        friendly: simpleModeVideoFriendly(),
+                        technical: simpleModeVideoTechnical()
+                    )
+                    simpleModeOutcomeRow(
+                        icon: "square.and.arrow.up",
+                        title: String(localized: "Output", comment: "Outcome map row title; matches Output scope tab."),
+                        friendly: simpleModeOutputFriendly(),
+                        technical: simpleModeOutputOutcome()
+                    )
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private func simpleModeOutcomeRow(icon: String, title: String, friendly: String, technical: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.accentColor.opacity(0.9))
+                .frame(width: 16, alignment: .center)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(0.9))
+                Text(friendly)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+                Text(technical)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            String.localizedStringWithFormat(
+                String(localized: "%@. %@ %@", comment: "VoiceOver: one outcome row; title, friendly sentence, technical sentence."),
+                title, friendly, technical
+            )
+        )
+    }
+
+    private func simpleModeImageOutcomeFriendly() -> String {
         if prefs.smartQuality {
             if prefs.autoFormat {
-                return "Automatic format and compression for each file."
+                return String(localized: "Chooses a modern format and strength for each photo automatically.", comment: "Outcome map friendly: images, smart, auto format.")
             }
-            return "Compression per file; image format follows the chip above."
+            return String(localized: "Uses your format chip and still tweaks strength per image.", comment: "Outcome map friendly: images, smart, manual format.")
         }
         if prefs.autoFormat {
-            return "WebP or AVIF per image. Other types: use All options."
+            return String(localized: "Picks WebP or AVIF; you set the overall strength style in All options.", comment: "Outcome map friendly: images, fixed tiers, auto format.")
         }
-        return "Fine-tune image, video, and PDF defaults in All options."
+        return String(localized: "Uses your format chips; strength style lives in All options.", comment: "Outcome map friendly: images, fixed tiers, manual format.")
+    }
+
+    private func simpleModeImageOutcomeTechnical() -> String {
+        if prefs.smartQuality {
+            if prefs.autoFormat {
+                return String(localized: "Auto WebP or AVIF from each image; compression strength adapts per file.", comment: "Simple outcome: images, smart on, auto format on.")
+            }
+            return String(
+                format: String(localized: "%@ from the chips; compression strength adapts per file.", comment: "Simple outcome: images, smart on, manual format; argument is format name."),
+                selectedFormat.displayName
+            )
+        }
+        if prefs.autoFormat {
+            return String(localized: "Auto WebP or AVIF; strength style (Photo / Graphic / Mixed) in All options… below.", comment: "Simple outcome: images, smart off, auto format.")
+        }
+        return String(
+            format: String(localized: "%@ from the chips; strength style in All options… below.", comment: "Simple outcome: images, smart off, manual format; argument is format name."),
+            selectedFormat.displayName
+        )
+    }
+
+    private func simpleModePDFFriendly() -> String {
+        if prefs.smartQuality {
+            return String(localized: "Balances size and readability; you choose text vs flatten in All options.", comment: "Outcome map friendly: PDFs smart.")
+        }
+        return String(localized: "You control flattening, quality, and grayscale in All options.", comment: "Outcome map friendly: PDFs fixed.")
+    }
+
+    private func simpleModePDFTechnical() -> String {
+        if prefs.smartQuality {
+            return String(localized: "PDF: flatten or keep text (All options…); tier chosen per file when flattening.", comment: "Simple outcome: PDFs with smart quality.")
+        }
+        return String(localized: "PDF: preserve vs flatten, quality, and grayscale in All options… below.", comment: "Simple outcome: PDFs without smart quality.")
+    }
+
+    private func simpleModeVideoFriendly() -> String {
+        if prefs.smartQuality {
+            return String(localized: "Adjusts quality per clip; bright HDR footage is handled sensibly.", comment: "Outcome map friendly: video smart.")
+        }
+        return String(localized: "You pick codec, quality, and max resolution in All options.", comment: "Outcome map friendly: video fixed.")
+    }
+
+    private func simpleModeVideoTechnical() -> String {
+        if prefs.smartQuality {
+            return String(localized: "MP4: encoding strength adapts per clip (HDR uses HEVC when needed).", comment: "Simple outcome: videos with smart quality.")
+        }
+        return String(localized: "MP4: codec (H.264 / HEVC), quality, and resolution cap in All options… below.", comment: "Simple outcome: videos without smart quality.")
+    }
+
+    private func simpleModeOutputFriendly() -> String {
+        String(localized: "Saves where you chose in Settings; optionally reveals the folder when done.", comment: "Outcome map friendly: output.")
+    }
+
+    private func simpleModeOutputOutcome() -> String {
+        let dest = outputDestinationLine
+        let naming = outputFilenameLine
+        let reveal = prefs.openFolderWhenDone
+            ? String(localized: "Opens the output folder when finished.", comment: "Simple outcome: open folder when done on.")
+            : String(localized: "Leaves the window as-is (does not open the folder).", comment: "Simple outcome: open folder when done off.")
+        return "\(dest); \(naming). \(reveal)"
     }
 
     // MARK: - Full sidebar (scoped)
@@ -305,7 +460,7 @@ struct SidebarView: View {
     private var fullSidebarChrome: some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 6) {
-                sidebarSectionHeading(icon: "slider.horizontal.3", title: "Adjust")
+                settingsSectionHeading(icon: "slider.horizontal.3", title: "Adjust")
                 scopeTabBar
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -324,42 +479,18 @@ struct SidebarView: View {
         }
     }
 
-    /// Four equal columns: icon + short title. Uses `minWidth: 0` so labels scale instead of overflowing.
+    /// Segmented control — clearer than ultra-small tab labels in a narrow sidebar.
     private var scopeTabBar: some View {
-        HStack(spacing: 3) {
+        Picker(String(localized: "Adjust scope", comment: "Accessibility: sidebar Images/PDFs/Videos/Output scope."), selection: $scopeRaw) {
             ForEach(availableScopes) { scope in
-                let selected = effectiveScope == scope
-                Button {
-                    scopeRaw = scope.rawValue
-                } label: {
-                    VStack(spacing: 2) {
-                        Image(systemName: scope.icon)
-                            .font(.system(size: 11, weight: .medium))
-                            .frame(height: 14)
-                        Text(scope.tabShortTitle)
-                            .font(.system(size: 8.5, weight: selected ? .semibold : .medium))
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.5)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .center)
-                    .padding(.vertical, 3)
-                    .padding(.horizontal, 1)
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(selected ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.05))
-                    )
-                }
-                .buttonStyle(.plain)
-                .frame(minWidth: 0, maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .accessibilityLabel(scope.title)
-                .help(scope.title)
+                Text(scope.tabShortTitle)
+                    .tag(scope.rawValue)
+                    .accessibilityLabel(scope.title)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(maxWidth: .infinity)
     }
 
     private var sidebarSectionsFooter: some View {
@@ -406,20 +537,28 @@ struct SidebarView: View {
 
     private var outputDestinationLine: String {
         switch prefs.saveLocation {
-        case .sameFolder: return "Saves next to originals"
-        case .downloads:  return "Saves to Downloads"
+        case .sameFolder:
+            return String(localized: "Saves next to originals", comment: "Output summary: save location.")
+        case .downloads:
+            return String(localized: "Saves to Downloads", comment: "Output summary: save location.")
         case .custom:
             return prefs.customFolderDisplayPath.isEmpty
-                ? "Custom folder (not set in Settings)"
+                ? String(localized: "Custom folder (not set in Settings)", comment: "Output summary: custom folder unset.")
                 : URL(fileURLWithPath: prefs.customFolderDisplayPath).lastPathComponent
         }
     }
 
     private var outputFilenameLine: String {
         switch prefs.filenameHandling {
-        case .appendSuffix:  return "Adds “-dinky” before the extension"
-        case .replaceOrigin: return "Replaces the original"
-        case .customSuffix:  return "Custom suffix: \(prefs.customSuffix)"
+        case .appendSuffix:
+            return String(localized: "Adds “-dinky” before the extension", comment: "Output summary: filename handling.")
+        case .replaceOrigin:
+            return String(localized: "Replaces the original", comment: "Output summary: filename handling.")
+        case .customSuffix:
+            return String.localizedStringWithFormat(
+                String(localized: "Custom suffix: %@", comment: "Output summary; argument is suffix string."),
+                prefs.customSuffix
+            )
         }
     }
 
@@ -440,20 +579,20 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var imagesContent: some View {
-        subHeader(icon: "photo.on.rectangle.angled", "Format")
+        settingsSubHeader(icon: "photo.on.rectangle.angled", "Format")
         FormatChipPicker(
             autoFormat: Binding(get: { prefs.autoFormat }, set: { prefs.autoFormat = $0 }),
             selectedFormat: $selectedFormat
         )
 
-        sectionDivider
+        SettingsSectionDivider()
 
-        subHeader(icon: "wand.and.stars", "Quality")
-        Toggle("Smart quality", isOn: Binding(
+        settingsSubHeader(icon: "wand.and.stars", "Quality")
+        Toggle(String(localized: "Smart quality (all types)", comment: "Sidebar: global smart quality for images, PDF, and video."), isOn: Binding(
             get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
         )).font(.system(size: 11))
         if prefs.smartQuality {
-            helper("Picks encoder strength per image from content (photo vs. graphic). Videos and PDFs are tuned per file too — see those tabs.")
+            settingsHelperText(String(localized: "Picks encoder strength per image from content (photo vs. graphic). The same switch tunes PDF tiers and video strength — use the PDF and Video tabs for related options.", comment: "Sidebar Images: smart quality on helper."))
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -468,15 +607,15 @@ struct SidebarView: View {
             ))
         }
 
-        sectionDivider
+        SettingsSectionDivider()
 
-        subHeader(icon: "arrow.left.and.right", "Max width")
+        settingsSubHeader(icon: "arrow.left.and.right", "Max width")
         Toggle("Resize to a maximum width", isOn: Binding(
             get: { prefs.maxWidthEnabled }, set: { prefs.maxWidthEnabled = $0 }
         )).toggleStyle(.switch).font(.system(size: 11))
         if prefs.maxWidthEnabled {
             VStack(alignment: .leading, spacing: 8) {
-                chipGrid(presets: widthPresets, current: prefs.maxWidth, fixedColumnCount: 3) { prefs.maxWidth = $0 }
+                settingsChipGrid(presets: settingsWidthPresets, current: prefs.maxWidth, fixedColumnCount: 3) { prefs.maxWidth = $0 }
                 HStack(spacing: 6) {
                     TextField("1920", value: Binding(
                         get: { prefs.maxWidth }, set: { prefs.maxWidth = max(1, $0) }
@@ -484,7 +623,7 @@ struct SidebarView: View {
                     .textFieldStyle(.roundedBorder).frame(width: 70)
                     Text(String(localized: "px", comment: "Unit: pixels.")).font(.system(size: 10)).foregroundStyle(.secondary)
                 }
-                helper("Try 1920 for web, 1280 for social, 640 for email.")
+                settingsHelperText("Try 1920 for web, 1280 for social, 640 for email.")
             }
             .transition(.asymmetric(
                 insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
@@ -492,15 +631,15 @@ struct SidebarView: View {
             ))
         }
 
-        sectionDivider
+        SettingsSectionDivider()
 
-        subHeader(icon: "gauge.with.dots.needle.67percent", "Max file size")
+        settingsSubHeader(icon: "gauge.with.dots.needle.67percent", "Max file size")
         Toggle("Target a smaller file size", isOn: Binding(
             get: { prefs.maxFileSizeEnabled }, set: { prefs.maxFileSizeEnabled = $0 }
         )).toggleStyle(.switch).font(.system(size: 11))
         if prefs.maxFileSizeEnabled {
             VStack(alignment: .leading, spacing: 8) {
-                chipGrid(presets: sizePresets, current: prefs.maxFileSizeKB) { prefs.maxFileSizeKB = $0 }
+                settingsChipGrid(presets: settingsSizePresets, current: prefs.maxFileSizeKB) { prefs.maxFileSizeKB = $0 }
                 HStack(spacing: 6) {
                     TextField("2", value: Binding(
                         get: { prefs.maxFileSizeMB }, set: { prefs.maxFileSizeMB = $0 }
@@ -508,7 +647,7 @@ struct SidebarView: View {
                     .textFieldStyle(.roundedBorder).frame(width: 70)
                     Text(String(localized: "MB", comment: "Unit: megabytes.")).font(.system(size: 10)).foregroundStyle(.secondary)
                 }
-                helper("Encoder aims near this cap; exact size varies by image.")
+                settingsHelperText("Encoder aims near this cap; exact size varies by image.")
             }
             .transition(.asymmetric(
                 insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
@@ -558,17 +697,17 @@ struct SidebarView: View {
     @ViewBuilder
     private var pdfsContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            subHeader(icon: "doc.text.viewfinder", "Output")
+            settingsSubHeader(icon: "doc.text.viewfinder", "Output")
             VStack(alignment: .leading, spacing: 4) {
                 pdfOutputModeChoice(
                     .preserveStructure,
-                    title: "Preserve text & links",
-                    subtitle: "Keeps selectable text, links, and forms. Good for documents you still need to copy from."
+                    title: String(localized: "Preserve text and links", comment: "Sidebar PDF mode title."),
+                    subtitle: String(localized: "Best-effort size: qpdf stream optimization, then PDFKit. Often no gain on exports that are already optimized. Keeps selectable text, links, and forms.", comment: "Sidebar PDF preserve mode subtitle.")
                 )
                 pdfOutputModeChoice(
                     .flattenPages,
-                    title: "Flatten (smallest)",
-                    subtitle: "Turns each page into an image. Smallest files; use quality and grayscale below."
+                    title: String(localized: "Smallest file (flatten pages)", comment: "Sidebar PDF mode title."),
+                    subtitle: String(localized: "Default for real compression: each page becomes a JPEG image. Use quality and optional grayscale below. No text selection.", comment: "Sidebar PDF flatten mode subtitle.")
                 )
             }
             .accessibilityElement(children: .contain)
@@ -576,8 +715,23 @@ struct SidebarView: View {
 
             if prefs.pdfOutputMode == .preserveStructure {
                 VStack(alignment: .leading, spacing: 4) {
-                    helper("Rewrites the PDF and strips metadata. Text, links, and forms stay usable. File size may change a little.")
-                    helper("Quality tiers and grayscale apply when you choose Flatten (smallest).")
+                    settingsHelperText(String(localized: "Tries qpdf first (stream recompression), then PDFKit. Output is only kept when smaller than the original. Expect “no gain” on many web and export PDFs — that is normal. For reliable shrink, use Smallest file (flatten pages).", comment: "Sidebar PDF: preserve mode size expectations."))
+                    settingsHelperText(String(localized: "Quality tiers and grayscale apply when you choose Smallest file (flatten pages).", comment: "Sidebar PDF: flatten options pointer."))
+
+                    SettingsSectionDivider()
+
+                    settingsSubHeader(icon: "flask", String(localized: "Advanced (experimental)", comment: "Sidebar PDF: experimental preserve subsection."))
+                    Picker(String(localized: "Experimental preserve pass", comment: "Sidebar PDF: VoiceOver label for experimental picker."), selection: Binding(
+                        get: { prefs.pdfPreserveExperimental },
+                        set: { prefs.pdfPreserveExperimental = $0 }
+                    )) {
+                        ForEach(PDFPreserveExperimentalMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    settingsHelperText(String(localized: "Optional extra qpdf steps when normal preserve isn’t enough. Can affect tagged PDF structure or image sharpness. Use Off unless you need more shrink while keeping text and links.", comment: "Sidebar PDF: experimental preserve risk copy."))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .transition(.asymmetric(
@@ -587,30 +741,30 @@ struct SidebarView: View {
             }
 
             if prefs.pdfOutputMode == .flattenPages {
-                sectionDivider
+                SettingsSectionDivider()
 
-                subHeader(icon: "doc.richtext", "Quality")
+                settingsSubHeader(icon: "doc.richtext", "Quality")
                 QualityChipPicker(
                     options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
                     selected: Binding(get: { prefs.pdfQualityRaw }, set: { prefs.pdfQualityRaw = $0 })
                 )
                 .disabled(prefs.smartQuality)
                 if prefs.smartQuality {
-                    helper("Dinky picks a tier from each document. Turn off Smart quality under Images for a fixed Low / Medium / High. Manual tier is still used as a fallback if analysis fails.")
+                    settingsHelperText(String(localized: "Dinky picks a tier from each document. Turn off Smart quality (all types) in Images or Video to set a fixed Low / Medium / High here. Manual tier is still used as a fallback if analysis fails.", comment: "Sidebar PDF: smart flatten helper."))
                         .transition(.asymmetric(
                             insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                             removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
                         ))
                 }
 
-                sectionDivider
+                SettingsSectionDivider()
 
-                subHeader(icon: "circle.lefthalf.filled", "Color")
+                settingsSubHeader(icon: "circle.lefthalf.filled", "Color")
                 Toggle("Grayscale PDF", isOn: Binding(
                     get: { prefs.pdfGrayscale }, set: { prefs.pdfGrayscale = $0 }
                 )).font(.system(size: 11))
                 if prefs.pdfGrayscale {
-                    helper("Smaller files when color isn’t needed.")
+                    settingsHelperText("Smaller files when color isn’t needed.")
                         .transition(.asymmetric(
                             insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                             removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -623,20 +777,20 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var videosContent: some View {
-        subHeader(icon: "film", "Format")
+        settingsSubHeader(icon: "film", "Format")
         QualityChipPicker(
             options: VideoCodecFamily.allCases.map { ($0.chipLabel, $0.rawValue, $0.description) },
             selected: Binding(get: { prefs.videoCodecFamilyRaw }, set: { prefs.videoCodecFamilyRaw = $0 })
         )
 
-        sectionDivider
+        SettingsSectionDivider()
 
-        subHeader(icon: "wand.and.stars", "Quality")
-        Toggle("Smart quality", isOn: Binding(
+        settingsSubHeader(icon: "wand.and.stars", "Quality")
+        Toggle(String(localized: "Smart quality (all types)", comment: "Sidebar: global smart quality for images, PDF, and video."), isOn: Binding(
             get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
         )).font(.system(size: 11))
         if prefs.smartQuality {
-            helper("Picks Balanced or High per clip from resolution, source bitrate, and content (screen recordings and animation / motion graphics get nudged up so text and edges stay crisp). HDR sources are exported with HEVC to preserve color.")
+            settingsHelperText(String(localized: "Picks Balanced or High per clip from resolution, source bitrate, and content (screen recordings and animation / motion graphics get nudged up so text and edges stay crisp). HDR sources are exported with HEVC to preserve color.", comment: "Sidebar Video: smart quality on helper."))
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -652,37 +806,37 @@ struct SidebarView: View {
             ))
         }
 
-        sectionDivider
+        SettingsSectionDivider()
 
-        subHeader(icon: "arrow.down.right.and.arrow.up.left", "Max resolution")
+        settingsSubHeader(icon: "arrow.down.right.and.arrow.up.left", "Max resolution")
         Toggle("Cap output resolution", isOn: Binding(
             get: { prefs.videoMaxResolutionEnabled }, set: { prefs.videoMaxResolutionEnabled = $0 }
         )).toggleStyle(.switch).font(.system(size: 11))
         if prefs.videoMaxResolutionEnabled {
             VStack(alignment: .leading, spacing: 8) {
-                chipGrid(
-                    presets: videoResolutionPresets,
+                settingsChipGrid(
+                    presets: settingsVideoResolutionPresets,
                     current: prefs.videoMaxResolutionLines,
                     fixedColumnCount: 4
                 ) { prefs.videoMaxResolutionLines = $0 }
-                helper("Smaller output by limiting height. Source resolution is kept when below the cap. Smart quality below ignores this.")
+                settingsHelperText(String(localized: "Smaller output by limiting height. Source resolution is kept when below the cap. Smart quality still picks Balanced or High per clip; when this is on, output size is capped.", comment: "Sidebar Video: max resolution + smart quality note."))
             }
             .transition(.asymmetric(
                 insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                 removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
             ))
         } else {
-            helper("Off keeps source resolution and just re-encodes for size. Turn this on to downscale large clips.")
+            settingsHelperText("Off keeps source resolution and just re-encodes for size. Turn this on to downscale large clips.")
         }
 
-        sectionDivider
+        SettingsSectionDivider()
 
-        subHeader(icon: "speaker.wave.2", "Audio")
+        settingsSubHeader(icon: "speaker.wave.2", "Audio")
         Toggle("Strip audio track", isOn: Binding(
             get: { prefs.videoRemoveAudio }, set: { prefs.videoRemoveAudio = $0 }
         )).font(.system(size: 11))
         if prefs.videoRemoveAudio {
-            helper("Best for screen recordings or silent clips.")
+            settingsHelperText("Best for screen recordings or silent clips.")
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -692,12 +846,12 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var outputContent: some View {
-        subHeader(icon: "square.and.arrow.up", "Output")
+        settingsSubHeader(icon: "square.and.arrow.up", "Output")
         Toggle("Reveal saved files in Finder", isOn: Binding(
             get: { prefs.openFolderWhenDone }, set: { prefs.openFolderWhenDone = $0 }
         )).font(.system(size: 11))
         if prefs.openFolderWhenDone {
-            helper("Opens the folder so you can grab outputs right away.")
+            settingsHelperText("Opens the folder so you can grab outputs right away.")
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -708,7 +862,7 @@ struct SidebarView: View {
             get: { prefs.stripMetadata }, set: { prefs.stripMetadata = $0 }
         )).font(.system(size: 11))
         if prefs.stripMetadata {
-            helper("Removes EXIF, location, and camera data when supported.")
+            settingsHelperText("Removes EXIF, location, and camera data when supported.")
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -719,7 +873,7 @@ struct SidebarView: View {
             get: { prefs.sanitizeFilenames }, set: { prefs.sanitizeFilenames = $0 }
         )).font(.system(size: 11))
         if prefs.sanitizeFilenames {
-            helper("Lowercase, hyphens for spaces, max 75 characters.")
+            settingsHelperText("Lowercase, hyphens for spaces, max 75 characters.")
                 .transition(.asymmetric(
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
@@ -730,31 +884,6 @@ struct SidebarView: View {
             openPreferences(.output)
         }
         .padding(.top, 4)
-    }
-
-    // MARK: - Sub-section helpers
-
-    private var sectionDivider: some View {
-        Divider().padding(.vertical, 4)
-    }
-
-    /// Matches ``sectionGroup`` title row: icon + 13pt semibold (see Presets).
-    private func sidebarSectionHeading(icon: String, title: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 6)
-    }
-
-    private func subHeader(icon: String, _ title: String) -> some View {
-        sidebarSectionHeading(icon: icon, title: title)
     }
 
     // MARK: - Preset summary
@@ -787,7 +916,9 @@ struct SidebarView: View {
             Divider().padding(.top, 4).padding(.bottom, 8)
             VStack(alignment: .leading, spacing: 8) {
                 summaryRow("photo",   preset.autoFormat ? "Auto" : preset.format.displayName)
-                if preset.smartQuality { summaryRow("wand.and.stars", "Smart quality") }
+                if preset.smartQuality {
+                    summaryRow("wand.and.stars", String(localized: "Smart quality (all types)", comment: "Preset summary line."))
+                }
                 summaryRow("arrow.left.and.right",
                            preset.maxWidthEnabled ? "Max \(preset.maxWidth) px" : "No width limit")
                 if preset.maxFileSizeEnabled {
@@ -802,7 +933,7 @@ struct SidebarView: View {
                     : "source"
                 summaryRow("video",
                            "\(vidCodec.chipLabel) · \(resCap)\(preset.videoRemoveAudio ? " · no audio" : "")")
-                let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .preserveStructure
+                let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
                 if pdfMode == .flattenPages {
                     let pdfQ = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
                     summaryRow("doc.richtext",
@@ -830,67 +961,6 @@ struct SidebarView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.primary.opacity(0.85))
         }
-    }
-
-    // MARK: - Chip grid
-
-    /// - Parameter fixedColumnCount: When set (e.g. `3` for six width presets), uses a balanced fixed grid; otherwise `.adaptive` packing.
-    private func chipGrid(
-        presets: [(String, Int)],
-        current: Int,
-        fixedColumnCount: Int? = nil,
-        onSelect: @escaping (Int) -> Void
-    ) -> some View {
-        let columns: [GridItem]
-        if let count = fixedColumnCount, count > 0 {
-            columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: count)
-        } else {
-            columns = [GridItem(.adaptive(minimum: 50), spacing: 4)]
-        }
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
-            ForEach(presets, id: \.1) { label, value in
-                let active = current == value
-                Text(label)
-                    .font(.system(size: 11, weight: active ? .semibold : .regular))
-                    .foregroundStyle(active ? .white : .secondary)
-                    .padding(.horizontal, 6).padding(.vertical, 4)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(active ? AnyShapeStyle(dinkyGradient) : AnyShapeStyle(Color.primary.opacity(0.08)))
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { onSelect(value) }
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func helper(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10))
-            .foregroundStyle(.tertiary)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    /// Compact icon + caption row used under the simple-sidebar format picker to clarify
-    /// that the picker is image-only — videos and PDFs have their own format behavior.
-    private func formatNoteRow(icon: String, text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .frame(width: 12, alignment: .center)
-            Text(text)
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -956,12 +1026,7 @@ struct SidebarView: View {
     }
 }
 
-/// MARK: - Shared chip pickers
-
-let dinkyGradient = LinearGradient(
-    colors: [Color(red: 0.25, green: 0.55, blue: 1.0), Color(red: 0.45, green: 0.30, blue: 0.95)],
-    startPoint: .leading, endPoint: .trailing
-)
+// MARK: - Shared chip pickers
 
 struct FormatChipPicker: View {
     @Binding var autoFormat: Bool

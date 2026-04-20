@@ -3,6 +3,8 @@ import SwiftUI
 struct HistorySheet: View {
     @EnvironmentObject var prefs: DinkyPreferences
     @Environment(\.dismiss) private var dismiss
+    /// When set, rows with stored batch summary data show “Open Summary…”.
+    var onOpenSessionSummary: ((SessionRecord) -> Void)?
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -83,21 +85,28 @@ struct HistorySheet: View {
 
     private var historyList: some View {
         List(prefs.sessionHistory) { record in
-            HStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(dateFormatter.string(from: record.timestamp))
                         .font(.caption.weight(.medium))
                     Text(record.formats.joined(separator: ", "))
                         .font(.system(size: 10))
                         .foregroundStyle(.tertiary)
+                    if let onOpenSessionSummary, record.batchSummaryData != nil {
+                        Button(String(localized: "Open Summary…", comment: "History row: reopen stored batch completion dialog.")) {
+                            onOpenSessionSummary(record)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                        .help(String(localized: "Show the file list and stats from this compression run.", comment: "History Open Summary tooltip."))
+                    }
                 }
 
-                Spacer()
+                Spacer(minLength: 0)
 
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(record.fileCount == 1
-                         ? String(localized: "1 file", comment: "History row file count singular.")
-                         : String(localized: "\(record.fileCount) files", comment: "History row file count plural."))
+                    Text(historySessionFileCountLabel(record.fileCount))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(formattedSize(record.totalBytesSaved) + String(localized: " saved", comment: "Suffix after size in history row."))
@@ -110,6 +119,13 @@ struct HistorySheet: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+    }
+
+    private func historySessionFileCountLabel(_ count: Int) -> String {
+        String.localizedStringWithFormat(
+            NSLocalizedString("history_session_file_count", bundle: .main, comment: "History row; plural by file count."),
+            count
+        )
     }
 
     private func formattedSize(_ bytes: Int64) -> String {

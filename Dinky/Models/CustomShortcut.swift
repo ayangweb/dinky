@@ -44,12 +44,15 @@ enum DinkyFixedShortcut {
     case toggleSidebar
     case dinkyHelp
     case settings
+    case showLastBatchSummary
 
     var title: String {
         switch self {
-        case .toggleSidebar: return String(localized: "Toggle Sidebar", comment: "Menu: show or hide format sidebar.")
+        case .toggleSidebar: return String(localized: "Format & Options Sidebar", comment: "Menu: show or hide compression sidebar.")
         case .dinkyHelp: return String(localized: "Dinky Help", comment: "Menu: open help window.")
         case .settings: return String(localized: "Settings", comment: "Menu: open app settings.")
+        case .showLastBatchSummary:
+            return String(localized: "Last Batch Summary…", comment: "Application menu: reopen the last batch completion dialog.")
         }
     }
 
@@ -61,10 +64,12 @@ enum DinkyFixedShortcut {
             return CustomShortcut(key: "?", modifiers: [.command, .shift])
         case .settings:
             return CustomShortcut(key: ",", modifiers: .command)
+        case .showLastBatchSummary:
+            return CustomShortcut(key: "b", modifiers: [.command, .option])
         }
     }
 
-    static let allCases: [DinkyFixedShortcut] = [.toggleSidebar, .dinkyHelp, .settings]
+    static let allCases: [DinkyFixedShortcut] = [.toggleSidebar, .dinkyHelp, .settings, .showLastBatchSummary]
 }
 
 // MARK: - CustomShortcut

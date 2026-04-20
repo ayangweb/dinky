@@ -7,7 +7,8 @@ Dinky.app/Contents/Resources/bin/
 ├── cjpeg      ← MozJPEG
 ├── cwebp      ← libwebp / Google WebP
 ├── oxipng     ← OxiPNG
-└── avifenc    ← libavif
+├── avifenc    ← libavif
+└── qpdf       ← QPDF (preserve-mode structural optimize; needs `lib/*.dylib` — see below)
 ```
 
 After placing binaries, make them executable:
@@ -57,3 +58,22 @@ cp /opt/homebrew/bin/avifenc            bin/
 chmod +x bin/*
 xattr -d com.apple.quarantine bin/* 2>/dev/null || true
 ```
+
+### qpdf (PDF structure / streams)
+
+Homebrew’s `qpdf` links to `libqpdf`, `jpeg-turbo`, and `openssl@3`. After copying the binary into `bin/`, copy the dylibs into `../lib/` and fix loader paths (Apple Silicon example):
+
+```bash
+brew install qpdf
+cp /opt/homebrew/bin/qpdf bin/
+cp /opt/homebrew/opt/qpdf/lib/libqpdf.*.dylib ../lib/
+cp /opt/homebrew/opt/jpeg-turbo/lib/libjpeg.*.dylib ../lib/
+cp /opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib ../lib/
+
+chmod +x bin/qpdf
+install_name_tool -change @rpath/libqpdf.30.dylib @loader_path/lib/libqpdf.30.3.2.dylib bin/qpdf
+# Xcode copies `bin/qpdf` into the app bundle’s `Resources/` root, so use `@loader_path/lib/…` (same folder as `cwebp`), not `../lib`.
+# Point libqpdf at vendored libjpeg + libcrypto (see `otool -L` on your copies).
+```
+
+Then re-sign in Xcode’s “Re-sign bundled binaries” phase (or `codesign -s - --force` on `qpdf` and each dylib).

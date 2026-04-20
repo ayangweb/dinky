@@ -4,6 +4,8 @@ import UserNotifications
 import Darwin
 import AppKit
 import PDFKit
+import AVFoundation
+import CoreMedia
 
 enum PasteClipboardResult {
     case added
@@ -31,6 +33,19 @@ final class ContentViewModel: ObservableObject {
     @Published var items: [ImageItem] = []
     @Published var isProcessing = false
     @Published var phase: DropZonePhase = .idle
+    @Published var pendingBatchSummary: CompressionBatchSummary?
+    /// Undo UI for the batch sheet (false when opened from History).
+    @Published var pendingBatchSummarySupportsUndo: Bool = true
+    /// Latest completed batch snapshot for **Last Batch Summary…** (menu / shortcut); cleared with **Clear All** or when no done rows remain.
+    @Published var lastBatchSummary: CompressionBatchSummary?
+    /// When true, `scheduleAutoClearAfterBatch` runs after the batch summary sheet is dismissed.
+    private var pendingAutoClearAfterBatchSummary = false
+    @Published var undoErrorMessage: String?
+    /// True after the user stopped a run early; shows **Continue** to resume pending files.
+    @Published var compressionInterrupted: Bool = false
+    /// When manual mode is off, shows **Compress Now** after Undo from the batch sheet (undo does not auto-start a run).
+    @Published var needsExplicitCompressAfterUndo: Bool = false
+    private var compressionTask: Task<Void, Never>?
     private var compressionStartTime: Date = .now
 
     /// Limits parallel `URLDownloader` work when many links are dropped at once.
@@ -93,13 +108,14 @@ final class ContentViewModel: ObservableObject {
     func recompress(_ item: CompressionItem, as format: CompressionFormat) {
         item.formatOverride = format
         item.forceCompress = true
+        item.undoSnapshot = nil
         item.status = .pending
         compress()
     }
 
     func effectivePDFOutputMode(for item: CompressionItem) -> PDFOutputMode {
         let p = item.presetID.flatMap { id in prefs.savedPresets.first(where: { $0.id == id }) }
-        return p.map { PDFOutputMode(rawValue: $0.pdfOutputModeRaw) ?? .preserveStructure } ?? prefs.pdfOutputMode
+        return p.map { PDFOutputMode(rawValue: $0.pdfOutputModeRaw) ?? .flattenPages } ?? prefs.pdfOutputMode
     }
 
     func queuePDFCompressAtQuality(_ targets: [CompressionItem], quality: PDFQuality) {
@@ -112,6 +128,26 @@ final class ContentViewModel: ObservableObject {
     func recompressPDF(_ item: CompressionItem, quality: PDFQuality) {
         item.pdfQualityOverride = quality
         item.forceCompress = true
+        item.undoSnapshot = nil
+        item.status = .pending
+        compress()
+    }
+
+    /// After a PDF zero-gain result: one-shot flatten at smallest tier (overrides preserve / sidebar mode for this item only).
+    func retryPDFFlattenSmallest(_ item: CompressionItem) {
+        guard item.mediaType == .pdf else { return }
+        item.pdfOutputModeOverride = .flattenPages
+        item.pdfQualityOverride = .smallest
+        item.undoSnapshot = nil
+        item.status = .pending
+        compress()
+    }
+
+    /// After preserve PDF zero-gain: one-shot experimental qpdf pass; does not change flatten vs preserve.
+    func retryPDFPreserveExperimental(_ item: CompressionItem, mode: PDFPreserveExperimentalMode) {
+        guard item.mediaType == .pdf else { return }
+        item.pdfPreserveExperimentalOverride = mode
+        item.undoSnapshot = nil
         item.status = .pending
         compress()
     }
@@ -126,20 +162,138 @@ final class ContentViewModel: ObservableObject {
     func recompressVideo(_ item: CompressionItem, quality: VideoQuality, codec: VideoCodecFamily) {
         item.videoRecompressOverride = (quality, codec)
         item.forceCompress = true
+        item.undoSnapshot = nil
         item.status = .pending
         compress()
     }
 
     func forceCompress(_ item: CompressionItem) {
         item.forceCompress = true
+        item.undoSnapshot = nil
         item.status = .pending
         compress()
     }
 
+    func undoCompression(_ item: CompressionItem) {
+        guard let snap = item.undoSnapshot else { return }
+        do {
+            try CompressionUndo.undo(snapshot: snap)
+            item.undoSnapshot = nil
+            item.status = .pending
+            refreshPendingBatchSummaryIfNeeded()
+            syncExplicitCompressCueAfterUndo()
+        } catch {
+            undoErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// After undo from the batch sheet, pending work does not auto-run when manual mode is off — surface **Compress Now**.
+    private func syncExplicitCompressCueAfterUndo() {
+        guard !prefs.manualMode else { return }
+        let hasPending = items.contains { if case .pending = $0.status { return true }; return false }
+        if hasPending { needsExplicitCompressAfterUndo = true }
+    }
+
+    /// Rebuilds file rows and byte totals from the current queue while preserving batch metadata and stable summary id.
+    private func reconciledBatchSummary(from existing: CompressionBatchSummary) -> CompressionBatchSummary {
+        let fileRows = BatchSummaryListRow.rows(from: items)
+        let doneCount = items.filter { if case .done = $0.status { return true }; return false }.count
+        let skippedCount = items.filter { if case .skipped = $0.status { return true }; return false }.count
+        let undoableDoneCount = items.filter { i in
+            guard case .done = i.status else { return false }
+            return i.undoSnapshot != nil
+        }.count
+        let savedBytes = items.reduce(Int64(0)) { $0 + $1.savedBytes }
+        let outputFolderURL = fileRows.compactMap { row -> URL? in
+            if case .compressed(let r) = row { return URL(fileURLWithPath: r.outputPath).deletingLastPathComponent() }
+            return nil
+        }.first ?? existing.outputFolderURL
+        return CompressionBatchSummary(
+            id: existing.id,
+            savedBytes: savedBytes,
+            doneCount: doneCount,
+            elapsed: existing.elapsed,
+            openedFolder: existing.openedFolder,
+            skippedCount: skippedCount,
+            outputFolderURL: outputFolderURL,
+            fileRows: fileRows,
+            undoableDoneCount: undoableDoneCount
+        )
+    }
+
+    /// Keeps the batch summary sheet in sync after a single-item undo (stable summary `id` preserves the open sheet).
+    private func refreshPendingBatchSummaryIfNeeded() {
+        guard let existing = pendingBatchSummary else { return }
+        let updated = reconciledBatchSummary(from: existing)
+        pendingBatchSummary = updated
+        lastBatchSummary = updated
+    }
+
+    /// Presents the last completed batch summary again (menu / shortcut), reconciling undo state with the current queue.
+    func showLastBatchSummary() {
+        guard let base = lastBatchSummary else { return }
+        let updated = reconciledBatchSummary(from: base)
+        lastBatchSummary = updated
+        pendingBatchSummary = updated
+        pendingBatchSummarySupportsUndo = true
+    }
+
+    /// Opens a saved snapshot from History (read-only; no undo).
+    func presentHistoricalBatchSummary(_ summary: CompressionBatchSummary) {
+        pendingBatchSummary = summary
+        pendingBatchSummarySupportsUndo = false
+    }
+
+    /// Undoes all completed items that still have an undo snapshot (reverse queue order).
+    func undoAllCompressibleDone() {
+        let targets = items.filter { item in
+            guard case .done = item.status else { return false }
+            return item.undoSnapshot != nil
+        }
+        for item in targets.reversed() {
+            guard let snap = item.undoSnapshot else { continue }
+            do {
+                try CompressionUndo.undo(snapshot: snap)
+                item.undoSnapshot = nil
+                item.status = .pending
+            } catch {
+                undoErrorMessage = error.localizedDescription
+                return
+            }
+        }
+        if !items.contains(where: { if case .done = $0.status { return true }; return false }) {
+            lastBatchSummary = nil
+        } else if let s = lastBatchSummary {
+            lastBatchSummary = reconciledBatchSummary(from: s)
+        }
+        if !items.isEmpty, items.allSatisfy({ if case .pending = $0.status { return true }; return false }) {
+            phase = .idle
+        }
+        syncExplicitCompressCueAfterUndo()
+    }
+
+    func onBatchSummaryDismissed() {
+        guard pendingAutoClearAfterBatchSummary else { return }
+        pendingAutoClearAfterBatchSummary = false
+        scheduleAutoClearAfterBatch()
+    }
+
     func clear() {
+        compressionTask?.cancel()
+        compressionTask = nil
         cleanupPasteTemps(for: items)
         items = []
         phase = .idle
+        isProcessing = false
+        compressionInterrupted = false
+        lastBatchSummary = nil
+        pendingBatchSummarySupportsUndo = true
+        needsExplicitCompressAfterUndo = false
+    }
+
+    /// Cancels the in-flight batch. Remaining queued work stays **pending**; use **Continue** to resume.
+    func stopCompression() {
+        compressionTask?.cancel()
     }
 
     func remove(_ item: CompressionItem) {
@@ -256,7 +410,12 @@ final class ContentViewModel: ObservableObject {
 
     func compress() {
         guard !isProcessing else { return }
-        let pending = items.filter { if case .pending = $0.status { return true }; return false }
+        compressionInterrupted = false
+        needsExplicitCompressAfterUndo = false
+        var pending = items.filter { if case .pending = $0.status { return true }; return false }
+        if prefs.batchLargestFirst {
+            pending.sort { $0.originalSize > $1.originalSize }
+        }
         // Nothing to do — don't flicker the drop zone into a `.done` "All done!"
         // screen when the user fires Compress Now with an empty queue.
         guard !pending.isEmpty else { return }
@@ -266,9 +425,10 @@ final class ContentViewModel: ObservableObject {
 
         let batchPreset = batchSharedPreset(from: pending)
 
-        Task {
+        compressionTask = Task { [weak self] in
+            guard let self else { return }
             await withTaskGroup(of: Void.self) { group in
-                let mediaSem = AsyncSemaphore(limit: prefs.concurrentCompressionLimit)
+                let mediaSem = AsyncSemaphore(limit: self.prefs.concurrentCompressionLimit)
                 let videoSem = AsyncSemaphore(limit: Self.concurrentVideoExportLimit)
                 for item in pending {
                     let mediaType = item.mediaType
@@ -291,8 +451,32 @@ final class ContentViewModel: ObservableObject {
                     }
                 }
             }
+            let batchCancelled = Task.isCancelled
             await MainActor.run {
+                self.compressionTask = nil
                 self.isProcessing = false
+                if self.items.isEmpty {
+                    self.phase = .idle
+                    self.compressionInterrupted = false
+                    return
+                }
+                if batchCancelled {
+                    for i in self.items.indices {
+                        if case .processing = self.items[i].status {
+                            self.items[i].status = .pending
+                        }
+                    }
+                    let hasFinishedWork = self.items.contains { item in
+                        switch item.status {
+                        case .done, .skipped, .zeroGain, .failed: return true
+                        default: return false
+                        }
+                    }
+                    self.phase = hasFinishedWork ? .done : .idle
+                    self.compressionInterrupted = true
+                    return
+                }
+                self.compressionInterrupted = false
                 // If the queue was emptied mid-run (Clear All, autoClear race, etc.),
                 // don't strand the empty drop zone in `.done` — fall back to idle.
                 self.phase = self.items.isEmpty ? .idle : .done
@@ -300,7 +484,52 @@ final class ContentViewModel: ObservableObject {
                 self.prefs.lifetimeSavedBytes += batchSaved
 
                 let doneCount = self.items.filter { if case .done = $0.status { return true }; return false }.count
-                if doneCount > 0 {
+
+                let elapsed = Date.now.timeIntervalSince(self.compressionStartTime)
+                let doneItems = self.items.compactMap { item -> URL? in
+                    if case .done(let url, _, _) = item.status { return url } else { return nil }
+                }
+                let outputFolderURL = doneItems.first?.deletingLastPathComponent()
+
+                let openFolder = batchPreset?.openFolderWhenDone ?? self.prefs.openFolderWhenDone
+                if openFolder, let first = doneItems.first {
+                    NSWorkspace.shared.open(first.deletingLastPathComponent())
+                }
+
+                let hasTerminalForSummary = self.items.contains { item in
+                    switch item.status {
+                    case .done, .skipped, .zeroGain, .failed: return true
+                    default: return false
+                    }
+                }
+
+                if hasTerminalForSummary {
+                    let skippedCount = self.items.filter { if case .skipped = $0.status { return true }; return false }.count
+                    let openedFolder = openFolder && outputFolderURL != nil
+                    let fileRows = BatchSummaryListRow.rows(from: self.items)
+                    let summaryOutputFolder = fileRows.compactMap { row -> URL? in
+                        if case .compressed(let r) = row {
+                            return URL(fileURLWithPath: r.outputPath).deletingLastPathComponent()
+                        }
+                        return nil
+                    }.first ?? outputFolderURL
+                    let undoableDoneCount = self.items.filter { i in
+                        guard case .done = i.status else { return false }
+                        return i.undoSnapshot != nil
+                    }.count
+                    let summary = CompressionBatchSummary(
+                        id: UUID(),
+                        savedBytes: batchSaved,
+                        doneCount: doneCount,
+                        elapsed: elapsed,
+                        openedFolder: openedFolder,
+                        skippedCount: skippedCount,
+                        outputFolderURL: summaryOutputFolder,
+                        fileRows: fileRows,
+                        undoableDoneCount: undoableDoneCount
+                    )
+                    self.lastBatchSummary = summary
+                    let batchSummaryData = try? JSONEncoder().encode(summary)
                     let formats = Array(Set(self.items.compactMap { item -> String? in
                         guard case .done = item.status else { return nil }
                         switch item.mediaType {
@@ -309,26 +538,25 @@ final class ContentViewModel: ObservableObject {
                         case .video: return "Video"
                         }
                     })).sorted()
-                    let record = SessionRecord(id: UUID(), timestamp: .now,
-                                              fileCount: doneCount,
-                                              totalBytesSaved: batchSaved,
-                                              formats: formats)
+                    let record = SessionRecord(
+                        id: UUID(),
+                        timestamp: .now,
+                        fileCount: fileRows.count,
+                        totalBytesSaved: batchSaved,
+                        formats: formats,
+                        batchSummaryData: batchSummaryData
+                    )
                     var history = self.prefs.sessionHistory
                     history.insert(record, at: 0)
                     self.prefs.sessionHistory = Array(history.prefix(50))
+
+                    if self.prefs.showBatchSummaryDialog {
+                        self.pendingBatchSummary = summary
+                        self.pendingBatchSummarySupportsUndo = true
+                    }
                 }
 
                 if self.prefs.playSoundEffects { self.playCompletionSound(savedBytes: batchSaved) }
-
-                let elapsed = Date.now.timeIntervalSince(self.compressionStartTime)
-                let doneItems = self.items.compactMap { item -> URL? in
-                    if case .done(let url, _, _) = item.status { return url } else { return nil }
-                }
-
-                let openFolder = batchPreset?.openFolderWhenDone ?? self.prefs.openFolderWhenDone
-                if openFolder, let first = doneItems.first {
-                    NSWorkspace.shared.open(first.deletingLastPathComponent())
-                }
 
                 let notify = batchPreset?.notifyWhenDone ?? self.prefs.notifyWhenDone
                 if notify {
@@ -336,7 +564,11 @@ final class ContentViewModel: ObservableObject {
                 }
 
                 if self.prefs.autoClearWhenDone, doneItems.isEmpty == false {
-                    self.scheduleAutoClearAfterBatch()
+                    if self.prefs.showBatchSummaryDialog, hasTerminalForSummary {
+                        self.pendingAutoClearAfterBatchSummary = true
+                    } else {
+                        self.scheduleAutoClearAfterBatch()
+                    }
                 }
             }
         }
@@ -384,7 +616,15 @@ final class ContentViewModel: ObservableObject {
         )
     }
 
+    private func collisionNamingStyle(for item: CompressionItem) -> CollisionNamingStyle {
+        if let p = activePreset(for: item) {
+            return CollisionNamingStyle(rawValue: p.collisionNamingStyleRaw) ?? .finderDuplicate
+        }
+        return prefs.collisionNamingStyle
+    }
+
     private func compressItem(_ item: CompressionItem) async {
+        if Task.isCancelled { return }
         let goals = compressionGoals(for: item)
         switch item.mediaType {
         case .image:
@@ -397,6 +637,7 @@ final class ContentViewModel: ObservableObject {
     }
 
     private func compressImageItem(_ item: CompressionItem, goals: CompressionGoals) async {
+        let sourceSnapshot = item.sourceURL
         let wasForced = await MainActor.run { () -> Bool in
             let f = item.forceCompress
             item.forceCompress = false
@@ -415,14 +656,25 @@ final class ContentViewModel: ObservableObject {
             await MainActor.run { item.detectedContentType = ct }
             format = ct == .photo ? .avif : .webp
             if smartQ { preclassifiedForSmartQ = ct }
+        } else if smartQ {
+            let ct = ContentClassifier.classify(item.sourceURL)
+            await MainActor.run { item.detectedContentType = ct }
+            preclassifiedForSmartQ = ct
         }
 
-        if format == .png && item.sourceURL.pathExtension.lowercased() != "png" {
+        let srcExt = item.sourceURL.pathExtension.lowercased()
+        let pngSourceOK = srcExt == "png" || srcExt == "heic" || srcExt == "heif"
+        if format == .png && !pngSourceOK {
             await MainActor.run { item.status = .failed(PNGInputError()) }
             return
         }
 
-        await MainActor.run { item.status = .processing }
+        await MainActor.run {
+            item.usedFirstFrameOnly = false
+            item.status = .processing
+            item.compressionProgress = 0
+        }
+        defer { item.compressionProgress = nil }
         let urlDL = item.isURLDownloadSource
         let outputURL: URL = {
             if let pr = preset { return pr.outputURL(for: item.sourceURL, format: format, globalPrefs: prefs, isFromURLDownload: urlDL) }
@@ -430,6 +682,16 @@ final class ContentViewModel: ObservableObject {
         }()
         let replaceOrigin = (preset.map { FilenameHandling(rawValue: $0.filenameHandlingRaw) } ?? prefs.filenameHandling) == .replaceOrigin
         let backupURL = prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
+        CompressionTiming.logReproContext(
+            media: "image",
+            smartQuality: smartQ,
+            extra: "autoFormat=\(autoFmt) format=\(format.rawValue) concurrent=\(prefs.concurrentCompressionLimit) maxWidth=\(goals.maxWidth != nil) maxFileSizeKB=\(goals.maxFileSizeKB != nil)"
+        )
+        let progressHandler: @Sendable (Float) -> Void = { p in
+            Task { @MainActor in
+                item.compressionProgress = Double(p)
+            }
+        }
         do {
             let result = try await CompressionService.shared.compress(
                 source: item.sourceURL,
@@ -442,11 +704,15 @@ final class ContentViewModel: ObservableObject {
                 isURLDownloadSource: urlDL,
                 smartQuality: smartQ,
                 contentTypeHint: hint,
-                preclassifiedContent: preclassifiedForSmartQ
+                preclassifiedContent: preclassifiedForSmartQ,
+                parallelCompressionLimit: prefs.concurrentCompressionLimit,
+                collisionNamingStyle: collisionNamingStyle(for: item),
+                progressHandler: progressHandler
             )
             let savings = result.originalSize > 0
                 ? Double(result.originalSize - result.outputSize) / Double(result.originalSize) : 0
             await MainActor.run {
+                item.usedFirstFrameOnly = result.usedFirstFrameOnly
                 item.detectedContentType = result.detectedContentType
                 if result.outputSize >= result.originalSize {
                     item.status = .zeroGain(attemptedSize: result.outputSize)
@@ -459,19 +725,28 @@ final class ContentViewModel: ObservableObject {
                                         originalSize: result.originalSize,
                                         outputSize: result.outputSize)
                     if self.prefs.preserveTimestamps {
-                        self.copyTimestamp(from: item.sourceURL, to: result.outputURL)
+                        self.copyTimestamp(from: sourceSnapshot, to: result.outputURL)
                     }
+                    var mergedRecovery = result.originalRecoveryURL
                     if replaceOrigin {
                         if urlDL {
                             try? FileManager.default.removeItem(at: item.sourceURL)
-                        } else {
-                            try? OriginalsHandler.disposeForReplace(
-                                originalAt: item.sourceURL,
-                                action: self.prefs.originalsAction,
-                                backupFolder: self.prefs.originalsAction == .backup ? self.prefs.originalsBackupDestinationURL() : nil
-                            )
+                        } else if let r2 = try? OriginalsHandler.disposeForReplace(
+                            originalAt: item.sourceURL,
+                            outputURL: result.outputURL,
+                            action: self.prefs.originalsAction,
+                            backupFolder: self.prefs.originalsAction == .backup ? self.prefs.originalsBackupDestinationURL() : nil
+                        ) {
+                            mergedRecovery = r2
                         }
                     }
+                    item.undoSnapshot = CompressionUndoSnapshot(
+                        sourceURL: sourceSnapshot,
+                        outputURL: result.outputURL,
+                        originalRecoveryURL: mergedRecovery,
+                        replaceOriginal: replaceOrigin,
+                        isURLDownloadSource: urlDL
+                    )
                 }
             }
         } catch {
@@ -480,40 +755,67 @@ final class ContentViewModel: ObservableObject {
     }
 
     private func compressPDFItem(_ item: CompressionItem) async {
-        let wasForced = await MainActor.run { () -> Bool in
-            let f = item.forceCompress
+        await MainActor.run {
             item.forceCompress = false
-            return f
         }
-        let pdfOverride = await MainActor.run { () -> PDFQuality? in
+        let (pdfOverride, pdfModeOverride, pdfExperimentalOverride) = await MainActor.run { () -> (PDFQuality?, PDFOutputMode?, PDFPreserveExperimentalMode?) in
             let q = item.pdfQualityOverride
             item.pdfQualityOverride = nil
-            return q
+            let m = item.pdfOutputModeOverride
+            item.pdfOutputModeOverride = nil
+            let e = item.pdfPreserveExperimentalOverride
+            item.pdfPreserveExperimentalOverride = nil
+            return (q, m, e)
         }
         let preset = activePreset(for: item)
         let urlDL = item.isURLDownloadSource
-        await MainActor.run { item.status = .processing }
+        await MainActor.run {
+            item.status = .processing
+            item.compressionProgress = 0
+            item.zeroGainPDFOutputMode = nil
+            if item.pageCount == nil {
+                item.pageCount = PDFDocument(url: item.sourceURL)?.pageCount
+            }
+        }
+        defer { item.compressionProgress = nil }
         let intendedOutput: URL = {
             if let pr = preset { return pr.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs, isFromURLDownload: urlDL) }
             return prefs.outputURL(for: item.sourceURL, mediaType: .pdf, isFromURLDownload: urlDL)
         }()
         let pdfFallback = preset.map { PDFQuality(rawValue: $0.pdfQualityRaw) ?? .medium } ?? prefs.pdfQuality
         let sourceURL = item.sourceURL
-        let outputMode = preset.map { PDFOutputMode(rawValue: $0.pdfOutputModeRaw) ?? .preserveStructure } ?? prefs.pdfOutputMode
+        let outputMode = pdfModeOverride ?? preset.map { PDFOutputMode(rawValue: $0.pdfOutputModeRaw) ?? .flattenPages } ?? prefs.pdfOutputMode
+        let preserveExperimental: PDFPreserveExperimentalMode = {
+            guard outputMode == .preserveStructure else { return .none }
+            let fromStored = preset.map { PDFPreserveExperimentalMode(rawValue: $0.pdfPreserveExperimentalRaw) ?? .none }
+                ?? prefs.pdfPreserveExperimental
+            return pdfExperimentalOverride ?? fromStored
+        }()
         let smartQ = preset?.smartQuality ?? prefs.smartQuality
         let pdfQuality: PDFQuality
         if let o = pdfOverride, outputMode == .flattenPages {
             pdfQuality = o
         } else if outputMode == .flattenPages, smartQ {
+            let tInfer = CFAbsoluteTimeGetCurrent()
             pdfQuality = await Task.detached {
                 PDFSmartQuality.inferQuality(url: sourceURL, fallback: pdfFallback)
             }.value
+            CompressionTiming.logPhase("pdf.smartQuality.infer", startedAt: tInfer)
         } else {
             pdfQuality = pdfFallback
         }
 
+        CompressionTiming.logReproContext(
+            media: "pdf",
+            smartQuality: smartQ,
+            extra: "mode=\(outputMode.rawValue) flatten=\(outputMode == .flattenPages)"
+        )
+
+        let collisionStyle = collisionNamingStyle(for: item)
+        let finalURL = OutputPathUniqueness.uniqueOutputURL(
+            desired: intendedOutput, sourceURL: sourceURL, style: collisionStyle
+        )
         let workURL: URL
-        let finalURL = intendedOutput
         if sourceURL.path == finalURL.path {
             workURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("dinky_pdf_\(UUID().uuidString).pdf")
@@ -528,22 +830,103 @@ final class ContentViewModel: ObservableObject {
             preservedModDate = (try? FileManager.default.attributesOfItem(atPath: sourceURL.path)[.modificationDate]) as? Date
         }
 
+        let pdfProgress: @Sendable (Float) -> Void = { p in
+            Task { @MainActor in
+                item.compressionProgress = Double(p)
+            }
+        }
+        let qualityAttempts: [PDFQuality] = outputMode == .flattenPages
+            ? PDFQuality.flattenQualityFallbackChain(startingAt: pdfQuality)
+            : [pdfQuality]
+
         do {
-            let result = try await CompressionService.shared.compressPDF(
-                source: item.sourceURL,
-                outputMode: outputMode,
-                quality: pdfQuality,
-                grayscale: grayscale,
-                stripMetadata: strip,
-                outputURL: workURL
-            )
+            var chosenResult: CompressionResult?
+            var chosenOutSize: Int64 = 0
+            var lastAttemptedOutSize: Int64 = 0
+
+            for q in qualityAttempts {
+                let result = try await CompressionService.shared.compressPDF(
+                    source: item.sourceURL,
+                    outputMode: outputMode,
+                    quality: q,
+                    grayscale: grayscale,
+                    stripMetadata: strip,
+                    outputURL: workURL,
+                    preserveExperimental: preserveExperimental,
+                    progressHandler: pdfProgress
+                )
+                let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
+                    ?? result.outputSize
+                lastAttemptedOutSize = outSize
+                if outSize >= result.originalSize {
+                    continue
+                }
+                // Any smaller output counts for PDF — “Skip if savings below” is for images/video only (PDF wins are often small but real on preserve, or meaningful on flatten).
+                chosenResult = result
+                chosenOutSize = outSize
+                break
+            }
+
+            if chosenResult == nil, outputMode == .flattenPages {
+                // Never force grayscale for bailouts — only the user’s “Grayscale PDFs” setting applies.
+                let bailouts: [(lastResort: Bool, ultra: Bool)] = [
+                    (true, false),
+                    (false, true),
+                ]
+                for pass in bailouts {
+                    guard chosenResult == nil else { break }
+                    do {
+                        let lr = try await CompressionService.shared.compressPDF(
+                            source: item.sourceURL,
+                            outputMode: outputMode,
+                            quality: pdfQuality,
+                            grayscale: grayscale,
+                            stripMetadata: strip,
+                            outputURL: workURL,
+                            flattenLastResort: pass.lastResort,
+                            flattenUltra: pass.ultra,
+                            preserveExperimental: preserveExperimental,
+                            progressHandler: pdfProgress
+                        )
+                        let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
+                            ?? lr.outputSize
+                        lastAttemptedOutSize = outSize
+                        if outSize < lr.originalSize {
+                            chosenResult = lr
+                            chosenOutSize = outSize
+                        }
+                    } catch {
+                        // Bailout flatten failed — try next pass or fall through to zero-gain.
+                    }
+                }
+            }
+
+            guard let result = chosenResult else {
+                let originalBytesForLog: Int64 = (try? item.sourceURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
+                    ?? ((try? FileManager.default.attributesOfItem(atPath: item.sourceURL.path)[.size] as? NSNumber)?.int64Value ?? 0)
+                PDFCompressionMetrics.logRejectedOutput(
+                    outputMode: outputMode,
+                    originalBytes: max(originalBytesForLog, 1),
+                    attemptedBytes: lastAttemptedOutSize,
+                    reason: "zero_gain_no_smaller_output"
+                )
+                try? FileManager.default.removeItem(at: workURL)
+                await MainActor.run {
+                    item.zeroGainPDFOutputMode = outputMode
+                    item.status = .zeroGain(attemptedSize: lastAttemptedOutSize)
+                }
+                return
+            }
+
             let producedURL: URL
+            var recoveryForUndo: URL?
             if workURL.path != finalURL.path {
                 do {
-                    try FileManager.default.removeItem(at: sourceURL)
-                    if FileManager.default.fileExists(atPath: finalURL.path) {
-                        try FileManager.default.removeItem(at: finalURL)
-                    }
+                    recoveryForUndo = try? OriginalsHandler.disposeSourceBeforeTempSwap(
+                        originalAt: sourceURL,
+                        action: prefs.originalsAction,
+                        backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
+                    )
                     try FileManager.default.moveItem(at: workURL, to: finalURL)
                     producedURL = finalURL
                 } catch {
@@ -557,8 +940,9 @@ final class ContentViewModel: ObservableObject {
                     if urlDL {
                         try? FileManager.default.removeItem(at: item.sourceURL)
                     } else {
-                        try? OriginalsHandler.disposeForReplace(
+                        recoveryForUndo = try? OriginalsHandler.disposeForReplace(
                             originalAt: item.sourceURL,
+                            outputURL: producedURL,
                             action: prefs.originalsAction,
                             backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
                         )
@@ -567,28 +951,35 @@ final class ContentViewModel: ObservableObject {
             }
 
             let outSize = (try? producedURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
-                ?? result.outputSize
-            let savings = result.originalSize > 0
-                ? Double(result.originalSize - outSize) / Double(result.originalSize) : 0
+                ?? chosenOutSize
             await MainActor.run {
-                if outSize >= result.originalSize {
-                    item.status = .zeroGain(attemptedSize: outSize)
-                    try? FileManager.default.removeItem(at: producedURL)
-                } else if self.prefs.minimumSavingsPercent > 0 && savings < Double(self.prefs.minimumSavingsPercent) / 100.0 && !wasForced {
-                    item.status = .skipped(savedPercent: savings * 100, threshold: self.prefs.minimumSavingsPercent)
-                    try? FileManager.default.removeItem(at: producedURL)
-                } else {
-                    item.status = .done(outputURL: producedURL,
-                                        originalSize: result.originalSize,
-                                        outputSize: outSize)
-                    if self.prefs.preserveTimestamps {
-                        if let d = preservedModDate {
-                            try? FileManager.default.setAttributes([.modificationDate: d], ofItemAtPath: producedURL.path)
-                        } else {
-                            self.copyTimestamp(from: item.sourceURL, to: producedURL)
-                        }
+                item.status = .done(outputURL: producedURL,
+                                    originalSize: result.originalSize,
+                                    outputSize: outSize)
+                if self.prefs.preserveTimestamps {
+                    if let d = preservedModDate {
+                        try? FileManager.default.setAttributes([.modificationDate: d], ofItemAtPath: producedURL.path)
+                    } else {
+                        self.copyTimestamp(from: sourceURL, to: producedURL)
                     }
                 }
+                item.undoSnapshot = CompressionUndoSnapshot(
+                    sourceURL: sourceURL,
+                    outputURL: producedURL,
+                    originalRecoveryURL: recoveryForUndo,
+                    replaceOriginal: replaceOrigin,
+                    isURLDownloadSource: urlDL
+                )
+            }
+        } catch let pdfErr as PDFCompressionError {
+            if case .rewriteNotSmallerThanOriginal(let attempted) = pdfErr {
+                try? FileManager.default.removeItem(at: workURL)
+                await MainActor.run {
+                    item.zeroGainPDFOutputMode = outputMode
+                    item.status = .zeroGain(attemptedSize: attempted)
+                }
+            } else {
+                await MainActor.run { item.status = .failed(pdfErr) }
             }
         } catch {
             await MainActor.run { item.status = .failed(error) }
@@ -610,9 +1001,9 @@ final class ContentViewModel: ObservableObject {
         let urlDL = item.isURLDownloadSource
         await MainActor.run {
             item.status = .processing
-            item.videoExportProgress = 0
+            item.compressionProgress = 0
         }
-        defer { item.videoExportProgress = nil }
+        defer { item.compressionProgress = nil }
         let intendedOutput: URL = {
             if let pr = preset { return pr.outputURL(for: item.sourceURL, mediaType: .video, globalPrefs: prefs, isFromURLDownload: urlDL) }
             return prefs.outputURL(for: item.sourceURL, mediaType: .video, isFromURLDownload: urlDL)
@@ -627,6 +1018,7 @@ final class ContentViewModel: ObservableObject {
         // When Smart Quality is on we also classify the clip (screen recording / camera / generic)
         // so the tier picker can adjust per content type and the results row can show what we saw.
         var smartContentType: VideoContentType? = nil
+        var hdrFromSmartQuality = false
         if let o = videoOverride {
             videoQuality = o.quality
             codec = o.codec
@@ -636,23 +1028,46 @@ final class ContentViewModel: ObservableObject {
                 let decision = await VideoSmartQuality.decide(asset: asset, fallback: videoFallback)
                 videoQuality = decision.quality
                 smartContentType = decision.contentType
+                hdrFromSmartQuality = decision.isHDR
             } else {
                 videoQuality = videoFallback
             }
         }
 
-        // User chose Smart wins: when Smart is on, ignore the resolution cap and let Smart pick the preset.
-        let resolutionCap: Int?
-        if smartQ {
-            resolutionCap = nil
-        } else {
-            let capEnabled = preset?.videoMaxResolutionEnabled ?? prefs.videoMaxResolutionEnabled
-            let capLines = preset?.videoMaxResolutionLines ?? prefs.videoMaxResolutionLines
-            resolutionCap = capEnabled ? capLines : nil
+        // Classification + duration (and HDR when Smart Quality ran) before encoding so rows still show chips if export fails.
+        let durationSeconds: Double?
+        do {
+            let d = try await asset.load(.duration)
+            let secs = CMTimeGetSeconds(d)
+            durationSeconds = secs.isFinite && secs > 0 ? secs : nil
+        } catch {
+            durationSeconds = nil
+        }
+        await MainActor.run {
+            item.detectedVideoContentType = smartContentType
+            if smartQ {
+                item.videoIsHDR = hdrFromSmartQuality
+            }
+            if let s = durationSeconds {
+                item.videoDuration = s
+            }
         }
 
+        // Max resolution cap applies whenever enabled — Smart Quality still picks Balanced / High; the cap limits export preset height.
+        let capEnabled = preset?.videoMaxResolutionEnabled ?? prefs.videoMaxResolutionEnabled
+        let capLines = preset?.videoMaxResolutionLines ?? prefs.videoMaxResolutionLines
+        let resolutionCap: Int? = capEnabled ? capLines : nil
+        CompressionTiming.logReproContext(
+            media: "video",
+            smartQuality: smartQ,
+            extra: "cap=\(resolutionCap.map(String.init) ?? "off") codec=\(codec.rawValue)"
+        )
+
+        let collisionStyle = collisionNamingStyle(for: item)
+        let finalURL = OutputPathUniqueness.uniqueOutputURL(
+            desired: intendedOutput, sourceURL: sourceURL, style: collisionStyle
+        )
         let workURL: URL
-        let finalURL = intendedOutput
         if sourceURL.path == finalURL.path {
             workURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("dinky_vid_\(UUID().uuidString).mp4")
@@ -667,7 +1082,7 @@ final class ContentViewModel: ObservableObject {
 
         let progressHandler: @Sendable (Float) -> Void = { p in
             Task { @MainActor in
-                item.videoExportProgress = Double(p)
+                item.compressionProgress = Double(p)
             }
         }
 
@@ -684,12 +1099,14 @@ final class ContentViewModel: ObservableObject {
                 progressHandler: progressHandler
             )
             let producedURL: URL
+            var recoveryForUndo: URL?
             if workURL.path != finalURL.path {
                 do {
-                    try FileManager.default.removeItem(at: sourceURL)
-                    if FileManager.default.fileExists(atPath: finalURL.path) {
-                        try FileManager.default.removeItem(at: finalURL)
-                    }
+                    recoveryForUndo = try? OriginalsHandler.disposeSourceBeforeTempSwap(
+                        originalAt: sourceURL,
+                        action: prefs.originalsAction,
+                        backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
+                    )
                     try FileManager.default.moveItem(at: workURL, to: finalURL)
                     producedURL = finalURL
                 } catch {
@@ -703,8 +1120,9 @@ final class ContentViewModel: ObservableObject {
                     if urlDL {
                         try? FileManager.default.removeItem(at: item.sourceURL)
                     } else {
-                        try? OriginalsHandler.disposeForReplace(
+                        recoveryForUndo = try? OriginalsHandler.disposeForReplace(
                             originalAt: item.sourceURL,
+                            outputURL: producedURL,
                             action: prefs.originalsAction,
                             backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
                         )
@@ -734,9 +1152,16 @@ final class ContentViewModel: ObservableObject {
                         if let d = preservedModDate {
                             try? FileManager.default.setAttributes([.modificationDate: d], ofItemAtPath: producedURL.path)
                         } else {
-                            self.copyTimestamp(from: item.sourceURL, to: producedURL)
+                            self.copyTimestamp(from: sourceURL, to: producedURL)
                         }
                     }
+                    item.undoSnapshot = CompressionUndoSnapshot(
+                        sourceURL: sourceURL,
+                        outputURL: producedURL,
+                        originalRecoveryURL: recoveryForUndo,
+                        replaceOriginal: replaceOrigin,
+                        isURLDownloadSource: urlDL
+                    )
                 }
             }
         } catch VideoCompressionError.alreadyOptimized {
@@ -808,7 +1233,7 @@ final class ContentViewModel: ObservableObject {
 
 struct PNGInputError: LocalizedError {
     var errorDescription: String? {
-        String(localized: "PNG lossless only works on PNG files. Try WebP or AVIF for this one.", comment: "Error when PNG output selected for non-PNG input.")
+        String(localized: "PNG lossless only works on PNG, HEIC, or HEIF files. Try WebP or AVIF for other images.", comment: "Error when PNG output selected for unsupported input.")
     }
 }
 
@@ -827,11 +1252,48 @@ struct ContentView: View {
     @State private var selectedIDs: Set<UUID> = []
     @State private var showingHistory  = false
     @AppStorage("manualModeHintDismissed") private var manualModeHintDismissed = false
+    /// Stacked over the batch summary sheet when the user opens skipped / zero-gain / error detail from the summary list.
+    @State private var batchSummaryFollowUp: BatchSummaryFollowUpSheet?
+
+    private enum BatchSummaryFollowUpSheet: Identifiable {
+        case zeroGain(itemId: UUID, filename: String, originalSize: Int64, attemptedSize: Int64, isPDF: Bool, pdfOutputMode: PDFOutputMode?)
+        case failed(itemId: UUID, filename: String, error: Error)
+
+        var id: UUID {
+            switch self {
+            case .zeroGain(let itemId, _, _, _, _, _): return itemId
+            case .failed(let itemId, _, _): return itemId
+            }
+        }
+    }
 
     init(prefs: DinkyPreferences, vm: ContentViewModel) {
         self.vm = vm
         // Sync vm's prefs reference on init so it reads the shared UserDefaults instance
         vm.prefs = prefs
+    }
+
+    private var pendingItemCount: Int {
+        vm.items.filter { if case .pending = $0.status { return true }; return false }.count
+    }
+
+    /// Primary CTA for manual mode — matches File ▸ Compress Now (hidden while **Continue** is shown).
+    private var showCompressNowCTA: Bool {
+        (prefs.manualMode || vm.needsExplicitCompressAfterUndo)
+            && pendingItemCount > 0
+            && !vm.isProcessing
+            && !vm.compressionInterrupted
+    }
+
+    /// After **Stop**, resume the remaining pending files (auto or manual).
+    private var showContinueCTA: Bool {
+        vm.compressionInterrupted && pendingItemCount > 0 && !vm.isProcessing
+    }
+
+    private func toggleSidebarVisible() {
+        withAnimation(.spring(duration: 0.35)) {
+            sidebarVisible.toggle()
+        }
     }
 
     // Merge hover state with the vm phase so DropZoneView stays purely visual
@@ -866,12 +1328,86 @@ struct ContentView: View {
         alert.runModal()
     }
 
+    private var isUndoErrorAlertPresented: Binding<Bool> {
+        Binding(
+            get: { vm.undoErrorMessage != nil },
+            set: { if !$0 { vm.undoErrorMessage = nil } }
+        )
+    }
+
+    private func openBatchSummaryZeroGainDetail(for id: UUID) {
+        if let item = vm.items.first(where: { $0.id == id }),
+           case .zeroGain(let attempted) = item.status {
+            batchSummaryFollowUp = .zeroGain(
+                itemId: id,
+                filename: item.filename,
+                originalSize: item.originalSize,
+                attemptedSize: attempted,
+                isPDF: item.mediaType == .pdf,
+                pdfOutputMode: item.zeroGainPDFOutputMode
+            )
+            return
+        }
+        if let row = vm.pendingBatchSummary?.fileRows.first(where: { $0.id == id }),
+           case .zeroGain(_, let fn, _, let orig, let att, let isPDF, let raw) = row {
+            batchSummaryFollowUp = .zeroGain(
+                itemId: id,
+                filename: fn,
+                originalSize: orig,
+                attemptedSize: att,
+                isPDF: isPDF,
+                pdfOutputMode: raw.flatMap { PDFOutputMode(rawValue: $0) }
+            )
+        }
+    }
+
+    private func openBatchSummaryFailedDetail(for id: UUID) {
+        if let item = vm.items.first(where: { $0.id == id }),
+           case .failed(let err) = item.status {
+            batchSummaryFollowUp = .failed(itemId: id, filename: item.filename, error: err)
+            return
+        }
+        if let row = vm.pendingBatchSummary?.fileRows.first(where: { $0.id == id }),
+           case .failed(_, let fn, _, let desc) = row {
+            let err = NSError(domain: "Dinky", code: 0, userInfo: [NSLocalizedDescriptionKey: desc])
+            batchSummaryFollowUp = .failed(itemId: id, filename: fn, error: err)
+        }
+    }
+
+    @ViewBuilder
+    private func batchSummaryFollowUpSheetContent(_ follow: BatchSummaryFollowUpSheet) -> some View {
+        switch follow {
+        case .zeroGain(let itemId, let filename, let orig, let att, let isPDF, let mode):
+            CompressionZeroGainDetailView(
+                filename: filename,
+                originalSize: orig,
+                attemptedSize: att,
+                isPDF: isPDF,
+                pdfOutputMode: mode,
+                onTryFlattenSmallest: (isPDF && (mode == .preserveStructure || mode == nil)) ? {
+                    batchSummaryFollowUp = nil
+                    if let item = vm.items.first(where: { $0.id == itemId }) {
+                        vm.retryPDFFlattenSmallest(item)
+                    }
+                } : nil,
+                onTryPreserveExperimental: (isPDF && (mode == .preserveStructure || mode == nil)) ? { exp in
+                    batchSummaryFollowUp = nil
+                    if let item = vm.items.first(where: { $0.id == itemId }) {
+                        vm.retryPDFPreserveExperimental(item, mode: exp)
+                    }
+                } : nil
+            )
+        case .failed(_, let filename, let error):
+            CompressionErrorDetailView(filename: filename, error: error)
+        }
+    }
+
     private var manualModeHintBanner: some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "hand.tap")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text(String(localized: "Manual mode: files stay queued until you right-click a row or choose Compress Now (\(prefs.shortcut(for: .compressNow).displayString)) from the File menu.", comment: "Manual mode banner; argument is shortcut."))
+            Text(String(localized: "Manual mode: files stay queued until you tap Compress Now in the toolbar or bottom bar, right-click a row, or use File ▸ Compress Now (\(prefs.shortcut(for: .compressNow).displayString)).", comment: "Manual mode banner; argument is shortcut."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -891,12 +1427,12 @@ struct ContentView: View {
         .padding(.vertical, 10)
         .adaptiveGlass(in: RoundedRectangle(cornerRadius: 0, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "Manual mode is on. Files stay queued until you compress them from the row menu or File menu Compress Now, \(prefs.shortcut(for: .compressNow).displayString).", comment: "VoiceOver: manual mode banner."))
+        .accessibilityLabel(String(localized: "Manual mode is on. Files stay queued until you compress them with Compress Now in the toolbar or bottom bar, the row menu, or File menu Compress Now, \(prefs.shortcut(for: .compressNow).displayString).", comment: "VoiceOver: manual mode banner."))
     }
 
-    var body: some View {
+    /// Split from `body` so the Swift compiler can type-check the main window without timing out.
+    private var mainWindowChrome: some View {
         ZStack(alignment: .leading) {
-            // ── Main content (drop target covers the full surface) ──
             VStack(spacing: 0) {
                 if updater.shouldShow(dismissedVersion: prefs.dismissedUpdateVersion) {
                     UpdateBanner(updater: updater, itemCount: vm.items.count)
@@ -913,17 +1449,15 @@ struct ContentView: View {
                 bottomBar
             }
             .animation(.easeInOut(duration: 0.25), value: updater.availableVersion)
-            // Drop handler lives here, above the sidebar, so the overlay can't block it
             .onDrop(of: [.fileURL, .url], isTargeted: $isDropTargeted, perform: handleDrop)
 
-            // ── Floating sidebar (top-aligned, height = content only) ──
-            if sidebarVisible {
+            if sidebarVisible && !vm.isProcessing {
                 GeometryReader { geo in
                     VStack {
                         SidebarView(
                             selectedFormat: Binding(
-                                get:  { vm.selectedFormat },
-                                set:  {
+                                get: { vm.selectedFormat },
+                                set: {
                                     vm.selectedFormat = $0
                                     prefs.defaultFormat = $0
                                 }
@@ -946,15 +1480,29 @@ struct ContentView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
-                    withAnimation(.spring(duration: 0.35)) { sidebarVisible.toggle() }
+                    toggleSidebarVisible()
                 } label: {
-                    Label(String(localized: "Toggle Sidebar", comment: "Toolbar: show or hide sidebar."), systemImage: "sidebar.left")
+                    Label(String(localized: "Format & options", comment: "Toolbar: show or hide compression sidebar."), systemImage: "sidebar.left")
                         .symbolVariant(sidebarVisible ? .fill : .none)
                 }
-                .help(sidebarVisible ? String(localized: "Hide the format sidebar", comment: "Toolbar tooltip.") : String(localized: "Show the format sidebar", comment: "Toolbar tooltip."))
+                .help(sidebarVisible ? String(localized: "Hide format, quality, and output options", comment: "Toolbar tooltip.") : String(localized: "Show format, quality, and output options", comment: "Toolbar tooltip."))
                 .accessibilityLabel(sidebarVisible ? String(localized: "Hide format sidebar", comment: "VoiceOver.") : String(localized: "Show format sidebar", comment: "VoiceOver."))
             }
+            if showCompressNowCTA {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        vm.compress()
+                    } label: {
+                        Label(String(localized: "Compress Now", comment: "Toolbar: run queued compression."), systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .help(String(localized: "Run compression on queued files (\(prefs.shortcut(for: .compressNow).displayString))", comment: "Toolbar: Compress Now help; argument is shortcut."))
+                }
+            }
         }
+    }
+
+    var body: some View {
+        mainWindowChrome
         .onReceive(NotificationCenter.default.publisher(for: .dinkyOpenPanel)) { _ in openPanel() }
         .onReceive(NotificationCenter.default.publisher(for: .dinkyOpenFiles)) { note in
             guard let urls = note.object as? [URL] else { return }
@@ -968,7 +1516,7 @@ struct ContentView: View {
             selectedIDs = []
         }
         .onReceive(NotificationCenter.default.publisher(for: .dinkyToggleSidebar)) { _ in
-            withAnimation(.spring(duration: 0.35)) { sidebarVisible.toggle() }
+            toggleSidebarVisible()
         }
         .onReceive(NotificationCenter.default.publisher(for: .dinkyDeleteSelectedRows)) { _ in
             vm.removeSelection(with: selectedIDs)
@@ -979,8 +1527,68 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .dinkyShowHistory)) { _ in
             showingHistory = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .dinkyShowLastBatchSummary)) { _ in
+            vm.showLastBatchSummary()
+        }
         .sheet(isPresented: $showingHistory) {
-            HistorySheet().environmentObject(prefs)
+            HistorySheet(
+                onOpenSessionSummary: { record in
+                    guard let data = record.batchSummaryData,
+                          let summary = try? JSONDecoder().decode(CompressionBatchSummary.self, from: data)
+                    else { return }
+                    showingHistory = false
+                    vm.presentHistoricalBatchSummary(summary)
+                }
+            )
+            .environmentObject(prefs)
+        }
+        .sheet(item: $vm.pendingBatchSummary) { summary in
+            BatchCompletionSummarySheet(
+                summary: summary,
+                supportsUndo: vm.pendingBatchSummarySupportsUndo,
+                openPreferences: revealPreferences,
+                onUndoAll: { vm.undoAllCompressibleDone() },
+                onUndoItem: { id in
+                    if let item = vm.items.first(where: { $0.id == id }) {
+                        vm.undoCompression(item)
+                    }
+                },
+                onQueueCompress: { id in
+                    if let item = vm.items.first(where: { $0.id == id }) {
+                        vm.forceCompress(item)
+                    }
+                },
+                onOpenZeroGainDetail: { openBatchSummaryZeroGainDetail(for: $0) },
+                onOpenFailedDetail: { openBatchSummaryFailedDetail(for: $0) },
+                onPDFFlattenSmallest: { id in
+                    if let item = vm.items.first(where: { $0.id == id }) {
+                        vm.retryPDFFlattenSmallest(item)
+                    }
+                },
+                onPDFPreserveExperimental: { id, mode in
+                    if let item = vm.items.first(where: { $0.id == id }) {
+                        vm.retryPDFPreserveExperimental(item, mode: mode)
+                    }
+                }
+            )
+        }
+        .sheet(item: $batchSummaryFollowUp) { follow in
+            batchSummaryFollowUpSheetContent(follow)
+        }
+        .onChange(of: vm.pendingBatchSummary?.id) { _, newId in
+            if newId == nil {
+                vm.onBatchSummaryDismissed()
+            }
+        }
+        .alert(
+            String(localized: "Couldn’t undo", comment: "Undo error alert title."),
+            isPresented: isUndoErrorAlertPresented
+        ) {
+            Button(String(localized: "OK", comment: "Alert dismiss.")) {
+                vm.undoErrorMessage = nil
+            }
+        } message: {
+            Text(vm.undoErrorMessage ?? "")
         }
         .onReceive(NotificationCenter.default.publisher(for: .dinkyCheckUpdates)) { _ in
             Task {
@@ -1015,12 +1623,14 @@ struct ContentView: View {
             ResultsRowView(
                 item: item,
                 selectedFormat: vm.selectedFormat,
+                showBottomDivider: item.id != vm.items.last?.id,
                 onForceCompress: { vm.forceCompress(item) },
-                onCancelDownload: { vm.remove(item) }
+                onCancelDownload: { vm.remove(item) },
+                onPDFFlattenSmallestRetry: { vm.retryPDFFlattenSmallest(item) },
+                onPDFPreserveExperimentalRetry: { vm.retryPDFPreserveExperimental(item, mode: $0) }
             )
                 .listRowInsets(EdgeInsets())
-                .listRowSeparator(.visible)
-                .listRowSeparatorTint(.primary.opacity(0.08))
+                .listRowSeparator(.hidden)
                 .onTapGesture(count: 2) {
                     if case .downloading = item.status { return }
                     let url = item.outputURL ?? item.sourceURL
@@ -1058,13 +1668,13 @@ struct ContentView: View {
                         }
                         if item.mediaType == .pdf, vm.effectivePDFOutputMode(for: item) == .flattenPages {
                             Button { vm.queuePDFCompressAtQuality(targets, quality: .low) } label: {
-                                Label(String(localized: "Compress at Low", comment: "Context menu PDF quality."), systemImage: "doc")
+                                Label(String(localized: "Compress PDF at Low", comment: "Context menu PDF quality."), systemImage: "doc")
                             }
                             Button { vm.queuePDFCompressAtQuality(targets, quality: .medium) } label: {
-                                Label(String(localized: "Compress at Medium", comment: "Context menu PDF quality."), systemImage: "doc")
+                                Label(String(localized: "Compress PDF at Medium", comment: "Context menu PDF quality."), systemImage: "doc")
                             }
                             Button { vm.queuePDFCompressAtQuality(targets, quality: .high) } label: {
-                                Label(String(localized: "Compress at High", comment: "Context menu PDF quality."), systemImage: "doc")
+                                Label(String(localized: "Compress PDF at High", comment: "Context menu PDF quality."), systemImage: "doc")
                             }
                             Divider()
                         }
@@ -1073,13 +1683,13 @@ struct ContentView: View {
                                 Button(VideoQuality.medium.displayName) { vm.queueVideoCompress(targets, quality: .medium, codec: .h264) }
                                 Button(VideoQuality.high.displayName)   { vm.queueVideoCompress(targets, quality: .high,   codec: .h264) }
                             } label: {
-                                Label(String(localized: "H.264", comment: "Video codec menu."), systemImage: "film")
+                                Label(String(localized: "Compress H.264", comment: "Video codec menu."), systemImage: "film")
                             }
                             Menu {
                                 Button(VideoQuality.medium.displayName) { vm.queueVideoCompress(targets, quality: .medium, codec: .hevc) }
                                 Button(VideoQuality.high.displayName)   { vm.queueVideoCompress(targets, quality: .high,   codec: .hevc) }
                             } label: {
-                                Label(String(localized: "H.265 (HEVC)", comment: "Video codec menu."), systemImage: "film")
+                                Label(String(localized: "Compress H.265 (HEVC)", comment: "Video codec menu."), systemImage: "film")
                             }
                             Divider()
                         }
@@ -1104,13 +1714,13 @@ struct ContentView: View {
                         }
                         if item.mediaType == .pdf, vm.effectivePDFOutputMode(for: item) == .flattenPages {
                             Button { vm.recompressPDF(item, quality: .low) } label: {
-                                Label(String(localized: "Re-compress at Low", comment: "Context menu."), systemImage: "doc")
+                                Label(String(localized: "Re-compress PDF at Low", comment: "Context menu."), systemImage: "doc")
                             }
                             Button { vm.recompressPDF(item, quality: .medium) } label: {
-                                Label(String(localized: "Re-compress at Medium", comment: "Context menu."), systemImage: "doc")
+                                Label(String(localized: "Re-compress PDF at Medium", comment: "Context menu."), systemImage: "doc")
                             }
                             Button { vm.recompressPDF(item, quality: .high) } label: {
-                                Label(String(localized: "Re-compress at High", comment: "Context menu."), systemImage: "doc")
+                                Label(String(localized: "Re-compress PDF at High", comment: "Context menu."), systemImage: "doc")
                             }
                             Divider()
                         }
@@ -1119,13 +1729,13 @@ struct ContentView: View {
                                 Button(VideoQuality.medium.displayName) { vm.recompressVideo(item, quality: .medium, codec: .h264) }
                                 Button(VideoQuality.high.displayName)   { vm.recompressVideo(item, quality: .high,   codec: .h264) }
                             } label: {
-                                Label(String(localized: "H.264", comment: "Video codec menu."), systemImage: "film")
+                                Label(String(localized: "Re-compress H.264", comment: "Video codec menu."), systemImage: "film")
                             }
                             Menu {
                                 Button(VideoQuality.medium.displayName) { vm.recompressVideo(item, quality: .medium, codec: .hevc) }
                                 Button(VideoQuality.high.displayName)   { vm.recompressVideo(item, quality: .high,   codec: .hevc) }
                             } label: {
-                                Label(String(localized: "H.265 (HEVC)", comment: "Video codec menu."), systemImage: "film")
+                                Label(String(localized: "Re-compress H.265 (HEVC)", comment: "Video codec menu."), systemImage: "film")
                             }
                             Divider()
                         }
@@ -1157,22 +1767,53 @@ struct ContentView: View {
     // MARK: - Bottom bar
 
     private var bottomBar: some View {
-        ZStack {
+        HStack(alignment: .center, spacing: 12) {
+            if showCompressNowCTA {
+                Button {
+                    vm.compress()
+                } label: {
+                    Text(String(localized: "Compress Now (\(prefs.shortcut(for: .compressNow).displayString))", comment: "Bottom bar: run queue; argument is shortcut."))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .help(String(localized: "Run compression on queued files", comment: "Bottom bar button help."))
+            }
+
+            if showContinueCTA {
+                Button {
+                    vm.compress()
+                } label: {
+                    Text(String(localized: "Continue", comment: "Bottom bar: resume queue after Stop."))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .help(String(localized: "Resume compressing files that are still waiting.", comment: "Bottom bar: Continue help."))
+            }
+
             Text(statusText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(vm.isEmpty ? .center : .leading)
+                .frame(maxWidth: .infinity, alignment: vm.isEmpty ? .center : .leading)
                 .animation(.easeInOut, value: vm.phase)
 
-            HStack {
-                Spacer()
-                if !vm.isEmpty {
-                    Button(String(localized: "Clear All", comment: "Bottom bar: clear list.")) { vm.clear() }
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            if vm.isProcessing {
+                Button {
+                    vm.stopCompression()
+                } label: {
+                    Text(String(localized: "Stop", comment: "Bottom bar: cancel in-flight compression."))
                 }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .help(String(localized: "Stop after current work winds down; remaining files stay queued. Use Continue to resume.", comment: "Bottom bar: Stop help."))
+            }
+
+            if !vm.isEmpty {
+                Button(String(localized: "Clear All", comment: "Bottom bar: clear list.")) { vm.clear() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 16)
@@ -1283,7 +1924,7 @@ struct ContentView: View {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories    = true
-        panel.allowedContentTypes     = [.jpeg, .png, .webP, .image, .pdf, .mpeg4Movie, .quickTimeMovie, .movie]
+        panel.allowedContentTypes     = [.jpeg, .png, .webP, .heic, .heif, .image, .pdf, .mpeg4Movie, .quickTimeMovie, .movie]
         if panel.runModal() == .OK {
             vm.addAndCompress(panel.urls)
         }

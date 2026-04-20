@@ -27,7 +27,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 
-	<!-- Registers Dinky as an "Open with" option for image files in Finder -->
+	<!-- Registers Dinky as an "Open with" option in Finder (images, PDF, common video) -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -45,6 +45,37 @@
 				<string>public.avif</string>
 				<string>public.tiff</string>
 				<string>com.microsoft.bmp</string>
+				<string>public.heic</string>
+				<string>public.heif</string>
+				<string>public.gif</string>
+				<string>com.compuserve.gif</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>PDF</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Video</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.mpeg-4</string>
+				<string>com.apple.quicktime-movie</string>
+				<string>public.m4v-video</string>
+				<string>public.avi</string>
 			</array>
 		</dict>
 	</array>

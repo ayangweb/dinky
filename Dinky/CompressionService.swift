@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import CoreGraphics
 import ImageIO
+import UniformTypeIdentifiers
 
 struct CompressionGoals {
     var maxWidth: Int?       // nil = no limit (pixels)
@@ -12,6 +13,8 @@ struct CompressionResult {
     let outputURL: URL
     let originalSize: Int64
     let outputSize: Int64
+    /// Where the original file was moved (Trash or backup) after compress, when applicable. Used for undo.
+    var originalRecoveryURL: URL? = nil
     let detectedContentType: ContentType?   // nil when Smart Quality is off
     var videoDuration: Double? = nil
     /// Detected video content (screen recording / camera / generic). `nil` for non-video.
@@ -21,6 +24,8 @@ struct CompressionResult {
     /// Codec the export actually used. For HDR sources this may differ from the user's choice
     /// because we force HEVC to keep HDR metadata intact.
     var videoEffectiveCodec: VideoCodecFamily? = nil
+    /// True when the source had multiple frames/pages (e.g. GIF, multi-page TIFF) and only the first was encoded.
+    var usedFirstFrameOnly: Bool = false
 }
 
 enum CompressionError: LocalizedError {
@@ -31,6 +36,8 @@ enum CompressionError: LocalizedError {
     case pdfPageRenderFailed(Int)
     case videoExportFailed(String)
     case videoExportSessionUnavailable
+    case heicTranscodeFailed
+    case imageResizeFailed
 
     var errorDescription: String? {
         switch self {
@@ -41,6 +48,8 @@ enum CompressionError: LocalizedError {
         case .pdfPageRenderFailed(let p): return "Could not render page \(p + 1)."
         case .videoExportFailed(let msg): return "Video export failed: \(msg)"
         case .videoExportSessionUnavailable: return "Could not create export session for this video."
+        case .heicTranscodeFailed: return "Could not read or convert this HEIC/HEIF image."
+        case .imageResizeFailed: return "Could not resize this image for the width limit."
         }
     }
 }
@@ -68,6 +77,140 @@ private let targetSizeFloor: [ContentType: Int] = [
     .mixed:   25,
 ]
 
+// MARK: - Heavy work off the `CompressionService` actor
+
+private let orientedFullImageDecodeOptions: [CFString: Any] = [
+    kCGImageSourceCreateThumbnailFromImageAlways: true,
+    kCGImageSourceCreateThumbnailWithTransform: true,
+    kCGImageSourceThumbnailMaxPixelSize: 32_768,
+    kCGImageSourceShouldCacheImmediately: true,
+]
+
+/// Full-resolution decode with EXIF orientation applied (matches Smart Quality thumbnails).
+private func cgImageDecodedOrientedFullSize(url: URL) throws -> CGImage {
+    guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+          CGImageSourceGetCount(src) > 0 else {
+        throw CompressionError.imageResizeFailed
+    }
+    guard let cgImage = CGImageSourceCreateThumbnailAtIndex(src, 0, orientedFullImageDecodeOptions as CFDictionary) else {
+        throw CompressionError.imageResizeFailed
+    }
+    return cgImage
+}
+
+private func orientedPixelSize(url: URL) -> CGSize? {
+    guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any]
+    else { return nil }
+
+    let w: Int
+    if let i = props[kCGImagePropertyPixelWidth as String] as? Int { w = i }
+    else if let n = props[kCGImagePropertyPixelWidth as String] as? NSNumber { w = n.intValue }
+    else { return nil }
+
+    let h: Int
+    if let i = props[kCGImagePropertyPixelHeight as String] as? Int { h = i }
+    else if let n = props[kCGImagePropertyPixelHeight as String] as? NSNumber { h = n.intValue }
+    else { return nil }
+
+    let orientVal: UInt32
+    if let u = props[kCGImagePropertyOrientation as String] as? UInt32 { orientVal = u }
+    else if let i = props[kCGImagePropertyOrientation as String] as? Int, i >= 0 { orientVal = UInt32(i) }
+    else if let n = props[kCGImagePropertyOrientation as String] as? NSNumber { orientVal = n.uint32Value }
+    else { orientVal = 1 }
+
+    // Display width/height: swap for left/right EXIF orientations (5…8).
+    let swapWH = (5...8).contains(Int(orientVal))
+    let dw = swapWH ? h : w
+    let dh = swapWH ? w : h
+    return CGSize(width: dw, height: dh)
+}
+
+private func imageSourceHasMultipleFrames(url: URL) -> Bool {
+    guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return false }
+    return CGImageSourceGetCount(src) > 1
+}
+
+/// Lossless pixel decode to PNG so `cwebp` / `avifenc` / `oxipng` can read the file.
+private func heicTranscodeToPNGIfNeeded(source: URL) throws -> URL {
+    let ext = source.pathExtension.lowercased()
+    guard ext == "heic" || ext == "heif" else { return source }
+
+    let cgImage: CGImage
+    do {
+        cgImage = try cgImageDecodedOrientedFullSize(url: source)
+    } catch {
+        throw CompressionError.heicTranscodeFailed
+    }
+
+    let tmpURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("dinky_heic_\(UUID().uuidString)")
+        .appendingPathExtension("png")
+
+    guard let dest = CGImageDestinationCreateWithURL(tmpURL as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+        throw CompressionError.heicTranscodeFailed
+    }
+    CGImageDestinationAddImage(dest, cgImage, nil)
+    guard CGImageDestinationFinalize(dest) else {
+        try? FileManager.default.removeItem(at: tmpURL)
+        throw CompressionError.heicTranscodeFailed
+    }
+    return tmpURL
+}
+
+/// Downscale so display pixel width is `maxWidth` (same semantics as former `sips --resampleWidth`).
+private func resizeImageMaxWidthUsingImageIO(source: URL, maxWidth: Int) throws -> URL {
+    guard maxWidth > 0 else { throw CompressionError.imageResizeFailed }
+    let cgImage = try cgImageDecodedOrientedFullSize(url: source)
+
+    let w = cgImage.width
+    let h = cgImage.height
+    guard w > 0, h > 0 else { throw CompressionError.imageResizeFailed }
+
+    let outW: Int
+    let outH: Int
+    if w <= maxWidth {
+        outW = w
+        outH = h
+    } else {
+        outW = maxWidth
+        outH = max(1, Int((Double(h) * Double(maxWidth) / Double(w)).rounded()))
+    }
+
+    let tmpURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("dinky_resize_io_\(UUID().uuidString)")
+        .appendingPathExtension("png")
+
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+    guard let ctx = CGContext(
+        data: nil,
+        width: outW,
+        height: outH,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: colorSpace,
+        bitmapInfo: bitmapInfo
+    ) else {
+        throw CompressionError.imageResizeFailed
+    }
+    ctx.interpolationQuality = .high
+    ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: outW, height: outH))
+    guard let scaled = ctx.makeImage() else {
+        throw CompressionError.imageResizeFailed
+    }
+
+    guard let dest = CGImageDestinationCreateWithURL(tmpURL as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+        throw CompressionError.imageResizeFailed
+    }
+    CGImageDestinationAddImage(dest, scaled, nil)
+    guard CGImageDestinationFinalize(dest) else {
+        try? FileManager.default.removeItem(at: tmpURL)
+        throw CompressionError.imageResizeFailed
+    }
+    return tmpURL
+}
+
 actor CompressionService {
 
     static let shared = CompressionService()
@@ -93,22 +236,51 @@ actor CompressionService {
         smartQuality: Bool = false,
         contentTypeHint: String = "auto",
         /// When Smart Quality is on and the caller already classified (e.g. Auto format), skip a second Vision pass.
-        preclassifiedContent: ContentType? = nil
+        preclassifiedContent: ContentType? = nil,
+        /// Matches Settings “Batch speed” so `avifenc --jobs` doesn’t oversubscribe when many files run at once.
+        parallelCompressionLimit: Int = 3,
+        collisionNamingStyle: CollisionNamingStyle = .finderDuplicate,
+        progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> CompressionResult {
+        let tTotal = CFAbsoluteTimeGetCurrent()
         let originalSize = fileSize(source)
+        let sourceHasMultipleFrames = imageSourceHasMultipleFrames(url: source)
+        let avifJobs = Self.avifEncoderJobCount(parallelLimit: parallelCompressionLimit)
+
+        func report(_ v: Float) {
+            progressHandler?(min(1, max(0, v)))
+        }
+
+        let outputURL = OutputPathUniqueness.uniqueOutputURL(
+            desired: outputURL, sourceURL: source, style: collisionNamingStyle
+        )
 
         try FileManager.default.createDirectory(
             at: outputURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
 
-        // Step 1: maybe resize
-        let workURL = try await maybeResize(source: source, maxWidth: goals.maxWidth)
-        let isTempWork = workURL != source
+        // Step 1: HEIC/HEIF → PNG (encoders don't read HEIC; Smart Quality still uses `source` below).
+        let tHeic = CFAbsoluteTimeGetCurrent()
+        let encoderInputURL = try await Task.detached {
+            try heicTranscodeToPNGIfNeeded(source: source)
+        }.value
+        CompressionTiming.logPhase("image.heicTranscodeOrPassthrough", startedAt: tHeic)
+        report(0.12)
+        let encoderInputIsTemp = encoderInputURL != source
+        defer { if encoderInputIsTemp { try? FileManager.default.removeItem(at: encoderInputURL) } }
+
+        // Step 2: maybe resize
+        let tResize = CFAbsoluteTimeGetCurrent()
+        let workURL = try await maybeResize(source: encoderInputURL, maxWidth: goals.maxWidth)
+        CompressionTiming.logPhase("image.resize", startedAt: tResize)
+        report(0.22)
+        let isTempWork = workURL != encoderInputURL
         defer { if isTempWork { try? FileManager.default.removeItem(at: workURL) } }
 
-        // Step 2: classify for Smart Quality on the **original** URL (EXIF intact).
+        // Step 3: classify for Smart Quality on the **original** URL (EXIF intact).
         // Off-actor so Vision/pixel work doesn't serialize on this actor.
+        let tClassify = CFAbsoluteTimeGetCurrent()
         let detected: ContentType?
         if smartQuality, let preclassifiedContent {
             detected = preclassifiedContent
@@ -122,18 +294,25 @@ actor CompressionService {
             default:                  detected = nil
             }
         }
+        CompressionTiming.logPhase("image.classify", startedAt: tClassify)
+        report(0.33)
 
-        // Step 3: compress — lossless formats skip quality targeting
+        // Step 4: compress — lossless formats skip quality targeting
+        let tEncode = CFAbsoluteTimeGetCurrent()
         if format == .png {
+            report(0.38)
             try await compressAtQuality(source: workURL, quality: 0,
                                         format: format, strip: stripMetadata, output: outputURL,
-                                        content: detected)
+                                        content: detected, avifJobs: avifJobs)
+            report(1)
         } else if let targetKB = goals.maxFileSizeKB {
             let floor = detected.flatMap { targetSizeFloor[$0] } ?? 10
+            report(0.34)
             try await compressToTargetSize(
                 source: workURL, targetBytes: Int64(targetKB) * 1024,
                 format: format, strip: stripMetadata, output: outputURL,
-                qualityFloor: floor, content: detected
+                qualityFloor: floor, content: detected, avifJobs: avifJobs,
+                progressHandler: progressHandler
             )
         } else {
             let q = quality(for: format, content: detected)
@@ -141,15 +320,19 @@ actor CompressionService {
             // q=92 lossy softens. AVIF graphics handle crispness via 4:4:4 +
             // slower speed.
             let nl: Int? = (format == .webp && detected == .graphic) ? 60 : nil
+            report(0.38)
             try await compressAtQuality(source: workURL, quality: q,
                                         format: format, strip: stripMetadata, output: outputURL,
-                                        content: detected, nearLossless: nl)
+                                        content: detected, nearLossless: nl, avifJobs: avifJobs)
+            report(1)
         }
+        CompressionTiming.logPhase("image.encode", startedAt: tEncode)
 
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             throw CompressionError.outputMissing
         }
 
+        var recovery: URL?
         if isURLDownloadSource {
             // Temp download — never trash/backup the temp path; remove silently.
             try? FileManager.default.removeItem(at: source)
@@ -158,16 +341,19 @@ actor CompressionService {
             case .keep:
                 break
             case .trash:
-                try? OriginalsHandler.dispose(originalAt: source, action: .trash, backupFolder: nil)
+                recovery = try? OriginalsHandler.dispose(originalAt: source, action: .trash, backupFolder: nil)
             case .backup:
-                try? OriginalsHandler.dispose(originalAt: source, action: .backup, backupFolder: backupFolderURL)
+                recovery = try? OriginalsHandler.dispose(originalAt: source, action: .backup, backupFolder: backupFolderURL)
             }
         }
 
+        CompressionTiming.logPhase("image.compressTotal", startedAt: tTotal)
         return CompressionResult(outputURL: outputURL,
                                  originalSize: originalSize,
                                  outputSize: fileSize(outputURL),
-                                 detectedContentType: detected)
+                                 originalRecoveryURL: recovery,
+                                 detectedContentType: detected,
+                                 usedFirstFrameOnly: sourceHasMultipleFrames)
     }
 
     /// Resolve quality based on Smart Quality classification (if available).
@@ -176,30 +362,24 @@ actor CompressionService {
         return defaultQuality[format] ?? 82
     }
 
-    // MARK: - Resize (sips, built-in to macOS)
+    /// `avifenc --jobs` scaled so N parallel encodes don’t each claim all cores (`--jobs all`).
+    private static func avifEncoderJobCount(parallelLimit: Int) -> Int {
+        let cores = ProcessInfo.processInfo.processorCount
+        return max(1, cores / max(1, parallelLimit))
+    }
+
+    // MARK: - Resize (ImageIO only; oriented dimensions, no `sips`)
 
     private func maybeResize(source: URL, maxWidth: Int?) async throws -> URL {
         guard let maxWidth else { return source }
 
-        // Check current dimensions
-        guard let size = imageSize(source), Int(size.width) > maxWidth else {
-            return source  // already within limit, skip resize
+        guard let size = orientedPixelSize(url: source), Int(size.width) > maxWidth else {
+            return source
         }
 
-        // WebP / AVIF / BMP (etc.) must not round-trip through JPEG — use lossless TIFF.
-        let ext: String
-        if ["jpg", "jpeg", "png", "tiff"].contains(source.pathExtension.lowercased()) {
-            ext = source.pathExtension
-        } else {
-            ext = "tiff"
-        }
-        let tmpURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dinky_resize_\(UUID().uuidString)")
-            .appendingPathExtension(ext)
-
-        try await run(URL(fileURLWithPath: "/usr/bin/sips"),
-                      args: ["--resampleWidth", String(maxWidth), source.path, "--out", tmpURL.path])
-        return tmpURL
+        return try await Task.detached {
+            try resizeImageMaxWidthUsingImageIO(source: source, maxWidth: maxWidth)
+        }.value
     }
 
     // MARK: - Quality binary search for file-size target
@@ -208,9 +388,16 @@ actor CompressionService {
         source: URL, targetBytes: Int64,
         format: CompressionFormat, strip: Bool, output: URL,
         qualityFloor: Int = 10,
-        content: ContentType?
+        content: ContentType?,
+        avifJobs: Int,
+        progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws {
         let fm = FileManager.default
+        var encodeSteps = 0
+        func bumpEncode() {
+            encodeSteps += 1
+            progressHandler?(min(0.97, 0.34 + Float(encodeSteps) * 0.048))
+        }
 
         // Graphic + WebP: binary-search `-near_lossless` (40…100) before lossy `-q`.
         // Higher values = closer to lossless = larger files; we maximize nl that still fits the cap.
@@ -218,6 +405,7 @@ actor CompressionService {
             var nlLo = 40, nlHi = 100
             var bestURL: URL?
             while nlLo <= nlHi {
+                bumpEncode()
                 let mid = (nlLo + nlHi) / 2
                 let tmp = fm.temporaryDirectory
                     .appendingPathComponent("dinky_nl\(mid)_\(UUID().uuidString)")
@@ -237,6 +425,7 @@ actor CompressionService {
             }
             if let best = bestURL {
                 try fm.moveItem(at: best, to: output)
+                progressHandler?(1)
                 return
             }
         }
@@ -245,12 +434,13 @@ actor CompressionService {
         var bestURL: URL?
 
         while lo <= hi {
+            bumpEncode()
             let mid = (lo + hi) / 2
             let tmp = fm.temporaryDirectory
                 .appendingPathComponent("dinky_q\(mid)_\(UUID().uuidString)")
                 .appendingPathExtension(format.outputExtension)
 
-            try await compressAtQuality(source: source, quality: mid, format: format, strip: strip, output: tmp, content: content)
+            try await compressAtQuality(source: source, quality: mid, format: format, strip: strip, output: tmp, content: content, avifJobs: avifJobs)
 
             if fileSize(tmp) <= targetBytes {
                 if let prev = bestURL { try? fm.removeItem(at: prev) }
@@ -264,11 +454,14 @@ actor CompressionService {
 
         if let best = bestURL {
             try fm.moveItem(at: best, to: output)
+            progressHandler?(1)
         } else {
             // Nothing met the target — use floor quality and let caller decide
+            bumpEncode()
             try await compressAtQuality(source: source, quality: qualityFloor,
                                         format: format, strip: strip, output: output,
-                                        content: content)
+                                        content: content, avifJobs: avifJobs)
+            progressHandler?(1)
         }
     }
 
@@ -278,11 +471,12 @@ actor CompressionService {
         source: URL, quality: Int,
         format: CompressionFormat, strip: Bool, output: URL,
         content: ContentType?,
-        nearLossless: Int? = nil
+        nearLossless: Int? = nil,
+        avifJobs: Int
     ) async throws {
         switch format {
         case .webp: try await runCwebp(source: source, quality: quality, strip: strip, output: output, content: content, nearLossless: nearLossless)
-        case .avif: try await runAvifenc(source: source, quality: quality, strip: strip, output: output, content: content)
+        case .avif: try await runAvifenc(source: source, quality: quality, strip: strip, output: output, content: content, avifJobs: avifJobs)
         case .png:  try await runOxipng(source: source, strip: strip, output: output)
         }
     }
@@ -296,14 +490,16 @@ actor CompressionService {
             // while keeping edges pixel-perfect. Best for graphics — UI,
             // illustrations, logos, anything with hard edges.
             // -q here controls compression effort, not visual quality.
-            args = ["-near_lossless", String(nl), "-m", "6", "-alpha_q", "100", "-exact", "-q", "100"]
+            // `-m 4` and fewer passes keep Smart Quality responsive vs max-effort `-m 6`.
+            args = ["-near_lossless", String(nl), "-m", "4", "-alpha_q", "100", "-exact", "-q", "100"]
         } else {
             // -preset must come first — it resets other flags.
+            // `-m 4` / `-pass 4` (photo): faster than max method + 6 analysis passes with minimal visible change at our quality levels.
             switch content {
-            case .photo:    args = ["-preset", "photo",   "-m", "6", "-sharp_yuv", "-pass", "6", "-af", "-q", q]
-            case .graphic:  args = ["-preset", "text",    "-m", "6", "-sharp_yuv", "-alpha_q", "100", "-exact", "-q", q]
-            case .mixed:    args = ["-preset", "picture", "-m", "6", "-sharp_yuv", "-q", q]
-            case .none:     args = ["-preset", "picture", "-m", "6", "-q", q]
+            case .photo:    args = ["-preset", "photo",   "-m", "4", "-sharp_yuv", "-pass", "4", "-af", "-q", q]
+            case .graphic:  args = ["-preset", "text",    "-m", "4", "-sharp_yuv", "-alpha_q", "100", "-exact", "-q", q]
+            case .mixed:    args = ["-preset", "picture", "-m", "4", "-sharp_yuv", "-q", q]
+            case .none:     args = ["-preset", "picture", "-m", "4", "-q", q]
             }
         }
         if strip { args += ["-metadata", "none"] }
@@ -311,18 +507,19 @@ actor CompressionService {
         try await run(binary, args: args)
     }
 
-    private func runAvifenc(source: URL, quality: Int, strip: Bool, output: URL, content: ContentType?) async throws {
+    private func runAvifenc(source: URL, quality: Int, strip: Bool, output: URL, content: ContentType?, avifJobs: Int) async throws {
         let binary = try binaryURL("avifenc")
         let qColor = String(quality)
         let qAlpha = String(min(quality + 10, 100))
+        let jobsArg = String(avifJobs)
         var args: [String]
         switch content {
-        case .photo:    args = ["--speed", "4", "--yuv", "420", "--depth", "10", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
+        case .photo:    args = ["--speed", "6", "--yuv", "420", "--depth", "10", "--jobs", jobsArg, "--qcolor", qColor, "--qalpha", qAlpha]
         // Graphic: 4:4:4 keeps color edges sharp (no chroma subsampling).
-        // Speed 4 (slower than the default 6) noticeably improves edge crispness.
-        case .graphic:  args = ["--speed", "4", "--yuv", "444", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
-        case .mixed:    args = ["--speed", "5", "--yuv", "422", "--depth", "10", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
-        case .none:     args = ["--speed", "5", "--yuv", "420", "--jobs", "all", "--qcolor", qColor, "--qalpha", qAlpha]
+        // Speed 5 balances edge quality with encode time (444 is already heavier than 420).
+        case .graphic:  args = ["--speed", "5", "--yuv", "444", "--jobs", jobsArg, "--qcolor", qColor, "--qalpha", qAlpha]
+        case .mixed:    args = ["--speed", "6", "--yuv", "422", "--depth", "10", "--jobs", jobsArg, "--qcolor", qColor, "--qalpha", qAlpha]
+        case .none:     args = ["--speed", "6", "--yuv", "420", "--jobs", jobsArg, "--qcolor", qColor, "--qalpha", qAlpha]
         }
         if strip { args += ["--ignore-exif", "--ignore-xmp"] }
         args += [source.path, output.path]
@@ -373,14 +570,65 @@ actor CompressionService {
 
     // MARK: - PDF compression
 
+    private func qpdfBinaryURL() -> URL? {
+        let u = binDir.appendingPathComponent("qpdf")
+        guard FileManager.default.isExecutableFile(atPath: u.path) else { return nil }
+        return u
+    }
+
+    /// Structural/stream optimization via bundled `qpdf` (smaller output only when `originalSize` check passes in caller).
+    private func runQpdfPreserve(
+        source: URL,
+        output: URL,
+        stripMetadata: Bool,
+        binary: URL,
+        experimental: PDFPreserveExperimentalMode
+    ) async throws {
+        var args: [String] = [
+            source.path,
+            output.path,
+            "--object-streams=generate",
+            "--compress-streams=y",
+            "--recompress-flate",
+            "--compression-level=9",
+            "--optimize-images",
+        ]
+        args.append(contentsOf: experimental.extraQpdfArgs)
+        if stripMetadata {
+            args.append(contentsOf: ["--remove-metadata", "--remove-info"])
+        }
+        do {
+            try await run(binary, args: args)
+        } catch {
+            var fallback = [
+                source.path,
+                output.path,
+                "--object-streams=generate",
+                "--compress-streams=y",
+                "--recompress-flate",
+                "--compression-level=9",
+            ]
+            fallback.append(contentsOf: experimental.qpdfExtrasWithoutJPEGQuality)
+            if stripMetadata {
+                fallback.append(contentsOf: ["--remove-metadata", "--remove-info"])
+            }
+            try await run(binary, args: fallback)
+        }
+    }
+
     func compressPDF(
         source: URL,
         outputMode: PDFOutputMode,
         quality: PDFQuality,
         grayscale: Bool,
         stripMetadata: Bool,
-        outputURL: URL
+        outputURL: URL,
+        flattenLastResort: Bool = false,
+        flattenUltra: Bool = false,
+        preserveExperimental: PDFPreserveExperimentalMode = .none,
+        progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> CompressionResult {
+        let tPDF = CFAbsoluteTimeGetCurrent()
         let originalSize = fileSize(source)
 
         try FileManager.default.createDirectory(
@@ -390,21 +638,79 @@ actor CompressionService {
 
         switch outputMode {
         case .preserveStructure:
-            try PDFCompressor.preserveStructure(source: source, stripMetadata: stripMetadata, outputURL: outputURL)
+            progressHandler?(0.06)
+            let fm = FileManager.default
+            let qpdfTmp = fm.temporaryDirectory.appendingPathComponent("dinky_qpdf_\(UUID().uuidString).pdf")
+            var usedQpdf = false
+            if let qpdfBin = qpdfBinaryURL() {
+                do {
+                    try await runQpdfPreserve(
+                        source: source,
+                        output: qpdfTmp,
+                        stripMetadata: stripMetadata,
+                        binary: qpdfBin,
+                        experimental: preserveExperimental
+                    )
+                    let qSz = fileSize(qpdfTmp)
+                    if qSz > 0 && qSz < originalSize {
+                        if fm.fileExists(atPath: outputURL.path) {
+                            try fm.removeItem(at: outputURL)
+                        }
+                        try fm.moveItem(at: qpdfTmp, to: outputURL)
+                        usedQpdf = true
+                    }
+                } catch {
+                    try? fm.removeItem(at: qpdfTmp)
+                }
+                if !usedQpdf {
+                    try? fm.removeItem(at: qpdfTmp)
+                }
+            }
+            if !usedQpdf {
+                let ph = progressHandler
+                try await Task.detached {
+                    try PDFCompressor.preserveStructure(
+                        source: source,
+                        stripMetadata: stripMetadata,
+                        outputURL: outputURL,
+                        progress: ph
+                    )
+                }.value
+            } else {
+                progressHandler?(1)
+            }
         case .flattenPages:
-            try PDFCompressor.compressFlattened(
-                source: source, quality: quality, grayscale: grayscale,
-                stripMetadata: stripMetadata, outputURL: outputURL
-            )
+            let ph = progressHandler
+            let ultra = flattenUltra
+            let lastResort = flattenLastResort && !ultra
+            try await Task.detached {
+                try PDFCompressor.compressFlattened(
+                    source: source, quality: quality, grayscale: grayscale,
+                    stripMetadata: stripMetadata, outputURL: outputURL,
+                    lastResortFlatten: lastResort,
+                    ultraLastResortFlatten: ultra,
+                    progress: ph
+                )
+            }.value
         }
+        CompressionTiming.logPhase("pdf.compress.\(outputMode == .flattenPages ? "flatten" : "preserve")", startedAt: tPDF)
 
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             throw CompressionError.outputMissing
         }
 
+        let outSz = fileSize(outputURL)
+        PDFCompressionMetrics.logOutcome(
+            outputMode: outputMode,
+            originalBytes: originalSize,
+            outputBytes: outSz,
+            flattenLastResort: flattenLastResort,
+            flattenUltra: flattenUltra
+        )
+
         return CompressionResult(outputURL: outputURL,
                                  originalSize: originalSize,
-                                 outputSize: fileSize(outputURL),
+                                 outputSize: outSz,
                                  detectedContentType: nil)
     }
 
@@ -493,14 +799,5 @@ actor CompressionService {
 
     private func fileSize(_ url: URL) -> Int64 {
         (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { Int64($0) } ?? 0
-    }
-
-    private func imageSize(_ url: URL) -> CGSize? {
-        guard let src   = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any],
-              let w     = props[kCGImagePropertyPixelWidth  as String] as? Int,
-              let h     = props[kCGImagePropertyPixelHeight as String] as? Int
-        else { return nil }
-        return CGSize(width: w, height: h)
     }
 }

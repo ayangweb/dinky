@@ -2,6 +2,16 @@ import Foundation
 import SwiftUI
 import PDFKit
 
+/// Captures enough state to reverse a successful compression (restore original, remove output).
+struct CompressionUndoSnapshot: Equatable {
+    var sourceURL: URL
+    var outputURL: URL
+    /// Trash or backup path where the original bytes were moved; `nil` if the original stayed at `sourceURL`.
+    var originalRecoveryURL: URL?
+    var replaceOriginal: Bool
+    var isURLDownloadSource: Bool
+}
+
 enum CompressionStatus {
     case pending
     /// Direct media URL fetch in progress (`totalBytes` nil when length unknown).
@@ -39,9 +49,11 @@ final class CompressionItem: ObservableObject, Identifiable {
     @Published var detectedVideoContentType: VideoContentType? = nil
     /// True when the source carried HDR (HLG / PQ / Dolby Vision) and the export preserved it.
     @Published var videoIsHDR: Bool = false
+    /// True when a multi-frame source (e.g. GIF) was compressed using only the first frame.
+    @Published var usedFirstFrameOnly: Bool = false
 
     var forceCompress: Bool = false
-    var pageCount: Int? = nil
+    @Published var pageCount: Int? = nil
     var videoDuration: Double? = nil
     /// When set, compression uses this preset’s stored options (`CompressionPreset`) instead of the sidebar.
     var presetID: UUID? = nil
@@ -54,15 +66,25 @@ final class CompressionItem: ObservableObject, Identifiable {
 
     /// One-shot flatten-PDF quality from the results list context menu; skips smart inference when set.
     var pdfQualityOverride: PDFQuality? = nil
+    /// One-shot PDF output mode (e.g. zero-gain sheet “flatten smallest”); cleared when compression starts.
+    var pdfOutputModeOverride: PDFOutputMode? = nil
+    /// One-shot experimental qpdf options for preserve mode (zero-gain retry); cleared when compression starts.
+    var pdfPreserveExperimentalOverride: PDFPreserveExperimentalMode? = nil
     /// One-shot video quality + codec from the context menu; skips smart inference when set.
     var videoRecompressOverride: (quality: VideoQuality, codec: VideoCodecFamily)? = nil
 
-    /// `0...1` while `AVAssetExportSession` is running; `nil` otherwise.
-    @Published var videoExportProgress: Double? = nil
+    /// `0...1` while compression is in progress (video export, staged image/PDF steps); `nil` when idle or indeterminate.
+    @Published var compressionProgress: Double? = nil
+
+    /// Set when compression succeeds; cleared after undo or re-queue.
+    var undoSnapshot: CompressionUndoSnapshot?
+    /// When `status` is `.zeroGain` for a PDF, which output mode produced the failed attempt (for sheet copy).
+    var zeroGainPDFOutputMode: PDFOutputMode?
 
     init(sourceURL: URL, presetID: UUID? = nil, mediaType: MediaType? = nil) {
         self.sourceURL = sourceURL
         self.presetID = presetID
+        self.undoSnapshot = nil
         self.mediaType = mediaType ?? (MediaTypeDetector.detect(sourceURL) ?? .image)
         if self.mediaType == .pdf {
             self.pageCount = PDFDocument(url: sourceURL)?.pageCount

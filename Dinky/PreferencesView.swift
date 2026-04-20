@@ -149,11 +149,19 @@ private struct GeneralTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Toggle(String(localized: "Manual mode", comment: "Settings UI."), isOn: Binding(
+                Toggle(String(localized: "Show batch summary when done", comment: "Settings UI."), isOn: Binding(
+                    get: { prefs.showBatchSummaryDialog },
+                    set: { prefs.showBatchSummaryDialog = $0 }
+                ))
+                Text(String(localized: "Shows a short summary after a successful batch (space saved, time, folder opened or not). Sounds and notifications follow their own settings.", comment: "Settings UI."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle(String(localized: "Manual mode by default", comment: "Settings UI."), isOn: Binding(
                     get: { prefs.manualMode },
                     set: { prefs.manualMode = $0 }
                 ))
-                Text(String(localized: "Files won't compress on drop — right-click to choose format per file.", comment: "Settings UI."))
+                Text(String(localized: "When on, new files stay queued until you compress them. When off, new files compress automatically. After Undoing a finished batch, use Compress Now (toolbar, bottom bar, or File menu) — that always runs when you ask, regardless of this setting.", comment: "Settings UI."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -184,6 +192,11 @@ private struct GeneralTab: View {
                 }
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
+                if prefs.originalsAction == .keep {
+                    Text(String(localized: "Source files are never moved or deleted — even when Filename = Replace original (the original is only displaced when output would overwrite it).", comment: "Settings UI."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if prefs.originalsAction == .trash {
                     Text(String(localized: "Permanent once the trash is emptied.", comment: "Settings UI."))
                     .font(.caption)
@@ -228,7 +241,7 @@ private struct GeneralTab: View {
                     Text(String(localized: "10%", comment: "Settings UI.")).tag(10)
                 }
                 .pickerStyle(.segmented)
-                Text(String(localized: "Applies to images, videos, and PDFs. Skip files where savings fall below this threshold.", comment: "Settings UI."))
+                Text(String(localized: "Applies to images and video only. PDFs always keep the result when it is smaller than the original (even a small %), because PDF savings are often modest on preserve mode or threshold-sized on flatten.", comment: "Settings UI: minimum savings threshold scope."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -244,6 +257,14 @@ private struct GeneralTab: View {
                 }
                 .pickerStyle(.menu)
                 Text(S.concurrentCompressionFootnote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle(S.batchLargestFirstLabel, isOn: Binding(
+                    get: { prefs.batchLargestFirst },
+                    set: { prefs.batchLargestFirst = $0 }
+                ))
+                Text(S.batchLargestFirstFootnote)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -271,6 +292,14 @@ private struct GeneralTab: View {
                     }
                 ))
                 Text(String(localized: "To receive notifications during Focus or Do Not Disturb, allow Dinky in System Settings → Focus.", comment: "Settings UI."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle(String(localized: "Open folder when done", comment: "Settings UI."), isOn: Binding(
+                    get: { prefs.openFolderWhenDone },
+                    set: { prefs.openFolderWhenDone = $0 }
+                ))
+                Text(String(localized: "Opens the output folder in Finder after each compression batch.", comment: "Settings UI."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -436,6 +465,14 @@ private struct OutputTab: View {
     var body: some View {
         Form {
             Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(String(localized: "Defaults for the main window. Presets can set their own folder and filename rules.", comment: "Settings Output tab intro."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    PreferencesRelatedTabLink(title: String(localized: "Per-preset output…", comment: "Settings UI."), tab: .presets)
+                }
+                .padding(.vertical, 2)
+
                 Picker(String(localized: "Save to", comment: "Settings UI."), selection: Binding(
                     get: { prefs.saveLocation },
                     set: { prefs.saveLocation = $0 }
@@ -487,14 +524,19 @@ private struct OutputTab: View {
                         .frame(width: 120)
                     }
                 }
+
+                Picker(String(localized: "If a file already exists", comment: "Settings UI: name collision handling."), selection: Binding(
+                    get: { prefs.collisionNamingStyle },
+                    set: { prefs.collisionNamingStyle = $0 }
+                )) {
+                    ForEach(CollisionNamingStyle.allCases) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
             } header: {
                 Text(String(localized: "Filename", comment: "Settings UI."))
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "These are the defaults for the main window. Presets can set their own folder and filename rules.", comment: "Settings UI."))
-                    .font(.caption)
-                    PreferencesRelatedTabLink(title: String(localized: "Per-preset output…", comment: "Settings UI."), tab: .presets)
-                }
             }
         }
         .formStyle(.grouped)
@@ -533,10 +575,59 @@ private struct PresetsTab: View {
         prefs.savedPresets.first { $0.id == selectedID }
     }
 
+    /// One-line summary so presets are distinguishable in the list without expanding.
     private func presetListSecondaryLine(_ preset: CompressionPreset) -> String {
-        let scope = PresetMediaScope(rawValue: preset.presetMediaScopeRaw)?.displayName ?? PresetMediaScope.all.displayName
-        let fmt = preset.autoFormat ? "Auto" : preset.format.displayName
-        return "\(scope) · \(fmt)"
+        let scope = PresetMediaScope(rawValue: preset.presetMediaScopeRaw) ?? .all
+        var parts: [String] = [scope.displayName]
+        let imageFmt = preset.autoFormat
+            ? String(localized: "Auto", comment: "Preset list: automatic image format.")
+            : preset.format.displayName
+        let vid = (VideoCodecFamily(rawValue: preset.videoCodecFamilyRaw) ?? .h264).chipLabel
+
+        switch scope {
+        case .all:
+            parts.append(imageFmt)
+            parts.append(vid)
+            let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
+            if pdfMode == .flattenPages {
+                let q = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
+                parts.append(String(localized: "PDF \(q.displayName)", comment: "Preset list: flattened PDF quality tier."))
+            } else {
+                parts.append(String(localized: "PDF preserve", comment: "Preset list: PDF preserve structure."))
+            }
+        case .image:
+            parts.append(imageFmt)
+            if preset.maxWidthEnabled {
+                parts.append(String(localized: "max \(preset.maxWidth) px", comment: "Preset list: max width pixels."))
+            }
+            if preset.maxFileSizeEnabled {
+                let mb = Double(preset.maxFileSizeKB) / 1024.0
+                let mbStr = mb < 1 ? String(format: "%.1f", mb) : String(format: "%.4g", mb)
+                parts.append(String(localized: "≤\(mbStr) MB", comment: "Preset list: target file size cap."))
+            }
+        case .video:
+            parts.append(vid)
+            if preset.videoMaxResolutionEnabled {
+                parts.append("\(preset.videoMaxResolutionLines)p")
+            } else {
+                parts.append(String(localized: "full res", comment: "Preset list: video no resolution cap."))
+            }
+            if preset.videoRemoveAudio {
+                parts.append(String(localized: "no audio", comment: "Preset list: audio stripped."))
+            }
+        case .pdf:
+            let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
+            if pdfMode == .flattenPages {
+                let q = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
+                parts.append(String(localized: "Flatten \(q.displayName)", comment: "Preset list: PDF flatten + quality."))
+                if preset.pdfGrayscale {
+                    parts.append(String(localized: "grayscale", comment: "Preset list: PDF grayscale."))
+                }
+            } else {
+                parts.append(String(localized: "Preserve", comment: "Preset list: PDF preserve links."))
+            }
+        }
+        return parts.joined(separator: " · ")
     }
 
     var body: some View {
@@ -655,7 +746,7 @@ private struct PresetsTab: View {
                 }
                 switch effectiveMediaTab(for: snapshot) {
                 case .image:
-                    ContentTypeChipPicker(contentTypeHintRaw: binding(\.contentTypeHintRaw, snapshot: snapshot))
+                    EmptyView()
                 case .video:
                     presetManualCompressionVideoControls(snapshot)
                 case .pdf:
@@ -738,6 +829,12 @@ private struct PresetsTab: View {
                     TextField(String(localized: "-dinky", comment: "Settings UI."), text: binding(\.customSuffix, snapshot: snapshot))
                 }
             }
+            Picker(String(localized: "If a file already exists", comment: "Settings UI: name collision handling."), selection: binding(\.collisionNamingStyleRaw, snapshot: snapshot)) {
+                ForEach(CollisionNamingStyle.allCases) { style in
+                    Text(style.displayName).tag(style.rawValue)
+                }
+            }
+            .labelsHidden()
         } header: {
             Text(String(localized: "Destination", comment: "Settings UI."))
         } footer: {
@@ -808,7 +905,7 @@ private struct PresetsTab: View {
                     selected: binding(\.pdfQualityRaw, snapshot: snapshot)
                 )
             } else {
-                Text(String(localized: "Low / Medium / High apply when Flatten (smallest) is selected under Media.", comment: "Settings UI."))
+                Text(String(localized: "Low / Medium / High apply when Smallest file (flatten) is selected under Media.", comment: "Settings UI."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -830,43 +927,57 @@ private struct PresetsTab: View {
     @ViewBuilder
     private func presetImageControls(_ snapshot: CompressionPreset) -> some View {
         let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
-        // Single container so Form doesn’t allocate one row per child (Divider/Toggle rows looked like blank gaps).
         VStack(alignment: .leading, spacing: 10) {
+            settingsSubHeader(icon: "photo.on.rectangle.angled", String(localized: "Format", comment: "Settings UI: Media image subsection."))
             FormatChipPicker(
                 autoFormat: binding(\.autoFormat, snapshot: snapshot),
                 selectedFormat: binding(\.format, snapshot: snapshot)
             )
-            Divider()
+
+            SettingsSectionDivider()
+
+            settingsSubHeader(icon: "wand.and.stars", String(localized: "Quality", comment: "Settings UI: Media image subsection."))
+            if live.smartQuality {
+                settingsHelperText(String(localized: "Picks encoder strength per image from content (photo vs. graphic). Turn off Smart quality under Compression to choose Photo, Graphic, or Mixed.", comment: "Settings UI."))
+            } else {
+                ContentTypeChipPicker(contentTypeHintRaw: binding(\.contentTypeHintRaw, snapshot: snapshot))
+            }
+
+            SettingsSectionDivider()
+
+            settingsSubHeader(icon: "arrow.left.and.right", String(localized: "Max width", comment: "Settings UI: Media image subsection."))
             Toggle(String(localized: "Limit width", comment: "Settings UI."), isOn: binding(\.maxWidthEnabled, snapshot: snapshot))
             if live.maxWidthEnabled {
-                presetChips(
-                    presets: [("640", 640), ("1080", 1080), ("1280", 1280),
-                              ("1920", 1920), ("2560", 2560), ("3840", 3840)],
+                settingsChipGrid(
+                    presets: settingsWidthPresets,
                     current: live.maxWidth,
-                    onSelect: { set(\.maxWidth, to: $0, for: snapshot) }
-                )
+                    fixedColumnCount: 3
+                ) { set(\.maxWidth, to: $0, for: snapshot) }
                 HStack(spacing: 6) {
                     TextField("", value: binding(\.maxWidth, snapshot: snapshot), format: .number)
                         .textFieldStyle(.roundedBorder).frame(width: 80)
                         .labelsHidden()
                     Text(String(localized: "px", comment: "Unit abbreviation for pixels.")).foregroundStyle(.secondary)
                 }
+                settingsHelperText(String(localized: "Try 1920 for web, 1280 for social, 640 for email.", comment: "Settings UI."))
             }
-            Divider()
+
+            SettingsSectionDivider()
+
+            settingsSubHeader(icon: "gauge.with.dots.needle.67percent", String(localized: "Max file size", comment: "Settings UI: Media image subsection."))
             Toggle(String(localized: "Limit file size", comment: "Settings UI."), isOn: binding(\.maxFileSizeEnabled, snapshot: snapshot))
             if live.maxFileSizeEnabled {
-                presetChips(
-                    presets: [("0.5 MB", 512), ("1 MB", 1024), ("2 MB", 2048),
-                              ("5 MB", 5120), ("10 MB", 10240)],
-                    current: live.maxFileSizeKB,
-                    onSelect: { set(\.maxFileSizeKB, to: $0, for: snapshot) }
-                )
+                settingsChipGrid(
+                    presets: settingsSizePresets,
+                    current: live.maxFileSizeKB
+                ) { set(\.maxFileSizeKB, to: $0, for: snapshot) }
                 HStack(spacing: 6) {
                     TextField("", value: mbBinding(for: snapshot), format: .number)
                         .textFieldStyle(.roundedBorder).frame(width: 80)
                         .labelsHidden()
                     Text(String(localized: "MB", comment: "Unit abbreviation for megabytes.")).foregroundStyle(.secondary)
                 }
+                settingsHelperText(String(localized: "Encoder aims near this cap; exact size varies by image.", comment: "Settings UI."))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -876,33 +987,49 @@ private struct PresetsTab: View {
     private func presetPDFControls(_ snapshot: CompressionPreset) -> some View {
         let livePDF = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
         VStack(alignment: .leading, spacing: 10) {
+            settingsSubHeader(icon: "doc.text.viewfinder", String(localized: "Output", comment: "Settings UI: Media PDF subsection."))
             Picker(String(localized: "Output", comment: "Settings UI."), selection: binding(\.pdfOutputModeRaw, snapshot: snapshot)) {
-                Text(String(localized: "Preserve text & links", comment: "Settings UI.")).tag(PDFOutputMode.preserveStructure.rawValue)
-                Text(String(localized: "Flatten (smallest)", comment: "Settings UI.")).tag(PDFOutputMode.flattenPages.rawValue)
+                Text(String(localized: "Preserve text (best-effort size)", comment: "Settings UI: PDF output mode.")).tag(PDFOutputMode.preserveStructure.rawValue)
+                Text(String(localized: "Smallest file (flatten)", comment: "Settings UI: PDF output mode.")).tag(PDFOutputMode.flattenPages.rawValue)
             }
             .pickerStyle(.segmented)
 
+            if PDFOutputMode(rawValue: livePDF.pdfOutputModeRaw) == .preserveStructure {
+                settingsHelperText(String(localized: "qpdf + PDFKit; keeps structure only when the result is smaller. Many PDFs won’t shrink. Low / Medium / High and grayscale apply when Smallest file (flatten) is selected.", comment: "Settings UI: PDF preserve expectations."))
+
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "flask", String(localized: "Advanced (experimental)", comment: "Settings UI: PDF experimental preserve."))
+                Picker(String(localized: "Experimental preserve pass", comment: "Settings UI: PDF experimental picker accessibility."), selection: binding(\.pdfPreserveExperimentalRaw, snapshot: snapshot)) {
+                    ForEach(PDFPreserveExperimentalMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                settingsHelperText(String(localized: "Optional extra qpdf steps for this preset when preserve finds little gain. May affect tags or image quality; leave Off unless you need it.", comment: "Settings UI: PDF experimental preserve helper."))
+            }
+
             if PDFOutputMode(rawValue: livePDF.pdfOutputModeRaw) == .flattenPages {
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "doc.richtext", String(localized: "Quality", comment: "Settings UI: Media PDF subsection."))
                 QualityChipPicker(
                     options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
                     selected: binding(\.pdfQualityRaw, snapshot: snapshot)
                 )
                 .disabled(livePDF.smartQuality)
                 if livePDF.smartQuality {
-                    Text(String(localized: "Manual tier is a fallback when smart analysis can’t run. Turn off Smart quality under Compression to fix Low / Medium / High.", comment: "Settings UI."))
-                    .font(.caption)
-                        .foregroundStyle(.secondary)
+                    settingsHelperText(String(localized: "Manual tier is a fallback when smart analysis can’t run. Turn off Smart quality under Compression to fix Low / Medium / High.", comment: "Settings UI."))
                 }
+
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "circle.lefthalf.filled", String(localized: "Color", comment: "Settings UI: Media PDF subsection."))
                 Toggle(String(localized: "Grayscale PDF", comment: "Settings UI."), isOn: binding(\.pdfGrayscale, snapshot: snapshot))
                 if livePDF.pdfGrayscale {
-                    Text(String(localized: "Smaller files when color isn’t needed.", comment: "Settings UI."))
-                    .font(.caption)
-                        .foregroundStyle(.secondary)
+                    settingsHelperText(String(localized: "Smaller files when color isn’t needed.", comment: "Settings UI."))
                 }
-            } else {
-                Text(String(localized: "Low / Medium / High and grayscale apply when Flatten (smallest) is selected.", comment: "Settings UI."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -912,32 +1039,33 @@ private struct PresetsTab: View {
     private func presetVideoControls(_ snapshot: CompressionPreset) -> some View {
         let liveVideo = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
         VStack(alignment: .leading, spacing: 10) {
+            settingsSubHeader(icon: "film", String(localized: "Format", comment: "Settings UI: Media video codec."))
             QualityChipPicker(
                 options: VideoCodecFamily.allCases.map { ($0.chipLabel, $0.rawValue, $0.description) },
                 selected: binding(\.videoCodecFamilyRaw, snapshot: snapshot)
             )
-            Divider()
+
+            SettingsSectionDivider()
+
+            settingsSubHeader(icon: "arrow.down.right.and.arrow.up.left", String(localized: "Max resolution", comment: "Settings UI: Media video subsection."))
             Toggle(String(localized: "Cap output resolution", comment: "Settings UI."), isOn: binding(\.videoMaxResolutionEnabled, snapshot: snapshot))
             if liveVideo.videoMaxResolutionEnabled {
-                presetChips(
-                    presets: [("480p", 480), ("720p", 720), ("1080p", 1080), ("2160p", 2160)],
+                settingsChipGrid(
+                    presets: settingsVideoResolutionPresets,
                     current: liveVideo.videoMaxResolutionLines,
-                    onSelect: { set(\.videoMaxResolutionLines, to: $0, for: snapshot) }
-                )
-                Text(String(localized: "Source resolution is kept when below the cap. Smart quality below ignores this.", comment: "Settings UI."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    fixedColumnCount: 4
+                ) { set(\.videoMaxResolutionLines, to: $0, for: snapshot) }
+                settingsHelperText(String(localized: "Source resolution is kept when below the cap. Smart quality below ignores this.", comment: "Settings UI."))
             } else {
-                Text(String(localized: "Off keeps source resolution and just re-encodes for size.", comment: "Settings UI."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                settingsHelperText(String(localized: "Off keeps source resolution and just re-encodes for size.", comment: "Settings UI."))
             }
-            Divider()
+
+            SettingsSectionDivider()
+
+            settingsSubHeader(icon: "speaker.wave.2", String(localized: "Audio", comment: "Settings UI: Media video subsection."))
             Toggle(String(localized: "Strip audio track", comment: "Settings UI."), isOn: binding(\.videoRemoveAudio, snapshot: snapshot))
             if liveVideo.videoRemoveAudio {
-                Text(String(localized: "Best for screen recordings or silent clips.", comment: "Settings UI."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                settingsHelperText(String(localized: "Best for screen recordings or silent clips.", comment: "Settings UI."))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1023,25 +1151,6 @@ private struct PresetsTab: View {
         )
     }
 
-    private func presetChips(presets: [(String, Int)], current: Int, onSelect: @escaping (Int) -> Void) -> some View {
-        let columns = [GridItem(.adaptive(minimum: 60), spacing: 4)]
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
-            ForEach(presets, id: \.1) { label, value in
-                let active = current == value
-                Text(label)
-                    .font(.system(size: 11, weight: active ? .semibold : .regular))
-                    .foregroundStyle(active ? .white : .secondary)
-                    .padding(.horizontal, 6).padding(.vertical, 4)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(active ? AnyShapeStyle(dinkyGradient) : AnyShapeStyle(Color.primary.opacity(0.08)))
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { onSelect(value) }
-            }
-        }
-    }
 }
 
 // MARK: - Watch Folders

@@ -53,8 +53,8 @@ enum ContentClassifier {
             return metaSignal
         }
 
-        // Need a thumbnail for the remaining signals.
-        guard let cg = makeThumbnail(url: url, maxPixel: 384) else { return .mixed }
+        // Need a thumbnail for the remaining signals (320px: enough for Vision + heuristics, faster decode than 384).
+        guard let cg = makeThumbnail(url: url, maxPixel: 320) else { return .mixed }
 
         let stats = sample(cgImage: cg)
         if let stats {

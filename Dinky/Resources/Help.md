@@ -63,7 +63,7 @@ Toggle **Settings → General → Use simple sidebar** off (or flip individual s
 
 - **Images** — format, content hint (photo / illustration / screenshot), max width, max file size.
 - **Videos** — codec family (H.264 / HEVC / AV1), quality tier, strip audio.
-- **PDFs** — preserve text & links, or flatten to images for the smallest possible file.
+- **PDFs** — **Smallest file (flatten pages)** is the default for real size savings; **Preserve text (best-effort size)** keeps structure when qpdf/PDFKit can actually shrink the file.
 
 ---
 
@@ -150,7 +150,7 @@ Dinky registers a **Compress Images** action for the Shortcuts app. Use it to pi
 - Everything runs **locally**. No uploads, no telemetry, no account.
 - **Crash reports** are off by default and never sent automatically. If something goes wrong, the post-crash prompt, the "Report a Bug…" menu, and the error detail sheet pre-fill an email or GitHub issue with version + macOS info — *you* still have to hit Send.
 - **Apple crash diagnostics** (MetricKit) are opt-in. Turn on **Settings → General → Privacy → Share crash diagnostics with Dinky** to let Apple deliver anonymous crash and hang reports to Dinky **on your Mac**. The data only leaves your device if you choose to attach it to an email or GitHub issue. Requires *Share with App Developers* under System Settings → Privacy & Security → Analytics & Improvements.
-- The encoders (`cwebp`, `avifenc`, `oxipng`, plus Apple's built-in PDF and AVFoundation video pipelines) ship inside the app and read your files directly.
+- The encoders (`cwebp`, `avifenc`, `oxipng`, bundled `qpdf` on the preserve-PDF path, plus PDFKit/ImageIO for flatten and AVFoundation for video) ship inside the app and read your files directly.
 - Originals are kept by default. *Move originals to trash after compressing* is opt-in, in **Settings → General**.
 - *Skip if savings below* (off by default) protects already-lean files from being re-encoded for nothing.
 - *Strip metadata* in any preset removes EXIF, GPS, camera info, and color profiles. Worth it before publishing photos to the web.
@@ -169,7 +169,7 @@ Either it was already very small (under your *Skip if savings below* threshold),
 Video re-encoding is CPU-heavy. The *Batch speed* setting in **Settings → General** controls how many files run at once — drop it to **Fast** if your Mac is doing other things.
 
 **My PDF lost text selection / hyperlinks.**
-You used *Flatten (smallest)*. Switch the preset's PDF output to *Preserve text & links* and re-run. Flatten always wins on size; preserve always wins on usefulness.
+You used *Smallest file (flatten pages)*. Switch the preset's PDF output to *Preserve text (best-effort size)* and re-run. Flatten is for reliable smaller files; preserve keeps text and links when optimization actually reduces size.
 
 **Right-click "Compress with Dinky" isn't showing up.**
 Open Dinky once after installing so macOS registers the Service. If it still doesn't appear, enable it in **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders**.
