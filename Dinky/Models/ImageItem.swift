@@ -75,6 +75,12 @@ final class CompressionItem: ObservableObject, Identifiable {
 
     /// `0...1` while compression is in progress (video export, staged image/PDF steps); `nil` when idle or indeterminate.
     @Published var compressionProgress: Double? = nil
+    /// Optional sub-step label (e.g. OCR page progress); `nil` when not applicable.
+    @Published var compressionStageLabel: String? = nil
+    /// Last completed PDF job: user had “Make scanned PDFs searchable” on.
+    var lastPdfCompressionOCROptIn: Bool = false
+    /// Last completed PDF job: Vision OCR layer was written before compression.
+    var lastPdfCompressionOCRApplied: Bool = false
 
     /// Set when compression succeeds; cleared after undo or re-queue.
     var undoSnapshot: CompressionUndoSnapshot?

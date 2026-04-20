@@ -1010,6 +1010,9 @@
         }
       }
     },
+    "%lld scanned PDFs made searchable." : {
+      "comment" : "Batch summary OCR line (plural)."
+    },
     "%lld skipped (below savings threshold or unchanged)" : {
       "comment" : "Batch summary; argument is skipped count."
     },
@@ -1247,6 +1250,9 @@
     },
     "≤%@ MB" : {
       "comment" : "Preset list: target file size cap."
+    },
+    "1 scanned PDF made searchable." : {
+      "comment" : "Batch summary OCR line (singular)."
     },
     "2" : {
       "comment" : "A placeholder text for a text field that lets the user specify a target maximum file size in megabytes.",
@@ -1895,6 +1901,9 @@
     },
     "Adds “-dinky” before the extension" : {
       "comment" : "Output summary: filename handling."
+    },
+    "Adds a text layer on scan-like PDFs before compression; normal documents skip this." : {
+      "comment" : "Sidebar PDF OCR helper."
     },
     "Adjust scope" : {
       "comment" : "Accessibility: sidebar Images/PDFs/Videos/Output scope."
@@ -8799,6 +8808,9 @@
     "Details…" : {
       "comment" : "Batch summary row: open zero-gain explanation."
     },
+    "Deutsch" : {
+
+    },
     "Did not open the output folder automatically." : {
       "comment" : "Batch summary: folder was not opened."
     },
@@ -9286,7 +9298,7 @@
         }
       }
     },
-    "Dinky picks a tier from each document. Turn off Smart quality (all types) in Images or Video to set a fixed Low / Medium / High here. Manual tier is still used as a fallback if analysis fails." : {
+    "Dinky picks a tier from each document. The choice below is the manual fallback if analysis fails." : {
       "comment" : "Sidebar PDF: smart flatten helper."
     },
     "Dinky picks format and compression for each file automatically. Turn off to configure each setting manually." : {
@@ -10305,6 +10317,12 @@
     "Encoder aims near this cap; exact size varies by image." : {
       "comment" : "Settings UI."
     },
+    "English (UK)" : {
+
+    },
+    "English (US)" : {
+
+    },
     "Error" : {
       "comment" : "Failed compression button label.",
       "localizations" : {
@@ -10535,6 +10553,9 @@
           }
         }
       }
+    },
+    "Español" : {
+
     },
     "Examples: _backup, holiday{n}" : {
       "comment" : "Settings: placeholder for custom duplicate pattern field."
@@ -11498,6 +11519,9 @@
     },
     "Format & Options Sidebar" : {
       "comment" : "File menu: toggle compression sidebar.\nMenu: show or hide compression sidebar."
+    },
+    "Français" : {
+
     },
     "From %@" : {
       "comment" : "Batch summary per file; argument is original filename.",
@@ -14457,6 +14481,9 @@
         }
       }
     },
+    "Italiano" : {
+
+    },
     "Keyboard shortcuts…" : {
       "comment" : "Settings UI.",
       "localizations" : {
@@ -15010,6 +15037,9 @@
     "Low / Medium / High apply when Smallest file (flatten) is selected under Media." : {
       "comment" : "Settings UI."
     },
+    "Make scanned PDFs searchable (OCR)" : {
+      "comment" : "Settings UI: PDF OCR toggle.\nSidebar PDF OCR toggle."
+    },
     "Manual compression" : {
       "comment" : "Settings UI.",
       "localizations" : {
@@ -15417,6 +15447,7 @@
     },
     "Manual tier is a fallback when smart analysis can’t run. Turn off Smart quality under Compression to fix Low / Medium / High." : {
       "comment" : "Settings UI.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15491,6 +15522,9 @@
           }
         }
       }
+    },
+    "Manual tier is the fallback when smart analysis can’t run." : {
+      "comment" : "Settings UI: PDF smart flatten helper."
     },
     "max %lld px" : {
       "comment" : "Preset list: max width pixels."
@@ -17295,6 +17329,26 @@
           }
         }
       }
+    },
+    "OCR" : {
+      "comment" : "Preset list: PDF OCR enabled."
+    },
+    "OCR languages" : {
+      "comment" : "Settings UI: PDF OCR language picker accessibility.\nSidebar PDF OCR language picker."
+    },
+    "OCR page %lld of %lld" : {
+      "comment" : "PDF OCR progress; page X of Y.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "OCR page %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "OCR runs on scans when enabled." : {
+      "comment" : "Simple outcome: PDF OCR technical append."
     },
     "Off" : {
       "comment" : "Settings UI.",
@@ -19498,6 +19552,9 @@
         }
       }
     },
+    "Pick the language closest to your scans (on-device Vision)." : {
+      "comment" : "Sidebar PDF OCR language helper."
+    },
     "Picks Balanced or High per clip from resolution, source bitrate, and content (screen recordings and animation / motion graphics get nudged up so text and edges stay crisp). HDR sources are exported with HEVC to preserve color." : {
       "comment" : "Sidebar Video: smart quality on helper."
     },
@@ -19744,6 +19801,9 @@
     },
     "PNG lossless only works on PNG, HEIC, or HEIF files. Try WebP or AVIF for other images." : {
       "comment" : "Error when PNG output selected for unsupported input."
+    },
+    "Português (Brasil)" : {
+
     },
     "Preferences" : {
       "comment" : "macOS Settings window title.",
@@ -21558,6 +21618,9 @@
           }
         }
       }
+    },
+    "Recognition uses Apple’s on-device Vision engine; pick the closest language to your documents." : {
+      "comment" : "Settings UI: OCR language helper."
     },
     "Recompresses embedded images more aggressively. Can introduce JPEG artifacts." : {
       "comment" : "PDF experimental preserve description."
@@ -23381,6 +23444,12 @@
     },
     "Saving the PDF did not reduce its size compared to the original." : {
       "comment" : "PDF preserve: rewrite was larger or the same size."
+    },
+    "Scan-like PDFs can be made searchable with OCR first." : {
+      "comment" : "Outcome map friendly: PDF OCR sentence append."
+    },
+    "Scanned PDFs" : {
+      "comment" : "Settings UI: PDF OCR subsection.\nSidebar PDF OCR header."
     },
     "Section" : {
       "comment" : "Fallback title for unnamed help section.",
@@ -26957,6 +27026,9 @@
         }
       }
     },
+    "Tighter max-size targets only list lower starting tiers; Dinky still steps down through the chain if needed." : {
+      "comment" : "Settings UI: PDF max size limits tier chips helper.\nSidebar PDF: max size limits tier chips helper."
+    },
     "Time: %@" : {
       "comment" : "Batch summary; argument is formatted duration."
     },
@@ -29648,6 +29720,9 @@
         }
       }
     },
+    "When a document looks like a scan, Dinky adds a text layer first, then compresses. Born-digital PDFs skip this step." : {
+      "comment" : "Settings UI: PDF OCR helper."
+    },
     "When enabled, the longest jobs run first so the batch tends to finish sooner. The default is smallest first for faster early feedback." : {
       "comment" : "Settings: explains batch ordering toggle.",
       "localizations" : {
@@ -30379,6 +30454,9 @@
           }
         }
       }
+    },
+    "日本語" : {
+
     }
   },
   "version" : "1.1"

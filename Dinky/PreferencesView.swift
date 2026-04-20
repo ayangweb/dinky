@@ -633,6 +633,9 @@ private struct PresetsTab: View {
             } else {
                 parts.append(String(localized: "PDF preserve", comment: "Preset list: PDF preserve structure."))
             }
+            if preset.pdfEnableOCR {
+                parts.append(String(localized: "OCR", comment: "Preset list: PDF OCR enabled."))
+            }
         case .image:
             parts.append(imageFmt)
             if preset.maxWidthEnabled {
@@ -663,6 +666,9 @@ private struct PresetsTab: View {
                 }
             } else {
                 parts.append(String(localized: "Preserve", comment: "Preset list: PDF preserve links."))
+            }
+            if preset.pdfEnableOCR {
+                parts.append(String(localized: "OCR", comment: "Preset list: PDF OCR enabled."))
             }
         }
         return parts.joined(separator: " · ")
@@ -968,9 +974,10 @@ private struct PresetsTab: View {
         VStack(alignment: .leading, spacing: 8) {
             if PDFOutputMode(rawValue: live.pdfOutputModeRaw) == .flattenPages {
                 QualityChipPicker(
-                    options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                    options: pdfFlattenChipOptionsForPreset(snapshot),
                     selected: binding(\.pdfQualityRaw, snapshot: snapshot)
                 )
+                .onAppear { snapPresetPdfFlattenQuality(snapshot) }
             } else {
                 Text(String(localized: "Low / Medium / High apply when Smallest file (flatten) is selected under Media.", comment: "Settings UI."))
                     .font(.caption)
@@ -1061,6 +1068,28 @@ private struct PresetsTab: View {
             }
             .pickerStyle(.segmented)
 
+            SettingsSectionDivider()
+
+            settingsSubHeader(icon: "doc.text.magnifyingglass", String(localized: "Scanned PDFs", comment: "Settings UI: PDF OCR subsection."))
+            Toggle(String(localized: "Make scanned PDFs searchable (OCR)", comment: "Settings UI: PDF OCR toggle."), isOn: binding(\.pdfEnableOCR, snapshot: snapshot))
+                .font(.system(size: 12))
+            settingsHelperText(String(localized: "When a document looks like a scan, Dinky adds a text layer first, then compresses. Born-digital PDFs skip this step.", comment: "Settings UI: PDF OCR helper."))
+            if livePDF.pdfEnableOCR {
+                Picker(String(localized: "OCR languages", comment: "Settings UI: PDF OCR language picker accessibility."), selection: pdfOCRPrimaryLanguageBinding(for: snapshot)) {
+                    Text("English (US)").tag("en-US")
+                    Text("English (UK)").tag("en-GB")
+                    Text("Français").tag("fr-FR")
+                    Text("Deutsch").tag("de-DE")
+                    Text("Español").tag("es-ES")
+                    Text("Italiano").tag("it-IT")
+                    Text("Português (Brasil)").tag("pt-BR")
+                    Text("日本語").tag("ja-JP")
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                settingsHelperText(String(localized: "Recognition uses Apple’s on-device Vision engine; pick the closest language to your documents.", comment: "Settings UI: OCR language helper."))
+            }
+
             if PDFOutputMode(rawValue: livePDF.pdfOutputModeRaw) == .preserveStructure {
                 settingsHelperText(String(localized: "qpdf + PDFKit; keeps structure only when the result is smaller. Many PDFs won’t shrink. Low / Medium / High and grayscale apply when Smallest file (flatten) is selected.", comment: "Settings UI: PDF preserve expectations."))
 
@@ -1086,18 +1115,6 @@ private struct PresetsTab: View {
             if PDFOutputMode(rawValue: livePDF.pdfOutputModeRaw) == .flattenPages {
                 SettingsSectionDivider()
 
-                settingsSubHeader(icon: "doc.richtext", String(localized: "Quality", comment: "Settings UI: Media PDF subsection."))
-                QualityChipPicker(
-                    options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
-                    selected: binding(\.pdfQualityRaw, snapshot: snapshot)
-                )
-                .disabled(livePDF.smartQuality)
-                if livePDF.smartQuality {
-                    settingsHelperText(String(localized: "Manual tier is a fallback when smart analysis can’t run. Turn off Smart quality under Compression to fix Low / Medium / High.", comment: "Settings UI."))
-                }
-
-                SettingsSectionDivider()
-
                 settingsSubHeader(icon: "circle.lefthalf.filled", String(localized: "Color", comment: "Settings UI: Media PDF subsection."))
                 Toggle(String(localized: "Grayscale PDF", comment: "Settings UI."), isOn: binding(\.pdfGrayscale, snapshot: snapshot))
                 if livePDF.pdfGrayscale {
@@ -1114,8 +1131,9 @@ private struct PresetsTab: View {
                 Toggle(String(localized: "Target a smaller file size", comment: "Settings UI: PDF max file size toggle."), isOn: binding(\.pdfMaxFileSizeEnabled, snapshot: snapshot))
                 if livePDF.pdfMaxFileSizeEnabled {
                     settingsChipGrid(
-                        presets: settingsSizePresets,
-                        current: livePDF.pdfMaxFileSizeKB
+                        presets: settingsPDFMaxFileSizePresets,
+                        current: livePDF.pdfMaxFileSizeKB,
+                        fixedColumnCount: 4
                     ) { set(\.pdfMaxFileSizeKB, to: $0, for: snapshot) }
                     HStack(spacing: 6) {
                         TextField("", value: pdfMbBinding(for: snapshot), format: .number)
@@ -1125,9 +1143,28 @@ private struct PresetsTab: View {
                     }
                     settingsHelperText(String(localized: "Steps down quality tiers until under the target. Exact size varies by content.", comment: "Settings UI: PDF max file size helper."))
                 }
+
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "doc.richtext", String(localized: "Quality", comment: "Settings UI: Media PDF subsection."))
+                QualityChipPicker(
+                    options: pdfFlattenChipOptionsForPreset(snapshot),
+                    selected: binding(\.pdfQualityRaw, snapshot: snapshot)
+                )
+                if livePDF.smartQuality {
+                    settingsHelperText(String(localized: "Manual tier is the fallback when smart analysis can’t run.", comment: "Settings UI: PDF smart flatten helper."))
+                }
+                if livePDF.pdfMaxFileSizeEnabled,
+                   PDFQuality.flattenUIShowableTiers(maxFileSizeEnabled: true, pdfMaxFileSizeKB: livePDF.pdfMaxFileSizeKB).count < PDFQuality.allCases.count {
+                    settingsHelperText(String(localized: "Tighter max-size targets only list lower starting tiers; Dinky still steps down through the chain if needed.", comment: "Settings UI: PDF max size limits tier chips helper."))
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { snapPresetPdfFlattenQuality(snapshot) }
+        .onChange(of: livePDF.pdfOutputModeRaw) { _, _ in snapPresetPdfFlattenQuality(snapshot) }
+        .onChange(of: livePDF.pdfMaxFileSizeEnabled) { _, _ in snapPresetPdfFlattenQuality(snapshot) }
+        .onChange(of: livePDF.pdfMaxFileSizeKB) { _, _ in snapPresetPdfFlattenQuality(snapshot) }
     }
 
     @ViewBuilder
@@ -1236,6 +1273,27 @@ private struct PresetsTab: View {
         prefs.savedPresets = presets
     }
 
+    private func pdfFlattenChipOptionsForPreset(_ snapshot: CompressionPreset) -> [(String, String, String)] {
+        let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        let tiers = PDFQuality.flattenUIShowableTiers(
+            maxFileSizeEnabled: live.pdfMaxFileSizeEnabled,
+            pdfMaxFileSizeKB: live.pdfMaxFileSizeKB
+        )
+        return tiers.map { ($0.displayName, $0.rawValue, $0.description) }
+    }
+
+    private func snapPresetPdfFlattenQuality(_ snapshot: CompressionPreset) {
+        let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        guard PDFOutputMode(rawValue: live.pdfOutputModeRaw) == .flattenPages else { return }
+        let allowed = PDFQuality.flattenUIShowableTiers(
+            maxFileSizeEnabled: live.pdfMaxFileSizeEnabled,
+            pdfMaxFileSizeKB: live.pdfMaxFileSizeKB
+        )
+        let current = PDFQuality(rawValue: live.pdfQualityRaw) ?? .medium
+        let snapped = PDFQuality.snapFlattenStartTier(current, allowed: allowed)
+        if snapped != current { set(\.pdfQualityRaw, to: snapped.rawValue, for: snapshot) }
+    }
+
     private func mbBinding(for snapshot: CompressionPreset) -> Binding<Double> {
         Binding(
             get: {
@@ -1252,7 +1310,18 @@ private struct PresetsTab: View {
                 let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
                 return Double(live.pdfMaxFileSizeKB) / 1024.0
             },
-            set: { set(\.pdfMaxFileSizeKB, to: max(1, Int($0 * 1024)), for: snapshot) }
+            set: { set(\.pdfMaxFileSizeKB, to: clampPDFMaxFileSizeKB(Int($0 * 1024)), for: snapshot) }
+        )
+    }
+
+    /// Single primary Vision locale tag; stored as a one-element `pdfOCRLanguages` array.
+    private func pdfOCRPrimaryLanguageBinding(for snapshot: CompressionPreset) -> Binding<String> {
+        Binding(
+            get: {
+                let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+                return live.pdfOCRLanguages.first ?? "en-US"
+            },
+            set: { set(\.pdfOCRLanguages, to: [$0], for: snapshot) }
         )
     }
 

@@ -45,15 +45,39 @@ struct CompressPDFIntent: AppIntent {
             try pdf.data.write(to: tmpIn)
             defer { try? FileManager.default.removeItem(at: tmpIn) }
 
+            var sourceForCompress = tmpIn
+            var ocrTempURL: URL?
+            defer { if let u = ocrTempURL { try? FileManager.default.removeItem(at: u) } }
+
+            if settings.pdfEnableOCR {
+                let likelihood = PDFDocumentSampler.sample(url: tmpIn)?.scanLikelihood ?? 0
+                if likelihood >= PDFScanDetection.ocrLikelihoodThreshold {
+                    let tmpOCR = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("dinky_ocr_intent_\(UUID().uuidString).pdf")
+                    do {
+                        try await PDFOCRService.makeSearchableCopy(
+                            sourceURL: tmpIn,
+                            outputURL: tmpOCR,
+                            languages: settings.pdfOCRLanguages,
+                            progressHandler: { _, _ in }
+                        )
+                        ocrTempURL = tmpOCR
+                        sourceForCompress = tmpOCR
+                    } catch {
+                        // Fall back to the downloaded original.
+                    }
+                }
+            }
+
             let steps = PDFPreserveQpdfStepsResolver.steps(
-                sourceURL: tmpIn,
+                sourceURL: sourceForCompress,
                 preserveExperimental: settings.preserveExperimental,
                 smartQuality: settings.smartQuality
             )
             let (quality, mono): (PDFQuality, Double) = {
                 if settings.outputMode == .flattenPages && settings.smartQuality {
                     return PDFSmartQuality.inferFlattenQualityAndMono(
-                        url: tmpIn,
+                        url: sourceForCompress,
                         fallback: settings.quality,
                         autoGrayscaleMonoScans: settings.pdfAutoGrayscaleMonoScans
                     )
@@ -63,7 +87,7 @@ struct CompressPDFIntent: AppIntent {
             let effectiveGrayscale = settings.grayscale
                 || (settings.smartQuality && settings.pdfAutoGrayscaleMonoScans && settings.outputMode == .flattenPages && mono >= 0.5)
             let result = try await CompressionService.shared.compressPDF(
-                source: tmpIn,
+                source: sourceForCompress,
                 outputMode: settings.outputMode,
                 quality: quality,
                 grayscale: effectiveGrayscale,

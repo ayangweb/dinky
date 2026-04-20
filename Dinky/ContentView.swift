@@ -204,6 +204,10 @@ final class ContentViewModel: ObservableObject {
             return i.undoSnapshot != nil
         }.count
         let savedBytes = items.reduce(Int64(0)) { $0 + $1.savedBytes }
+        let pdfOCRAppliedCount = items.filter { i in
+            guard i.mediaType == .pdf, case .done = i.status else { return false }
+            return i.lastPdfCompressionOCRApplied
+        }.count
         let outputFolderURL = fileRows.compactMap { row -> URL? in
             if case .compressed(let r) = row { return URL(fileURLWithPath: r.outputPath).deletingLastPathComponent() }
             return nil
@@ -217,7 +221,8 @@ final class ContentViewModel: ObservableObject {
             skippedCount: skippedCount,
             outputFolderURL: outputFolderURL,
             fileRows: fileRows,
-            undoableDoneCount: undoableDoneCount
+            undoableDoneCount: undoableDoneCount,
+            pdfOCRAppliedCount: pdfOCRAppliedCount
         )
     }
 
@@ -517,6 +522,10 @@ final class ContentViewModel: ObservableObject {
                         guard case .done = i.status else { return false }
                         return i.undoSnapshot != nil
                     }.count
+                    let pdfOCRAppliedCount = self.items.filter { i in
+                        guard i.mediaType == .pdf, case .done = i.status else { return false }
+                        return i.lastPdfCompressionOCRApplied
+                    }.count
                     let summary = CompressionBatchSummary(
                         id: UUID(),
                         savedBytes: batchSaved,
@@ -526,7 +535,8 @@ final class ContentViewModel: ObservableObject {
                         skippedCount: skippedCount,
                         outputFolderURL: summaryOutputFolder,
                         fileRows: fileRows,
-                        undoableDoneCount: undoableDoneCount
+                        undoableDoneCount: undoableDoneCount,
+                        pdfOCRAppliedCount: pdfOCRAppliedCount
                     )
                     self.lastBatchSummary = summary
                     let batchSummaryData = try? JSONEncoder().encode(summary)
@@ -786,7 +796,12 @@ final class ContentViewModel: ObservableObject {
                 item.pageCount = PDFDocument(url: item.sourceURL)?.pageCount
             }
         }
-        defer { item.compressionProgress = nil }
+        var ocrTempURL: URL?
+        defer {
+            item.compressionProgress = nil
+            item.compressionStageLabel = nil
+            if let t = ocrTempURL { try? FileManager.default.removeItem(at: t) }
+        }
         let intendedOutput: URL = {
             if let pr = preset { return pr.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs, isFromURLDownload: urlDL) }
             return prefs.outputURL(for: item.sourceURL, mediaType: .pdf, isFromURLDownload: urlDL)
@@ -795,19 +810,6 @@ final class ContentViewModel: ObservableObject {
         let sourceURL = item.sourceURL
         let outputMode = pdfModeOverride ?? preset.map { PDFOutputMode(rawValue: $0.pdfOutputModeRaw) ?? .flattenPages } ?? prefs.pdfOutputMode
         let smartQ = preset?.smartQuality ?? prefs.smartQuality
-        let preserveQpdfSteps: [PDFPreserveQpdfStep] = {
-            guard outputMode == .preserveStructure else { return [.base] }
-            if let o = pdfExperimentalOverride {
-                return [PDFPreserveQpdfStep.from(experimental: o)]
-            }
-            let exp = preset.map { PDFPreserveExperimentalMode(rawValue: $0.pdfPreserveExperimentalRaw) ?? .none }
-                ?? prefs.pdfPreserveExperimental
-            return PDFPreserveQpdfStepsResolver.steps(
-                sourceURL: sourceURL,
-                preserveExperimental: exp,
-                smartQuality: smartQ
-            )
-        }()
         var monoLikelihoodForFlatten: Double = 0
         let pdfQuality: PDFQuality
         let autoMonoScans = preset?.pdfAutoGrayscaleMonoScans ?? prefs.pdfAutoGrayscaleMonoScans
@@ -828,6 +830,61 @@ final class ContentViewModel: ObservableObject {
         } else {
             pdfQuality = pdfFallback
         }
+
+        let pdfOCREnabled = preset?.pdfEnableOCR ?? prefs.pdfEnableOCR
+        let pdfOCRLangs = preset?.pdfOCRLanguages ?? prefs.pdfOCRLanguages
+        var sourceForCompression = sourceURL
+
+        await MainActor.run {
+            item.lastPdfCompressionOCROptIn = pdfOCREnabled
+            item.lastPdfCompressionOCRApplied = false
+        }
+
+        if pdfOCREnabled {
+            let likelihood = await Task.detached {
+                PDFDocumentSampler.sample(url: sourceURL)?.scanLikelihood ?? 0
+            }.value
+            if likelihood >= PDFScanDetection.ocrLikelihoodThreshold {
+                let tmp = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("dinky_ocr_\(UUID().uuidString).pdf")
+                do {
+                    try await PDFOCRService.makeSearchableCopy(
+                        sourceURL: sourceURL,
+                        outputURL: tmp,
+                        languages: pdfOCRLangs,
+                        progressHandler: { done, total in
+                            Task { @MainActor in
+                                item.compressionStageLabel = String.localizedStringWithFormat(
+                                    String(localized: "OCR page %lld of %lld", comment: "PDF OCR progress; page X of Y."),
+                                    Int64(done), Int64(total)
+                                )
+                                let frac = Double(done) / Double(max(total, 1))
+                                item.compressionProgress = frac * 0.2
+                            }
+                        }
+                    )
+                    ocrTempURL = tmp
+                    sourceForCompression = tmp
+                    await MainActor.run { item.lastPdfCompressionOCRApplied = true }
+                } catch {
+                    // Use the original file when OCR fails.
+                }
+            }
+        }
+
+        let preserveQpdfSteps: [PDFPreserveQpdfStep] = {
+            guard outputMode == .preserveStructure else { return [.base] }
+            if let o = pdfExperimentalOverride {
+                return [PDFPreserveQpdfStep.from(experimental: o)]
+            }
+            let exp = preset.map { PDFPreserveExperimentalMode(rawValue: $0.pdfPreserveExperimentalRaw) ?? .none }
+                ?? prefs.pdfPreserveExperimental
+            return PDFPreserveQpdfStepsResolver.steps(
+                sourceURL: sourceForCompression,
+                preserveExperimental: exp,
+                smartQuality: smartQ
+            )
+        }()
 
         CompressionTiming.logReproContext(
             media: "pdf",
@@ -869,9 +926,11 @@ final class ContentViewModel: ObservableObject {
             preservedModDate = (try? FileManager.default.attributesOfItem(atPath: sourceURL.path)[.modificationDate]) as? Date
         }
 
+        let ocrPhaseFraction: Double = (ocrTempURL != nil) ? 0.2 : 0
         let pdfProgress: @Sendable (Float) -> Void = { p in
             Task { @MainActor in
-                item.compressionProgress = Double(p)
+                item.compressionStageLabel = nil
+                item.compressionProgress = ocrPhaseFraction + Double(p) * (1.0 - ocrPhaseFraction)
             }
         }
         let qualityAttempts: [PDFQuality] = outputMode == .flattenPages
@@ -885,7 +944,7 @@ final class ContentViewModel: ObservableObject {
 
             for q in qualityAttempts {
                 let result = try await CompressionService.shared.compressPDF(
-                    source: item.sourceURL,
+                    source: sourceForCompression,
                     outputMode: outputMode,
                     quality: q,
                     grayscale: effectiveGrayscale,
@@ -925,7 +984,7 @@ final class ContentViewModel: ObservableObject {
                     guard chosenResult == nil || (!bailoutTargetMet && pdfTargetBytes != nil) else { break }
                     do {
                         let lr = try await CompressionService.shared.compressPDF(
-                            source: item.sourceURL,
+                            source: sourceForCompression,
                             outputMode: outputMode,
                             quality: pdfQuality,
                             grayscale: effectiveGrayscale,

@@ -129,6 +129,7 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfGrayscale)
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfMaxFileSizeEnabled)
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfOutputModeRaw)
+        .animation(.easeInOut(duration: 0.2), value: prefs.pdfEnableOCR)
         .animation(.easeInOut(duration: 0.2), value: prefs.videoRemoveAudio)
         .animation(.easeInOut(duration: 0.2), value: prefs.videoCodecFamilyRaw)
         .animation(.easeInOut(duration: 0.2), value: prefs.videoMaxResolutionEnabled)
@@ -140,6 +141,30 @@ struct SidebarView: View {
         .onChange(of: prefs.showImagesSection) { _, _ in syncScopeIfNeeded() }
         .onChange(of: prefs.showPDFsSection) { _, _ in syncScopeIfNeeded() }
         .onChange(of: prefs.showVideosSection) { _, _ in syncScopeIfNeeded() }
+        .onAppear { snapPdfFlattenQualityIfNeeded() }
+        .onChange(of: prefs.pdfMaxFileSizeEnabled) { _, _ in snapPdfFlattenQualityIfNeeded() }
+        .onChange(of: prefs.pdfMaxFileSizeKB) { _, _ in snapPdfFlattenQualityIfNeeded() }
+        .onChange(of: prefs.pdfOutputModeRaw) { _, _ in snapPdfFlattenQualityIfNeeded() }
+    }
+
+    /// Keeps manual flatten tier in sync with max-size UI (higher tiers hidden for tight caps).
+    private func snapPdfFlattenQualityIfNeeded() {
+        guard prefs.pdfOutputMode == .flattenPages else { return }
+        let allowed = PDFQuality.flattenUIShowableTiers(
+            maxFileSizeEnabled: prefs.pdfMaxFileSizeEnabled,
+            pdfMaxFileSizeKB: prefs.pdfMaxFileSizeKB
+        )
+        let current = PDFQuality(rawValue: prefs.pdfQualityRaw) ?? .medium
+        let snapped = PDFQuality.snapFlattenStartTier(current, allowed: allowed)
+        if snapped != current { prefs.pdfQualityRaw = snapped.rawValue }
+    }
+
+    private var pdfFlattenQualityChipOptions: [(String, String, String)] {
+        let tiers = PDFQuality.flattenUIShowableTiers(
+            maxFileSizeEnabled: prefs.pdfMaxFileSizeEnabled,
+            pdfMaxFileSizeKB: prefs.pdfMaxFileSizeKB
+        )
+        return tiers.map { ($0.displayName, $0.rawValue, $0.description) }
     }
 
     // MARK: - Presets (shared)
@@ -408,17 +433,29 @@ struct SidebarView: View {
     }
 
     private func simpleModePDFFriendly() -> String {
+        var base: String
         if prefs.smartQuality {
-            return String(localized: "Balances size and readability; you choose text vs flatten in All options.", comment: "Outcome map friendly: PDFs smart.")
+            base = String(localized: "Balances size and readability; you choose text vs flatten in All options.", comment: "Outcome map friendly: PDFs smart.")
+        } else {
+            base = String(localized: "You control flattening, quality, and grayscale in All options.", comment: "Outcome map friendly: PDFs fixed.")
         }
-        return String(localized: "You control flattening, quality, and grayscale in All options.", comment: "Outcome map friendly: PDFs fixed.")
+        if prefs.pdfEnableOCR {
+            base += " " + String(localized: "Scan-like PDFs can be made searchable with OCR first.", comment: "Outcome map friendly: PDF OCR sentence append.")
+        }
+        return base
     }
 
     private func simpleModePDFTechnical() -> String {
+        var base: String
         if prefs.smartQuality {
-            return String(localized: "PDF: flatten or keep text (All options…); tier chosen per file when flattening.", comment: "Simple outcome: PDFs with smart quality.")
+            base = String(localized: "PDF: flatten or keep text (All options…); tier chosen per file when flattening.", comment: "Simple outcome: PDFs with smart quality.")
+        } else {
+            base = String(localized: "PDF: preserve vs flatten, quality, and grayscale in All options… below.", comment: "Simple outcome: PDFs without smart quality.")
         }
-        return String(localized: "PDF: preserve vs flatten, quality, and grayscale in All options… below.", comment: "Simple outcome: PDFs without smart quality.")
+        if prefs.pdfEnableOCR {
+            base += " " + String(localized: "OCR runs on scans when enabled.", comment: "Simple outcome: PDF OCR technical append.")
+        }
+        return base
     }
 
     private func simpleModeVideoFriendly() -> String {
@@ -624,7 +661,7 @@ struct SidebarView: View {
                         .textCase(.uppercase)
                         .padding(.top, 2)
                     QualityChipPicker(
-                        options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
+                        options: pdfFlattenQualityChipOptions,
                         selected: Binding(get: { prefs.pdfQualityRaw }, set: { prefs.pdfQualityRaw = $0 })
                     )
                 }
@@ -750,6 +787,36 @@ struct SidebarView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(String(localized: "PDF output mode", comment: "VoiceOver: PDF mode picker."))
 
+            SettingsSectionDivider()
+
+            settingsSubHeader(icon: "doc.text.magnifyingglass", String(localized: "Scanned PDFs", comment: "Sidebar PDF OCR header."))
+            Toggle(String(localized: "Make scanned PDFs searchable (OCR)", comment: "Sidebar PDF OCR toggle."), isOn: Binding(
+                get: { prefs.pdfEnableOCR }, set: { prefs.pdfEnableOCR = $0 }
+            )).font(.system(size: 11))
+            settingsHelperText(String(localized: "Adds a text layer on scan-like PDFs before compression; normal documents skip this.", comment: "Sidebar PDF OCR helper."))
+            if prefs.pdfEnableOCR {
+                Picker(String(localized: "OCR languages", comment: "Sidebar PDF OCR language picker."), selection: Binding(
+                    get: { prefs.pdfOCRLanguages.first ?? "en-US" },
+                    set: { prefs.pdfOCRLanguages = [$0] }
+                )) {
+                    Text("English (US)").tag("en-US")
+                    Text("English (UK)").tag("en-GB")
+                    Text("Français").tag("fr-FR")
+                    Text("Deutsch").tag("de-DE")
+                    Text("Español").tag("es-ES")
+                    Text("Italiano").tag("it-IT")
+                    Text("Português (Brasil)").tag("pt-BR")
+                    Text("日本語").tag("ja-JP")
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                settingsHelperText(String(localized: "Pick the language closest to your scans (on-device Vision).", comment: "Sidebar PDF OCR language helper."))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                        removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                    ))
+            }
+
             if prefs.pdfOutputMode == .preserveStructure {
                 VStack(alignment: .leading, spacing: 4) {
                     settingsHelperText(String(localized: "Tries qpdf first (stream recompression), then PDFKit. Output is only kept when smaller than the original. Expect “no gain” on many web and export PDFs — that is normal. For reliable shrink, use Smallest file (flatten pages).", comment: "Sidebar PDF: preserve mode size expectations."))
@@ -788,22 +855,6 @@ struct SidebarView: View {
             if prefs.pdfOutputMode == .flattenPages {
                 SettingsSectionDivider()
 
-                settingsSubHeader(icon: "doc.richtext", "Quality")
-                QualityChipPicker(
-                    options: PDFQuality.allCases.map { ($0.displayName, $0.rawValue, $0.description) },
-                    selected: Binding(get: { prefs.pdfQualityRaw }, set: { prefs.pdfQualityRaw = $0 })
-                )
-                .disabled(prefs.smartQuality)
-                if prefs.smartQuality {
-                    settingsHelperText(String(localized: "Dinky picks a tier from each document. Turn off Smart quality (all types) in Images or Video to set a fixed Low / Medium / High here. Manual tier is still used as a fallback if analysis fails.", comment: "Sidebar PDF: smart flatten helper."))
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
-                            removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
-                        ))
-                }
-
-                SettingsSectionDivider()
-
                 settingsSubHeader(icon: "circle.lefthalf.filled", "Color")
                 Toggle("Grayscale PDF", isOn: Binding(
                     get: { prefs.pdfGrayscale }, set: { prefs.pdfGrayscale = $0 }
@@ -824,7 +875,11 @@ struct SidebarView: View {
                 )).toggleStyle(.switch).font(.system(size: 11))
                 if prefs.pdfMaxFileSizeEnabled {
                     VStack(alignment: .leading, spacing: 8) {
-                        settingsChipGrid(presets: settingsSizePresets, current: prefs.pdfMaxFileSizeKB) { prefs.pdfMaxFileSizeKB = $0 }
+                        settingsChipGrid(
+                            presets: settingsPDFMaxFileSizePresets,
+                            current: prefs.pdfMaxFileSizeKB,
+                            fixedColumnCount: 4
+                        ) { prefs.pdfMaxFileSizeKB = $0 }
                         HStack(spacing: 6) {
                             TextField("10", value: Binding(
                                 get: { prefs.pdfMaxFileSizeMB }, set: { prefs.pdfMaxFileSizeMB = $0 }
@@ -838,6 +893,29 @@ struct SidebarView: View {
                         insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                         removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
                     ))
+                }
+
+                SettingsSectionDivider()
+
+                settingsSubHeader(icon: "doc.richtext", "Quality")
+                QualityChipPicker(
+                    options: pdfFlattenQualityChipOptions,
+                    selected: Binding(get: { prefs.pdfQualityRaw }, set: { prefs.pdfQualityRaw = $0 })
+                )
+                if prefs.smartQuality {
+                    settingsHelperText(String(localized: "Dinky picks a tier from each document. The choice below is the manual fallback if analysis fails.", comment: "Sidebar PDF: smart flatten helper."))
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                            removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                        ))
+                }
+                if prefs.pdfMaxFileSizeEnabled,
+                   PDFQuality.flattenUIShowableTiers(maxFileSizeEnabled: true, pdfMaxFileSizeKB: prefs.pdfMaxFileSizeKB).count < PDFQuality.allCases.count {
+                    settingsHelperText(String(localized: "Tighter max-size targets only list lower starting tiers; Dinky still steps down through the chain if needed.", comment: "Sidebar PDF: max size limits tier chips helper."))
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                            removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                        ))
                 }
             }
         }
@@ -1017,9 +1095,9 @@ struct SidebarView: View {
                 if pdfMode == .flattenPages {
                     let pdfQ = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
                     summaryRow("doc.richtext",
-                               "PDF flatten · \(pdfQ.displayName)\(preset.pdfGrayscale ? " · grayscale" : "")")
+                               "PDF flatten · \(pdfQ.displayName)\(preset.pdfGrayscale ? " · grayscale" : "")\(preset.pdfEnableOCR ? " · OCR" : "")")
                 } else {
-                    summaryRow("doc.richtext", "PDF preserve text & links")
+                    summaryRow("doc.richtext", "PDF preserve text & links\(preset.pdfEnableOCR ? " · OCR" : "")")
                 }
                 summaryRow("folder", saveLabel)
                 summaryRow("doc.text", filenameLabel)
@@ -1190,8 +1268,7 @@ struct QualityChipPicker: View {
 
     var body: some View {
         let activeDesc = options.first(where: { selected == $0.raw })?.description ?? ""
-        let count = min(options.count, 3)
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: count), spacing: 4) {
+        HStack(spacing: 4) {
             ForEach(options, id: \.raw) { opt in
                 let active = selected == opt.raw
                 chipCell(opt.label, active: active)

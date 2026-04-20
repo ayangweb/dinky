@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalPasteHotkeyObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        migratePDFMaxFileSizeIfNeeded()
         DiagnosticsReporter.shared.startMonitoring()
         UNUserNotificationCenter.current().delegate = self
         GlobalHotkeyManager.shared.syncFromDefaults()
@@ -68,6 +69,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func acceptedURLs(from urls: [URL]) -> [URL] {
         urls.filter { MediaTypeDetector.detect($0) != nil }
+    }
+
+    /// Older builds allowed sub‑MB targets; clamp global PDF max size to 5–25 MB to match current presets.
+    private func migratePDFMaxFileSizeIfNeeded() {
+        let key = "pdfMaxFileSizeKB"
+        let v = UserDefaults.standard.integer(forKey: key)
+        guard v != 0 else { return }
+        let clamped = clampPDFMaxFileSizeKB(v)
+        if clamped != v {
+            UserDefaults.standard.set(clamped, forKey: key)
+        }
     }
 }
 

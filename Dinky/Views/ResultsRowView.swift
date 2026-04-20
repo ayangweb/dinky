@@ -322,27 +322,35 @@ struct ResultsRowView: View {
         case .processing:
             Group {
                 if let p = item.compressionProgress {
-                    HStack(spacing: 6) {
-                        HStack(spacing: 5) {
-                            if !shouldReduceMotion {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .symbolRenderingMode(.monochrome)
-                                    .foregroundStyle(Self.progressBarTint.opacity(0.95))
-                                    .symbolEffect(.rotate, options: .repeating)
-                                    .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            HStack(spacing: 5) {
+                                if !shouldReduceMotion {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .symbolRenderingMode(.monochrome)
+                                        .foregroundStyle(Self.progressBarTint.opacity(0.95))
+                                        .symbolEffect(.rotate, options: .repeating)
+                                        .accessibilityHidden(true)
+                                }
+                                ProgressView(value: p, total: 1)
+                                    .scaleEffect(0.72)
+                                    .frame(width: 52)
+                                    .tint(Self.progressBarTint)
                             }
-                            ProgressView(value: p, total: 1)
-                                .scaleEffect(0.72)
-                                .frame(width: 52)
-                                .tint(Self.progressBarTint)
-                        }
-                        .animation(rowProgressAnimation, value: p)
-                        Text("\(Int((p * 100).rounded(.towardZero)))%")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .contentTransition(.numericText())
                             .animation(rowProgressAnimation, value: p)
+                            Text("\(Int((p * 100).rounded(.towardZero)))%")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .contentTransition(.numericText())
+                                .animation(rowProgressAnimation, value: p)
+                        }
+                        if let stage = item.compressionStageLabel {
+                            Text(stage)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
                     }
                     .help(String(localized: "Compressing — \(Int((p * 100).rounded(.towardZero))) percent", comment: "Tooltip; argument is percent."))
                 } else {

@@ -56,6 +56,7 @@
 		VC000001000000000000001 /* VideoCompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = VC100001000000000000001 /* VideoCompressor.swift */; };
 		PQ000001000000000000001 /* PDFSmartQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = PQ100001000000000000001 /* PDFSmartQuality.swift */; };
 		DS000001000000000000001 /* PDFDocumentSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = DS100001000000000000001 /* PDFDocumentSampler.swift */; };
+		OC000001000000000000001 /* PDFOCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = OC100001000000000000001 /* PDFOCRService.swift */; };
 		PH000001000000000000001 /* PDFPreserveHeuristics.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH100001000000000000001 /* PDFPreserveHeuristics.swift */; };
 		VQ000001000000000000001 /* VideoSmartQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = VQ100001000000000000001 /* VideoSmartQuality.swift */; };
 		VCC0001000000000000001 /* VideoContentClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = VCC1001000000000000001 /* VideoContentClassifier.swift */; };
@@ -74,6 +75,7 @@
 		FC000001000000000000001 /* FinderCommentsCopier.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC100001000000000000001 /* FinderCommentsCopier.swift */; };
 		OP000001000000000000001 /* OutputPathUniqueness.swift in Sources */ = {isa = PBXBuildFile; fileRef = OP100001000000000000001 /* OutputPathUniqueness.swift */; };
 		SP000001000000000000001 /* SavingsPerspective.swift in Sources */ = {isa = PBXBuildFile; fileRef = SP100001000000000000001 /* SavingsPerspective.swift */; };
+		XTBLD00000000000000001 /* PDFScanDetectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = XTREF00000000000000001 /* PDFScanDetectionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -131,6 +133,7 @@
 		VC100001000000000000001 /* VideoCompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCompressor.swift; sourceTree = "<group>"; };
 		PQ100001000000000000001 /* PDFSmartQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFSmartQuality.swift; sourceTree = "<group>"; };
 		DS100001000000000000001 /* PDFDocumentSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentSampler.swift; sourceTree = "<group>"; };
+		OC100001000000000000001 /* PDFOCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFOCRService.swift; sourceTree = "<group>"; };
 		PH100001000000000000001 /* PDFPreserveHeuristics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFPreserveHeuristics.swift; sourceTree = "<group>"; };
 		VQ100001000000000000001 /* VideoSmartQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoSmartQuality.swift; sourceTree = "<group>"; };
 		VCC1001000000000000001 /* VideoContentClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoContentClassifier.swift; sourceTree = "<group>"; };
@@ -181,10 +184,19 @@
 		FC100001000000000000001 /* FinderCommentsCopier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderCommentsCopier.swift; sourceTree = "<group>"; };
 		OP100001000000000000001 /* OutputPathUniqueness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputPathUniqueness.swift; sourceTree = "<group>"; };
 		SP100001000000000000001 /* SavingsPerspective.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavingsPerspective.swift; sourceTree = "<group>"; };
+		XTREF00000000000000001 /* PDFScanDetectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFScanDetectionTests.swift; sourceTree = "<group>"; };
+		XTPRD00000000000000001 /* DinkyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DinkyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		E21DF18078534E6AAFC3CD56 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XTFR00000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -244,6 +256,7 @@
 				VC100001000000000000001 /* VideoCompressor.swift */,
 				PQ100001000000000000001 /* PDFSmartQuality.swift */,
 				DS100001000000000000001 /* PDFDocumentSampler.swift */,
+				OC100001000000000000001 /* PDFOCRService.swift */,
 				PH100001000000000000001 /* PDFPreserveHeuristics.swift */,
 				VQ100001000000000000001 /* VideoSmartQuality.swift */,
 				VCC1001000000000000001 /* VideoContentClassifier.swift */,
@@ -272,6 +285,7 @@
 			isa = PBXGroup;
 			children = (
 				06FD4F8D9AC8412C83F517C6 /* Dinky.app */,
+				XTPRD00000000000000001 /* DinkyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -326,9 +340,18 @@
 			isa = PBXGroup;
 			children = (
 				4E72C0A5F2794B39AD3A51DF /* Dinky */,
+				XTGRP00000000000000001 /* DinkyTests */,
 				AI100001000000000000001 /* AppIcon.icon */,
 				3337D9E5CCB647BAA20571DE /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		XTGRP00000000000000001 /* DinkyTests */ = {
+			isa = PBXGroup;
+			children = (
+				XTREF00000000000000001 /* PDFScanDetectionTests.swift */,
+			);
+			path = DinkyTests;
 			sourceTree = "<group>";
 		};
 		E168EFE304164DA3B71EFE4F /* bin */ = {
@@ -364,7 +387,42 @@
 			productReference = 06FD4F8D9AC8412C83F517C6 /* Dinky.app */;
 			productType = "com.apple.product-type.application";
 		};
+		XTGT00000000000000001 /* DinkyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = XTCL00000000000000001 /* Build configuration list for PBXNativeTarget "DinkyTests" */;
+			buildPhases = (
+				XTSS00000000000000001 /* Sources */,
+				XTFR00000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				XTTD00000000000000001 /* PBXTargetDependency */,
+			);
+			name = DinkyTests;
+			productName = DinkyTests;
+			productReference = XTPRD00000000000000001 /* DinkyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		XTCP00000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 30998CF249484469BEA4BC05 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1224039F8B5340EE9F91589E /* Dinky */;
+			remoteInfo = Dinky;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		XTTD00000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1224039F8B5340EE9F91589E /* Dinky */;
+			targetProxy = XTCP00000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		30998CF249484469BEA4BC05 /* Project object */ = {
@@ -405,6 +463,7 @@
 			projectRoot = "";
 			targets = (
 				1224039F8B5340EE9F91589E /* Dinky */,
+				XTGT00000000000000001 /* DinkyTests */,
 			);
 		};
 /* End PBXProject section */
@@ -476,6 +535,7 @@
 				VC000001000000000000001 /* VideoCompressor.swift in Sources */,
 				PQ000001000000000000001 /* PDFSmartQuality.swift in Sources */,
 				DS000001000000000000001 /* PDFDocumentSampler.swift in Sources */,
+				OC000001000000000000001 /* PDFOCRService.swift in Sources */,
 				PH000001000000000000001 /* PDFPreserveHeuristics.swift in Sources */,
 				VQ000001000000000000001 /* VideoSmartQuality.swift in Sources */,
 				VCC0001000000000000001 /* VideoContentClassifier.swift in Sources */,
@@ -491,6 +551,14 @@
 				FC000001000000000000001 /* FinderCommentsCopier.swift in Sources */,
 				OP000001000000000000001 /* OutputPathUniqueness.swift in Sources */,
 				SP000001000000000000001 /* SavingsPerspective.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XTSS00000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				XTBLD00000000000000001 /* PDFScanDetectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -643,7 +711,7 @@
 				CODE_SIGN_ENTITLEMENTS = Dinky/Dinky.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.5.3;
+				CURRENT_PROJECT_VERSION = 2.6.0;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -656,7 +724,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.5.3;
+				MARKETING_VERSION = 2.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dinky.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -673,7 +741,7 @@
 				CODE_SIGN_ENTITLEMENTS = Dinky/Dinky.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.5.3;
+				CURRENT_PROJECT_VERSION = 2.6.0;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -686,12 +754,48 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.5.3;
+				MARKETING_VERSION = 2.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dinky.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "";
+			};
+			name = Release;
+		};
+		XTBCFGD000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinky.app.DinkyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dinky.app/Contents/MacOS/Dinky";
+			};
+			name = Debug;
+		};
+		XTBCFGR000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinky.app.DinkyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dinky.app/Contents/MacOS/Dinky";
 			};
 			name = Release;
 		};
@@ -712,6 +816,15 @@
 			buildConfigurations = (
 				2CAA52676FD140AF9F910BFB /* Debug */,
 				35FB812A91A24C2DBCA72A70 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		XTCL00000000000000001 /* Build configuration list for PBXNativeTarget "DinkyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				XTBCFGD000000000000001 /* Debug */,
+				XTBCFGR000000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -271,10 +271,31 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("pdfMaxFileSizeKB") var pdfMaxFileSizeKB: Int = 10240  // 10 MB default
     var pdfMaxFileSizeMB: Double {
         get { Double(pdfMaxFileSizeKB) / 1024.0 }
-        set { pdfMaxFileSizeKB = max(1, Int(newValue * 1024)) }
+        set { pdfMaxFileSizeKB = clampPDFMaxFileSizeKB(Int(newValue * 1024)) }
     }
     /// Preserve mode: rasterize image-heavy pages at 144 DPI while keeping text pages selectable.
     @AppStorage("pdfResolutionDownsampling") var pdfResolutionDownsampling: Bool = false
+    /// Add Vision OCR text layer for documents that look like scans (before qpdf/flatten).
+    @AppStorage("pdfEnableOCR") var pdfEnableOCR: Bool = true
+    /// JSON array of BCP-47 language tags for Vision OCR.
+    @AppStorage("pdfOCRLanguagesJSON") private var pdfOCRLanguagesJSON: String = "[\"en-US\"]"
+
+    static let defaultPdfOCRLanguages: [String] = ["en-US"]
+
+    var pdfOCRLanguages: [String] {
+        get {
+            guard let data = pdfOCRLanguagesJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data),
+                  !decoded.isEmpty else { return Self.defaultPdfOCRLanguages }
+            return decoded
+        }
+        set {
+            let v = newValue.isEmpty ? Self.defaultPdfOCRLanguages : newValue
+            if let data = try? JSONEncoder().encode(v), let s = String(data: data, encoding: .utf8) {
+                pdfOCRLanguagesJSON = s
+            }
+        }
+    }
     var pdfPreserveExperimental: PDFPreserveExperimentalMode {
         get { PDFPreserveExperimentalMode(rawValue: pdfPreserveExperimentalRaw) ?? .none }
         set { pdfPreserveExperimentalRaw = newValue.rawValue }
@@ -621,7 +642,9 @@ final class DinkyPreferences: ObservableObject {
         stripMetadata: Bool,
         preserveExperimental: PDFPreserveExperimentalMode,
         smartQuality: Bool,
-        pdfAutoGrayscaleMonoScans: Bool
+        pdfAutoGrayscaleMonoScans: Bool,
+        pdfEnableOCR: Bool,
+        pdfOCRLanguages: [String]
     ) {
         let d = UserDefaults.standard
         let modeRaw = d.string(forKey: "pdfOutputMode") ?? PDFOutputMode.flattenPages.rawValue
@@ -634,7 +657,15 @@ final class DinkyPreferences: ObservableObject {
         let experimental = PDFPreserveExperimentalMode(rawValue: expRaw) ?? .none
         let smart = d.object(forKey: "smartQuality") as? Bool ?? true
         let autoMono = d.object(forKey: "pdfAutoGrayscaleMonoScans") as? Bool ?? true
-        return (mode, quality, grayscale, strip, experimental, smart, autoMono)
+        let ocrOn = d.object(forKey: "pdfEnableOCR") as? Bool ?? true
+        let json = d.string(forKey: "pdfOCRLanguagesJSON") ?? "[\"en-US\"]"
+        let langs: [String] = {
+            guard let data = json.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data),
+                  !decoded.isEmpty else { return defaultPdfOCRLanguages }
+            return decoded
+        }()
+        return (mode, quality, grayscale, strip, experimental, smart, autoMono, ocrOn, langs)
     }
 
     /// Video compression defaults for Shortcuts — same keys as `@AppStorage` on this type.

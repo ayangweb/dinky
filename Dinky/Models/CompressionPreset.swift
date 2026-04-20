@@ -55,6 +55,10 @@ struct CompressionPreset: Codable, Identifiable {
     /// Mirrors images' Max width: opt-in cap on output video height.
     var videoMaxResolutionEnabled: Bool
     var videoMaxResolutionLines: Int
+    /// When true and the document looks like a scan, add a searchable text layer before compression.
+    var pdfEnableOCR: Bool
+    /// BCP-47 tags for Vision (e.g. `"en-US"`). Default Latin.
+    var pdfOCRLanguages: [String]
 
     let createdAt: Date
 
@@ -93,11 +97,13 @@ struct CompressionPreset: Codable, Identifiable {
         self.pdfAutoGrayscaleMonoScans = prefs.pdfAutoGrayscaleMonoScans
         self.pdfPreserveExperimentalRaw = prefs.pdfPreserveExperimentalRaw
         self.pdfMaxFileSizeEnabled = prefs.pdfMaxFileSizeEnabled
-        self.pdfMaxFileSizeKB = prefs.pdfMaxFileSizeKB
+        self.pdfMaxFileSizeKB = clampPDFMaxFileSizeKB(prefs.pdfMaxFileSizeKB)
         self.pdfResolutionDownsampling = prefs.pdfResolutionDownsampling
         self.videoRemoveAudio = prefs.videoRemoveAudio
         self.videoMaxResolutionEnabled = prefs.videoMaxResolutionEnabled
         self.videoMaxResolutionLines = prefs.videoMaxResolutionLines
+        self.pdfEnableOCR = prefs.pdfEnableOCR
+        self.pdfOCRLanguages = prefs.pdfOCRLanguages
         self.createdAt = .now
     }
 
@@ -144,11 +150,17 @@ struct CompressionPreset: Codable, Identifiable {
         pdfPreserveExperimentalRaw = try c.decodeIfPresent(String.self, forKey: .pdfPreserveExperimentalRaw)
             ?? PDFPreserveExperimentalMode.none.rawValue
         pdfMaxFileSizeEnabled = try c.decodeIfPresent(Bool.self, forKey: .pdfMaxFileSizeEnabled) ?? false
-        pdfMaxFileSizeKB = try c.decodeIfPresent(Int.self, forKey: .pdfMaxFileSizeKB) ?? 10240
+        pdfMaxFileSizeKB = clampPDFMaxFileSizeKB(try c.decodeIfPresent(Int.self, forKey: .pdfMaxFileSizeKB) ?? 10240)
         pdfResolutionDownsampling = try c.decodeIfPresent(Bool.self, forKey: .pdfResolutionDownsampling) ?? false
         videoRemoveAudio = try c.decodeIfPresent(Bool.self, forKey: .videoRemoveAudio) ?? false
         videoMaxResolutionEnabled = try c.decodeIfPresent(Bool.self, forKey: .videoMaxResolutionEnabled) ?? false
         videoMaxResolutionLines = try c.decodeIfPresent(Int.self, forKey: .videoMaxResolutionLines) ?? 1080
+        pdfEnableOCR = try c.decodeIfPresent(Bool.self, forKey: .pdfEnableOCR) ?? true
+        if let langs = try c.decodeIfPresent([String].self, forKey: .pdfOCRLanguages), !langs.isEmpty {
+            pdfOCRLanguages = langs
+        } else {
+            pdfOCRLanguages = DinkyPreferences.defaultPdfOCRLanguages
+        }
     }
 
     func apply(to prefs: DinkyPreferences, selectedFormat: inout CompressionFormat) {
@@ -190,6 +202,8 @@ struct CompressionPreset: Codable, Identifiable {
         prefs.videoRemoveAudio = videoRemoveAudio
         prefs.videoMaxResolutionEnabled = videoMaxResolutionEnabled
         prefs.videoMaxResolutionLines = videoMaxResolutionLines
+        prefs.pdfEnableOCR = pdfEnableOCR
+        prefs.pdfOCRLanguages = pdfOCRLanguages
     }
 }
 

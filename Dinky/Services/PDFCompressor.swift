@@ -82,6 +82,29 @@ enum PDFQuality: String, CaseIterable, Identifiable {
         guard let i = flattenTierDescending.firstIndex(of: first) else { return [first] }
         return Array(flattenTierDescending[i...])
     }
+
+    /// Starting tiers to show when a max-size target is on: tighter caps hide higher tiers (unlikely to hit the cap on the first pass).
+    static func flattenUIShowableTiers(maxFileSizeEnabled: Bool, pdfMaxFileSizeKB: Int) -> [PDFQuality] {
+        guard maxFileSizeEnabled else { return PDFQuality.allCases }
+        let mb = Double(pdfMaxFileSizeKB) / 1024.0
+        if mb <= 6 {
+            return [.smallest, .low]
+        }
+        if mb <= 12 {
+            return [.smallest, .low, .medium]
+        }
+        return [.smallest, .low, .medium, .high]
+    }
+
+    /// Picks the nearest allowed starting tier when the current one is hidden (walks down the flatten fallback chain).
+    static func snapFlattenStartTier(_ current: PDFQuality, allowed: [PDFQuality]) -> PDFQuality {
+        guard !allowed.isEmpty else { return current }
+        if allowed.contains(current) { return current }
+        for q in flattenQualityFallbackChain(startingAt: current) {
+            if allowed.contains(q) { return q }
+        }
+        return allowed[0]
+    }
 }
 
 enum PDFCompressor {

@@ -91,11 +91,14 @@ struct CompressionBatchSummary: Identifiable, Equatable {
     let fileRows: [BatchSummaryListRow]
     /// Done items that can be reverted (non-nil undo snapshot).
     let undoableDoneCount: Int
+    /// PDFs where OCR ran and added a searchable text layer this batch.
+    let pdfOCRAppliedCount: Int
 }
 
 extension CompressionBatchSummary: Codable {
     enum CodingKeys: String, CodingKey {
         case id, savedBytes, doneCount, elapsed, openedFolder, skippedCount, outputFolderURL, undoableDoneCount, fileRows
+        case pdfOCRAppliedCount
     }
 
     init(from decoder: Decoder) throws {
@@ -108,6 +111,7 @@ extension CompressionBatchSummary: Codable {
         skippedCount = try c.decode(Int.self, forKey: .skippedCount)
         outputFolderURL = try c.decodeIfPresent(URL.self, forKey: .outputFolderURL)
         undoableDoneCount = try c.decode(Int.self, forKey: .undoableDoneCount)
+        pdfOCRAppliedCount = try c.decodeIfPresent(Int.self, forKey: .pdfOCRAppliedCount) ?? 0
         if let rows = try? c.decode([BatchSummaryListRow].self, forKey: .fileRows) {
             fileRows = rows
         } else {
@@ -127,6 +131,7 @@ extension CompressionBatchSummary: Codable {
         try c.encodeIfPresent(outputFolderURL, forKey: .outputFolderURL)
         try c.encode(undoableDoneCount, forKey: .undoableDoneCount)
         try c.encode(fileRows, forKey: .fileRows)
+        try c.encode(pdfOCRAppliedCount, forKey: .pdfOCRAppliedCount)
     }
 }
 
@@ -222,6 +227,23 @@ struct BatchCompletionSummarySheet: View {
                             String(localized: "%lld no size gain", comment: "Batch summary; argument is zero-gain count."),
                             Int64(zeroGainRowCount)
                         ),
+                        textSecondary: true
+                    )
+                }
+
+                if summary.pdfOCRAppliedCount > 0 {
+                    summaryStatRow(
+                        icon: "doc.text.magnifyingglass",
+                        text: {
+                            let n = summary.pdfOCRAppliedCount
+                            if n == 1 {
+                                return String(localized: "1 scanned PDF made searchable.", comment: "Batch summary OCR line (singular).")
+                            }
+                            return String.localizedStringWithFormat(
+                                String(localized: "%lld scanned PDFs made searchable.", comment: "Batch summary OCR line (plural)."),
+                                Int64(n)
+                            )
+                        }(),
                         textSecondary: true
                     )
                 }

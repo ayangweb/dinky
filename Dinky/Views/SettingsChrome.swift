@@ -20,6 +20,24 @@ let settingsSizePresets: [(String, Int)] = [
     ("5 MB", 5120), ("10 MB", 10240)
 ]
 
+// MARK: - PDF max file size (flatten target)
+
+private let pdfMaxFileSizeKBMin = 5 * 1024
+private let pdfMaxFileSizeKBMax = 25 * 1024
+
+/// Quick picks: 5–15 MB in 5 MB steps, plus 25 MB max (values are KiB).
+let settingsPDFMaxFileSizePresets: [(String, Int)] = [
+    ("5 MB", 5 * 1024),
+    ("10 MB", 10 * 1024),
+    ("15 MB", 15 * 1024),
+    ("25 MB", 25 * 1024),
+]
+
+/// Clamps PDF max-size targets to 5–25 MB (matches chip presets and manual entry).
+func clampPDFMaxFileSizeKB(_ kb: Int) -> Int {
+    min(pdfMaxFileSizeKBMax, max(pdfMaxFileSizeKBMin, kb))
+}
+
 let settingsVideoResolutionPresets: [(String, Int)] = [
     ("480p", 480), ("720p", 720), ("1080p", 1080), ("2160p", 2160)
 ]
