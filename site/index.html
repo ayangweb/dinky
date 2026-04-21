@@ -178,18 +178,24 @@
       overflow: visible;
     }
 
-    /* Padding gives the wiggle + shadow room. Drop-shadow stays on the img only; the wiggle
-       transform runs on this wrapper. Pairing filter + transform on the same node (or filter
-       on parent + transform on child) makes iOS Safari paint an opaque backing behind the
-       icon during the animation instead of true transparency. */
+    /* Outer wrap: room for shadow + rotation. Inner stage: filter + wiggle on one element so
+       iOS Safari does not promote separate layers (filtered img vs transformed parent), which
+       showed as one or two opaque rectangles behind the icon. */
     .app-icon-wrap {
       margin-bottom: 24px;
       padding: 20px 22px;
-      /* Same pivot as .app-icon 50% 85%: padding-top + 85% of icon height */
-      transform-origin: 50% 101.6px;
     }
 
-    .app-icon-wrap.is-wiggling {
+    .app-icon-stage {
+      display: inline-block;
+      line-height: 0;
+      transform-origin: 50% 85%;
+      filter:
+        drop-shadow(0 1px 1px var(--shadow-xs))
+        drop-shadow(0 10px 20px var(--shadow-md));
+    }
+
+    .app-icon-stage.is-wiggling {
       animation: app-icon-wiggle 1.1s ease-out 1 both;
     }
 
@@ -197,9 +203,6 @@
       display: block;
       width: 96px;
       height: 96px;
-      filter:
-        drop-shadow(0 1px 1px var(--shadow-xs))
-        drop-shadow(0 10px 20px var(--shadow-md));
     }
 
     @keyframes app-icon-wiggle {
@@ -213,7 +216,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .app-icon-wrap.is-wiggling { animation: none; }
+      .app-icon-stage.is-wiggling { animation: none; }
     }
 
     /* GitHub hover star burst — count grows gently with stargazers (sqrt curve, capped) */
@@ -1170,7 +1173,6 @@
       .app-icon-wrap {
         margin-bottom: 20px;
         padding: 16px 18px;
-        transform-origin: 50% 77.2px;
       }
 
       .app-icon {
@@ -1278,7 +1280,9 @@
 <body>
   <section class="hero">
     <div class="app-icon-wrap">
-      <img src="app-icon.webp" alt="Dinky app icon" class="app-icon" />
+      <div class="app-icon-stage">
+        <img src="app-icon.webp" alt="Dinky app icon" class="app-icon" />
+      </div>
     </div>
     <h1>Dinky</h1>
     <p class="tagline">Dinky makes files smaller.</p>
@@ -1854,15 +1858,15 @@
 
   <script>
     (function () {
-      const wrap = document.querySelector('.app-icon-wrap');
-      if (!wrap) return;
+      const stage = document.querySelector('.app-icon-stage');
+      if (!stage) return;
       let armed = false;
 
       function wiggle() {
-        wrap.classList.remove('is-wiggling');
+        stage.classList.remove('is-wiggling');
         // Force reflow so re-adding the class restarts the animation
-        void wrap.offsetWidth;
-        wrap.classList.add('is-wiggling');
+        void stage.offsetWidth;
+        stage.classList.add('is-wiggling');
       }
 
       function trigger(initial) {
