@@ -196,6 +196,9 @@ final class UpdateChecker: ObservableObject {
             "/usr/bin/ditto \(bashSingleQuotedPath(stagedApp.path)) \(bashSingleQuotedPath(destination.path)) || exit 1",
             // Strip quarantine so Gatekeeper doesn't block the freshly-written bundle.
             "/usr/bin/xattr -rd com.apple.quarantine \(bashSingleQuotedPath(destination.path)) 2>/dev/null || true",
+            // Re-register with Launch Services so the old version stops appearing in
+            // Finder's "Open With" menu and other LS-backed pickers.
+            "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f \(bashSingleQuotedPath(destination.path)) 2>/dev/null || true",
         ]
         for p in cleanupPaths {
             lines.append("rm -rf \(bashSingleQuotedPath(p))")
