@@ -1,6 +1,7 @@
 // UpdateChecker.swift — polls GitHub Releases for a newer Dinky.
 // Zero dependencies. Pure URLSession + Codable.
 
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -104,7 +105,8 @@ final class UpdateChecker: ObservableObject {
     // MARK: - In-app install
 
     /// Downloads the zip via URLSession (no quarantine), unzips with ditto,
-    /// copies Dinky.app over itself, then relaunches from the new binary.
+    /// then replaces the running bundle **after** this process exits (shell script).
+    /// Copying over `Bundle.main.bundleURL` while running hangs — never do that in-process.
     func downloadAndInstall() async {
         guard let assetURL = downloadURL else { return }
         installState = .downloading(progress: 0)
@@ -120,43 +122,44 @@ final class UpdateChecker: ObservableObject {
             _ = try? fm.removeItem(at: tempFile)
             try fm.moveItem(at: downloadedURL, to: tempFile)
 
-            // ── 2. Install ────────────────────────────────────────────
             installState = .installing
             let dest = Bundle.main.bundleURL
 
+            let stagedApp: URL
+            var cleanupPaths: [String] = [tempFile.path]
+
             if ext == "zip" {
-                // Unzip into a temp dir — no hdiutil, no Gatekeeper disk-image scan.
                 let unzipDir = tmp.appendingPathComponent("Dinky-update-extracted")
                 _ = try? fm.removeItem(at: unzipDir)
                 try await shell("/usr/bin/ditto", ["-xk", tempFile.path, unzipDir.path])
                 let source = unzipDir.appendingPathComponent("Dinky.app")
-                _ = try? fm.removeItem(at: dest)
-                try await shell("/usr/bin/ditto", [source.path, dest.path])
-                try? fm.removeItem(at: unzipDir)
+                guard fm.fileExists(atPath: source.path) else {
+                    throw UpdateError.missingAppInArchive
+                }
+                stagedApp = source
+                cleanupPaths.append(unzipDir.path)
             } else {
-                // Fallback: DMG path for older releases.
-                let mountOut = try await shell("/usr/bin/hdiutil",
-                                               ["attach", tempFile.path,
-                                                "-nobrowse", "-noautoopen", "-readonly"])
-                guard let mountPoint = mountOut
-                    .components(separatedBy: "\n")
-                    .first(where: { $0.contains("/Volumes/") })?
-                    .components(separatedBy: "\t")
-                    .last?
-                    .trimmingCharacters(in: .whitespaces),
-                      !mountPoint.isEmpty
-                else { throw UpdateError.mountFailed }
-                let source = URL(fileURLWithPath: mountPoint).appendingPathComponent("Dinky.app")
-                _ = try? fm.removeItem(at: dest)
-                try await shell("/usr/bin/ditto", [source.path, dest.path])
-                _ = try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
+                let mountOut = try await shell(
+                    "/usr/bin/hdiutil",
+                    ["attach", tempFile.path, "-nobrowse", "-noautoopen", "-readonly"]
+                )
+                guard let mountPoint = parseHDIMountPoint(from: mountOut) else {
+                    throw UpdateError.mountFailed
+                }
+                let mountedApp = URL(fileURLWithPath: mountPoint).appendingPathComponent("Dinky.app")
+                guard fm.fileExists(atPath: mountedApp.path) else {
+                    try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
+                    throw UpdateError.missingAppInArchive
+                }
+                let stagedCopy = tmp.appendingPathComponent("Dinky-staged-\(UUID().uuidString).app")
+                _ = try? fm.removeItem(at: stagedCopy)
+                try await shell("/usr/bin/ditto", [mountedApp.path, stagedCopy.path])
+                try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
+                stagedApp = stagedCopy
+                cleanupPaths.append(stagedCopy.path)
             }
-            try? fm.removeItem(at: tempFile)
 
-            // ── 3. Relaunch ───────────────────────────────────────────
-            let appPath = dest.path
-            Process.launchedProcess(launchPath: "/bin/sh",
-                                    arguments: ["-c", "sleep 0.6 && open \"$1\"", "sh", appPath])
+            try launchDeferredBundleReplace(stagedApp: stagedApp, destination: dest, cleanupPaths: cleanupPaths)
             NSApp.terminate(nil)
 
         } catch {
@@ -164,9 +167,56 @@ final class UpdateChecker: ObservableObject {
         }
     }
 
+    /// Writes a shell script that waits for this process to quit, replaces the app bundle, cleans up, and opens the new app.
+    private func launchDeferredBundleReplace(stagedApp: URL, destination: URL, cleanupPaths: [String]) throws {
+        let fm = FileManager.default
+        let scriptURL = fm.temporaryDirectory.appendingPathComponent("dinky-install-\(UUID().uuidString).sh")
+        var lines: [String] = [
+            "#!/bin/bash",
+            "set -e",
+            "sleep 2",
+            "rm -rf \(bashSingleQuotedPath(destination.path))",
+            "/usr/bin/ditto \(bashSingleQuotedPath(stagedApp.path)) \(bashSingleQuotedPath(destination.path))",
+        ]
+        for p in cleanupPaths {
+            lines.append("rm -rf \(bashSingleQuotedPath(p))")
+        }
+        lines.append("/usr/bin/open \(bashSingleQuotedPath(destination.path))")
+        try lines.joined(separator: "\n").write(to: scriptURL, atomically: true, encoding: .utf8)
+        try fm.setAttributes([.posixPermissions: NSNumber(value: Int16(0o755))], ofItemAtPath: scriptURL.path)
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/bash")
+        proc.arguments = [scriptURL.path]
+        try proc.run()
+    }
+
+    private func bashSingleQuotedPath(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private func parseHDIMountPoint(from mountOut: String) -> String? {
+        guard let line = mountOut
+            .components(separatedBy: "\n")
+            .first(where: { $0.contains("/Volumes/") })?
+            .components(separatedBy: "\t")
+            .last
+        else { return nil }
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     private enum UpdateError: LocalizedError {
         case mountFailed
-        var errorDescription: String? { "Couldn't mount the update disk image." }
+        case missingAppInArchive
+        var errorDescription: String? {
+            switch self {
+            case .mountFailed:
+                return String(localized: "Couldn't mount the update disk image.", comment: "In-app updater error.")
+            case .missingAppInArchive:
+                return String(localized: "The update didn’t contain Dinky.app.", comment: "In-app updater error.")
+            }
+        }
     }
 
     @discardableResult
