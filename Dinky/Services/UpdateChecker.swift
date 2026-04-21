@@ -184,10 +184,14 @@ final class UpdateChecker: ObservableObject {
     private func launchDeferredBundleReplace(stagedApp: URL, destination: URL, cleanupPaths: [String]) throws {
         let fm = FileManager.default
         let scriptURL = fm.temporaryDirectory.appendingPathComponent("dinky-install-\(UUID().uuidString).sh")
+        let pid = ProcessInfo.processInfo.processIdentifier
         var lines: [String] = [
             "#!/bin/bash",
             "set -e",
-            "sleep 2",
+            // Poll until this PID is gone (handles both the fast NSApp.terminate path
+            // and the 4-second hard-exit fallback). 10s cap is a safety valve.
+            "deadline=$(( $(date +%s) + 10 ))",
+            "while kill -0 \(pid) 2>/dev/null && [ $(date +%s) -lt $deadline ]; do sleep 0.2; done",
             "rm -rf \(bashSingleQuotedPath(destination.path))",
             "/usr/bin/ditto \(bashSingleQuotedPath(stagedApp.path)) \(bashSingleQuotedPath(destination.path))",
         ]
