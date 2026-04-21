@@ -598,10 +598,28 @@ private struct OutputTab: View {
 
 // MARK: - Presets
 
-/// Sub-panel when **Applies to** is All (Image / Video / PDF); ignored for single-type presets.
-private enum PresetMediaSettingsTab: String, CaseIterable, Identifiable {
+/// Which media type’s settings are shown when **Applies to** includes more than one type.
+private enum PresetMediaSettingsTab: String, CaseIterable, Identifiable, Hashable {
     case image, video, pdf
     var id: String { rawValue }
+
+    var mediaType: MediaType {
+        switch self {
+        case .image: return .image
+        case .video: return .video
+        case .pdf: return .pdf
+        }
+    }
+
+    static let canonicalDisplayOrder: [PresetMediaSettingsTab] = [.image, .video, .pdf]
+
+    static func tab(for media: MediaType) -> PresetMediaSettingsTab {
+        switch media {
+        case .image: return .image
+        case .video: return .video
+        case .pdf: return .pdf
+        }
+    }
 }
 
 private struct PresetsTab: View {
@@ -615,29 +633,44 @@ private struct PresetsTab: View {
 
     /// One-line summary so presets are distinguishable in the list without expanding.
     private func presetListSecondaryLine(_ preset: CompressionPreset) -> String {
-        let scope = PresetMediaScope(rawValue: preset.presetMediaScopeRaw) ?? .all
-        var parts: [String] = [scope.displayName]
+        let included = preset.includedMediaTypes
+        let all = PresetMediaScopeRawCodec.allTypes
+        var parts: [String] = [preset.includedMediaTypesSummaryLabel]
         let imageFmt = preset.autoFormat
             ? String(localized: "Auto", comment: "Preset list: automatic image format.")
             : preset.format.displayName
         let vid = (VideoCodecFamily(rawValue: preset.videoCodecFamilyRaw) ?? .h264).chipLabel
 
-        switch scope {
-        case .all:
-            parts.append(imageFmt)
-            parts.append(vid)
-            let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
-            if pdfMode == .flattenPages {
-                let q = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
-                parts.append(String(localized: "PDF \(q.displayName)", comment: "Preset list: flattened PDF quality tier."))
-            } else {
-                parts.append(String(localized: "PDF preserve", comment: "Preset list: PDF preserve structure."))
+        if included == all {
+            parts.append(contentsOf: allMediaTypesPresetSummaryFragments(preset, imageFmt: imageFmt, vid: vid))
+        } else {
+            let order: [MediaType] = [.image, .video, .pdf]
+            for m in order where included.contains(m) {
+                parts.append(contentsOf: singleMediaSummaryFragments(media: m, preset: preset, imageFmt: imageFmt, vid: vid))
             }
-            if preset.pdfEnableOCR {
-                parts.append(String(localized: "OCR", comment: "Preset list: PDF OCR enabled."))
-            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func allMediaTypesPresetSummaryFragments(_ preset: CompressionPreset, imageFmt: String, vid: String) -> [String] {
+        var parts: [String] = [imageFmt, vid]
+        let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
+        if pdfMode == .flattenPages {
+            let q = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
+            parts.append(String(localized: "PDF \(q.displayName)", comment: "Preset list: flattened PDF quality tier."))
+        } else {
+            parts.append(String(localized: "PDF preserve", comment: "Preset list: PDF preserve structure."))
+        }
+        if preset.pdfEnableOCR {
+            parts.append(String(localized: "OCR", comment: "Preset list: PDF OCR enabled."))
+        }
+        return parts
+    }
+
+    private func singleMediaSummaryFragments(media: MediaType, preset: CompressionPreset, imageFmt: String, vid: String) -> [String] {
+        switch media {
         case .image:
-            parts.append(imageFmt)
+            var parts: [String] = [imageFmt]
             if preset.maxWidthEnabled {
                 parts.append(String(localized: "max \(preset.maxWidth) px", comment: "Preset list: max width pixels."))
             }
@@ -646,8 +679,9 @@ private struct PresetsTab: View {
                 let mbStr = mb < 1 ? String(format: "%.1f", mb) : String(format: "%.4g", mb)
                 parts.append(String(localized: "≤\(mbStr) MB", comment: "Preset list: target file size cap."))
             }
+            return parts
         case .video:
-            parts.append(vid)
+            var parts: [String] = [vid]
             if preset.videoMaxResolutionEnabled {
                 parts.append("\(preset.videoMaxResolutionLines)p")
             } else {
@@ -656,7 +690,9 @@ private struct PresetsTab: View {
             if preset.videoRemoveAudio {
                 parts.append(String(localized: "no audio", comment: "Preset list: audio stripped."))
             }
+            return parts
         case .pdf:
+            var parts: [String] = []
             let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
             if pdfMode == .flattenPages {
                 let q = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
@@ -670,8 +706,8 @@ private struct PresetsTab: View {
             if preset.pdfEnableOCR {
                 parts.append(String(localized: "OCR", comment: "Preset list: PDF OCR enabled."))
             }
+            return parts
         }
-        return parts.joined(separator: " · ")
     }
 
     var body: some View {
@@ -686,39 +722,82 @@ private struct PresetsTab: View {
         .onChange(of: selectedID) { _, newID in
             guard let id = newID,
                   let p = prefs.savedPresets.first(where: { $0.id == id }) else { return }
-            syncMediaTabToPresetScope(PresetMediaScope(rawValue: p.presetMediaScopeRaw) ?? .all)
+            syncMediaTabToIncluded(p.includedMediaTypes)
         }
         .onChange(of: selectedPreset?.presetMediaScopeRaw) { _, raw in
-            guard let raw, let scope = PresetMediaScope(rawValue: raw) else { return }
-            switch scope {
-            case .all: break
-            case .image: presetMediaSettingsTab = .image
-            case .pdf: presetMediaSettingsTab = .pdf
-            case .video: presetMediaSettingsTab = .video
-            }
+            guard let raw else { return }
+            clampPresetMediaSettingsTab(included: PresetMediaScopeRawCodec.includedTypes(from: raw))
         }
     }
 
-    private func syncMediaTabToPresetScope(_ scope: PresetMediaScope) {
-        switch scope {
-        case .all: break
-        case .image: presetMediaSettingsTab = .image
-        case .pdf: presetMediaSettingsTab = .pdf
-        case .video: presetMediaSettingsTab = .video
+    private func syncMediaTabToIncluded(_ included: Set<MediaType>) {
+        if included.count == 1, let only = included.first {
+            presetMediaSettingsTab = PresetMediaSettingsTab.tab(for: only)
+            return
         }
+        clampPresetMediaSettingsTab(included: included)
     }
 
-    private func presetMediaScope(for snapshot: CompressionPreset) -> PresetMediaScope {
+    private func clampPresetMediaSettingsTab(included: Set<MediaType>) {
+        if included.contains(presetMediaSettingsTab.mediaType) { return }
+        presetMediaSettingsTab = PresetMediaSettingsTab.canonicalDisplayOrder.first { included.contains($0.mediaType) } ?? .image
+    }
+
+    private func includedMediaTypes(for snapshot: CompressionPreset) -> Set<MediaType> {
         let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
-        return PresetMediaScope(rawValue: live.presetMediaScopeRaw) ?? .all
+        return live.includedMediaTypes
+    }
+
+    private func mediaSettingsTabsShown(for snapshot: CompressionPreset) -> [PresetMediaSettingsTab] {
+        let inc = includedMediaTypes(for: snapshot)
+        return PresetMediaSettingsTab.canonicalDisplayOrder.filter { inc.contains($0.mediaType) }
     }
 
     private func effectiveMediaTab(for snapshot: CompressionPreset) -> PresetMediaSettingsTab {
-        switch presetMediaScope(for: snapshot) {
-        case .all: return presetMediaSettingsTab
-        case .image: return .image
-        case .pdf: return .pdf
-        case .video: return .video
+        let inc = includedMediaTypes(for: snapshot)
+        if inc.count == 1, let only = inc.first {
+            return PresetMediaSettingsTab.tab(for: only)
+        }
+        if inc.contains(presetMediaSettingsTab.mediaType) {
+            return presetMediaSettingsTab
+        }
+        return PresetMediaSettingsTab.canonicalDisplayOrder.first { inc.contains($0.mediaType) } ?? .image
+    }
+
+    private func presetAppliesToBinding(_ type: MediaType, snapshot: CompressionPreset) -> Binding<Bool> {
+        Binding(
+            get: { includedMediaTypes(for: snapshot).contains(type) },
+            set: { newValue in
+                var types = includedMediaTypes(for: snapshot)
+                if newValue {
+                    types.insert(type)
+                } else {
+                    if types.count <= 1, types.contains(type) { return }
+                    types.remove(type)
+                }
+                self.set(\.presetMediaScopeRaw, to: PresetMediaScopeRawCodec.serialize(types), for: snapshot)
+                clampPresetMediaSettingsTab(included: types)
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func presetAppliesToMultiSelectRow(snapshot: CompressionPreset) -> some View {
+        let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        LabeledContent(String(localized: "Applies to", comment: "Settings UI.")) {
+            Menu {
+                ForEach([MediaType.image, .video, .pdf], id: \.self) { type in
+                    Toggle(isOn: presetAppliesToBinding(type, snapshot: snapshot)) {
+                        Text(type.presetAppliesToSegmentLabel)
+                    }
+                }
+            } label: {
+                Text(live.includedMediaTypesSummaryLabel)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityHint(String(localized: "Shows a menu to choose which file types use this preset.", comment: "VoiceOver: preset Applies to menu."))
         }
     }
 
@@ -777,11 +856,11 @@ private struct PresetsTab: View {
             let liveForQuality = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
             Toggle(String(localized: "Smart quality", comment: "Settings UI."), isOn: binding(\.smartQuality, snapshot: snapshot))
             if !liveForQuality.smartQuality {
-                if presetMediaScope(for: snapshot) == .all {
+                if includedMediaTypes(for: snapshot).count > 1 {
                     Picker(String(localized: "Manual compression", comment: "Settings UI."), selection: $presetMediaSettingsTab) {
-                        Text(String(localized: "Image", comment: "Settings UI.")).tag(PresetMediaSettingsTab.image)
-                        Text(String(localized: "Video", comment: "Settings UI.")).tag(PresetMediaSettingsTab.video)
-                        Text(String(localized: "PDF", comment: "Settings UI.")).tag(PresetMediaSettingsTab.pdf)
+                        ForEach(mediaSettingsTabsShown(for: snapshot), id: \.self) { tab in
+                            Text(tab.mediaType.presetAppliesToSegmentLabel).tag(tab)
+                        }
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
@@ -803,16 +882,12 @@ private struct PresetsTab: View {
             }
         }
         Section {
-            Picker(String(localized: "Applies to", comment: "Settings UI."), selection: binding(\.presetMediaScopeRaw, snapshot: snapshot)) {
-                ForEach(PresetMediaScope.allCases) { scope in
-                    Text(scope.displayName).tag(scope.rawValue)
-                }
-            }
-            if presetMediaScope(for: snapshot) == .all {
+            presetAppliesToMultiSelectRow(snapshot: snapshot)
+            if includedMediaTypes(for: snapshot).count > 1 {
                 Picker(String(localized: "Media settings", comment: "Settings UI."), selection: $presetMediaSettingsTab) {
-                    Text(String(localized: "Image", comment: "Settings UI.")).tag(PresetMediaSettingsTab.image)
-                    Text(String(localized: "Video", comment: "Settings UI.")).tag(PresetMediaSettingsTab.video)
-                    Text(String(localized: "PDF", comment: "Settings UI.")).tag(PresetMediaSettingsTab.pdf)
+                    ForEach(mediaSettingsTabsShown(for: snapshot), id: \.self) { tab in
+                        Text(tab.mediaType.presetAppliesToSegmentLabel).tag(tab)
+                    }
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)

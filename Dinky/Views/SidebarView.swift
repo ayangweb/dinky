@@ -181,8 +181,7 @@ struct SidebarView: View {
                     presetRow(
                         id: preset.id.uuidString,
                         name: preset.name,
-                        subtitle: PresetMediaScope(rawValue: preset.presetMediaScopeRaw)?.displayName
-                            ?? PresetMediaScope.all.displayName,
+                        subtitle: preset.includedMediaTypesSummaryLabel,
                         isActive: prefs.activePresetID == preset.id.uuidString
                     ) {
                         var fmt = selectedFormat

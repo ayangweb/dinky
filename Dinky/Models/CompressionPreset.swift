@@ -36,7 +36,7 @@ struct CompressionPreset: Codable, Identifiable {
     var presetCustomFolderBookmark: Data
     // Content type hint
     var contentTypeHintRaw: String
-    /// Which media types this preset targets (`all` | `image` | `pdf` | `video`).
+    /// Which media types this preset targets: `all`, a single token, or comma-separated `image` / `video` / `pdf`.
     var presetMediaScopeRaw: String
     // PDF / Video (same keys as DinkyPreferences)
     var pdfOutputModeRaw: String
@@ -211,15 +211,25 @@ struct CompressionPreset: Codable, Identifiable {
 
 extension CompressionPreset {
 
+    /// Media types this preset applies to (non-empty; unknown legacy raw values decode as all three).
+    var includedMediaTypes: Set<MediaType> {
+        PresetMediaScopeRawCodec.includedTypes(from: presetMediaScopeRaw)
+    }
+
+    /// Short label for lists and sidebars: `All`, or comma-separated `Images`, `Videos`, `PDFs`.
+    var includedMediaTypesSummaryLabel: String {
+        let inc = includedMediaTypes
+        if inc == PresetMediaScopeRawCodec.allTypes {
+            return PresetMediaScope.all.displayName
+        }
+        let order: [MediaType] = [.image, .video, .pdf]
+        let names = order.filter { inc.contains($0) }.map(\.presetAppliesToSummaryWord)
+        return names.joined(separator: String(localized: ", ", comment: "Separator between media types in preset subtitle."))
+    }
+
     /// Whether this preset should run for the given file type (watch routing, etc.).
     func applies(to media: MediaType) -> Bool {
-        guard let scope = PresetMediaScope(rawValue: presetMediaScopeRaw) else { return true }
-        switch scope {
-        case .all: return true
-        case .image: return media == .image
-        case .pdf: return media == .pdf
-        case .video: return media == .video
-        }
+        includedMediaTypes.contains(media)
     }
 
     func resolvedPresetCustomFolder() -> URL? {
