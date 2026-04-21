@@ -53,7 +53,7 @@ Hey! I'm [Derek Castelli](https://www.heyderekj.com), a full-time freelance web 
 - **Skip threshold** — skip files below a minimum savings target: Off, 2%, 5%, or 10%
 - **Advanced** — strip metadata, sanitize filenames for web, open output folder automatically
 - **Quirky idle animation** — three choreographed card-drop variants that loop then hold until you come back
-- 31 MB installed (bundled encoders + PDF **qpdf** dylibs). Dinky style.
+- 31 MB installed. Dinky style.
 
 ### What others don't do
 
