@@ -74,6 +74,8 @@
       flex-wrap: wrap;
       align-items: flex-start;
       gap: 28px 40px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--divider);
     }
     .cmp-writeups-specialists-intro {
       flex: 1 1 220px;

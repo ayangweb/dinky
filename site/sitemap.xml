@@ -56,7 +56,12 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://dinkyfiles.com/compare/macos-preview/</loc>
+    <loc>https://dinkyfiles.com/compare/quicktime/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dinkyfiles.com/compare/preview/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
