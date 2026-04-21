@@ -2148,6 +2148,15 @@
         }
       }
     },
+    "After success: originals move to Trash" : {
+      "comment" : "Compression confirm: originals policy."
+    },
+    "After success: originals move to your Backup folder" : {
+      "comment" : "Compression confirm: originals policy."
+    },
+    "After success: originals stay where they are" : {
+      "comment" : "Compression confirm: originals policy."
+    },
     "All caught up." : {
       "comment" : "Manual update: no update available.",
       "localizations" : {
@@ -2686,6 +2695,9 @@
           }
         }
       }
+    },
+    "Always confirm before compressing" : {
+      "comment" : "Compression confirm sheet.\nSettings UI."
     },
     "Animation or other frames were omitted; only the first frame was compressed." : {
       "comment" : "Tooltip: first-frame-only chip."
@@ -3316,12 +3328,6 @@
     "Auto" : {
       "comment" : "Preset list: automatic image format."
     },
-    "Auto WebP or AVIF from each image; compression strength adapts per file." : {
-      "comment" : "Simple outcome: images, smart on, auto format on."
-    },
-    "Auto WebP or AVIF; strength style (Photo / Graphic / Mixed) in All options… below." : {
-      "comment" : "Simple outcome: images, smart off, auto format."
-    },
     "Auto-clear queue when done" : {
       "comment" : "Settings UI.",
       "localizations" : {
@@ -3946,6 +3952,9 @@
     "Best-effort size: qpdf stream optimization, then PDFKit. Often no gain on exports that are already optimized. Keeps selectable text, links, and forms." : {
       "comment" : "Sidebar PDF preserve mode subtitle."
     },
+    "Best-effort smaller file while keeping selectable text and links." : {
+      "comment" : "Results row: PDF preserve tooltip."
+    },
     "Big in. Dinky out." : {
       "comment" : "Batch completion sheet title; brand tagline.",
       "localizations" : {
@@ -4184,7 +4193,7 @@
       }
     },
     "Cancel" : {
-      "comment" : "Alert cancel button.\nButton to cancel shortcut recording.\nSettings UI.",
+      "comment" : "Alert cancel button.\nButton to cancel shortcut recording.\nCompression confirm sheet.\nSettings UI.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5117,9 +5126,6 @@
           }
         }
       }
-    },
-    "Chooses a modern format and strength for each photo automatically." : {
-      "comment" : "Outcome map friendly: images, smart, auto format."
     },
     "Clear" : {
       "comment" : "Clear session history list.\nToolbar or list: clear completed rows.",
@@ -6761,6 +6767,266 @@
     "Compress Videos" : {
       "comment" : "Shortcuts app: video intent title.\nShortcuts: suggested action short title."
     },
+    "compress_confirm_add_files" : {
+      "comment" : "Compression confirm: file count for lead sentence; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_comma_pair" : {
+      "comment" : "Compression confirm: join two count phrases with a comma.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, %@"
+          }
+        }
+      }
+    },
+    "compress_confirm_images" : {
+      "comment" : "Compression confirm: image type count; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld image"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld images"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_lead_add" : {
+      "comment" : "Compression confirm lead; argument is a pluralized file count phrase.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re about to add %@."
+          }
+        }
+      }
+    },
+    "compress_confirm_lead_add_and_fetch" : {
+      "comment" : "Compression confirm lead; arguments are pluralized count phrases.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re about to add %@ and fetch %@."
+          }
+        }
+      }
+    },
+    "compress_confirm_lead_fetch" : {
+      "comment" : "Compression confirm lead; argument is a pluralized link count phrase.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re about to fetch %@."
+          }
+        }
+      }
+    },
+    "compress_confirm_links" : {
+      "comment" : "Compression confirm: link count; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld link"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld links"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_links_to_fetch" : {
+      "comment" : "Compression confirm: remote-only queue summary; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld link to fetch"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld links to fetch"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_local_files" : {
+      "comment" : "Compression confirm: local file count; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld local file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld local files"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_more_locals" : {
+      "comment" : "Compression confirm: overflow file count in pending list; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%lld more file (summary above)"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+%lld more files (summary above)"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_other_files_unknown" : {
+      "comment" : "Compression confirm: unknown extension count; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld other file (type detected when compressing)"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld other files (type detected when compressing)"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_pdfs" : {
+      "comment" : "Compression confirm: PDF count; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld PDF"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld PDFs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compress_confirm_videos" : {
+      "comment" : "Compression confirm: video count; plural.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld video"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld videos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Compressed" : {
       "comment" : "Preview pane label.\nSize pill label.",
       "localizations" : {
@@ -7540,8 +7806,26 @@
         }
       }
     },
+    "Confirm compression" : {
+      "comment" : "Compression confirm sheet title."
+    },
     "Continue" : {
-      "comment" : "Bottom bar: resume queue after Stop."
+      "comment" : "Bottom bar: resume queue after Stop.\nCompression confirm sheet."
+    },
+    "Converts %1$@ to %2$@" : {
+      "comment" : "VoiceOver: format conversion chip; arguments are uppercase source extension, uppercase output extension."
+    },
+    "Converts each image to a modern format (AVIF or WebP when Auto is on) and sets strength automatically." : {
+      "comment" : "Outcome map friendly: images, smart, auto format."
+    },
+    "Converts each image to WebP or AVIF (new files); compression strength adapts per file." : {
+      "comment" : "Simple outcome: images, smart on, auto format on."
+    },
+    "Converts to WebP or AVIF; strength style (Photo / Graphic / Mixed) in All options… below." : {
+      "comment" : "Simple outcome: images, smart off, auto format."
+    },
+    "Converts to WebP or AVIF; you set the overall strength style in All options." : {
+      "comment" : "Outcome map friendly: images, fixed tiers, auto format."
     },
     "Copies Finder Get Info → Comments to the compressed file." : {
       "comment" : "Sidebar: preserve Finder comments helper."
@@ -9310,7 +9594,7 @@
     "Dinky picks a tier from each document. The choice below is the manual fallback if analysis fails." : {
       "comment" : "Sidebar PDF: smart flatten helper."
     },
-    "Dinky picks format and compression for each file automatically. Turn off to configure each setting manually." : {
+    "Dinky picks WebP, AVIF, or another output format per image — new files, not a same-format JPEG squeeze. Turn off Quick choices to configure manually." : {
       "comment" : "VoiceOver: simple mode automatic toggle."
     },
     "Dismiss" : {
@@ -9700,6 +9984,9 @@
           }
         }
       }
+    },
+    "Downloads before compressing." : {
+      "comment" : "Compression confirm: remote URL row."
     },
     "Downloads folder" : {
       "comment" : "Settings UI.",
@@ -10091,6 +10378,9 @@
           }
         }
       }
+    },
+    "Edit presets…" : {
+      "comment" : "Compression confirm: open Presets tab."
     },
     "Email Error…" : {
       "comment" : "Send error by email.",
@@ -11123,6 +11413,9 @@
     },
     "First frame only" : {
       "comment" : "VoiceOver: first-frame-only chip."
+    },
+    "Flatten · %@" : {
+      "comment" : "Results row: PDF flatten chip; tier name."
     },
     "Flatten (smallest)" : {
       "comment" : "Settings UI.",
@@ -13785,6 +14078,9 @@
     "How Dinky handles photos, documents, video, and saved files — expand for details." : {
       "comment" : "Collapsed teaser under What to expect header."
     },
+    "How it will run" : {
+      "comment" : "Compression confirm: controls section."
+    },
     "How many files crunch at once — not image, video, or PDF quality. Fast is gentle; Fastest clears the queue sooner if your Mac is up for it." : {
       "comment" : "Settings: explains batch parallelism tiers.",
       "localizations" : {
@@ -13943,7 +14239,7 @@
       }
     },
     "Image" : {
-      "comment" : "Settings UI: media type segment.",
+      "comment" : "Compression confirm: media label.\nSettings UI: media type segment.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -14019,6 +14315,9 @@
         }
       }
     },
+    "Image → .%@" : {
+      "comment" : "Compression confirm: resolved output extension."
+    },
     "Image file" : {
       "comment" : "Tooltip for generic image type chip."
     },
@@ -14026,7 +14325,7 @@
       "comment" : "Settings UI: PDF image downsampling.\nSidebar PDF: image downsampling subsection."
     },
     "Images" : {
-      "comment" : "Outcome map row title.\nPreset list: applies to image files.\nShortcuts app: intent category.\nShortcuts: images parameter title.\nSidebar quality subsection label.",
+      "comment" : "Compression confirm: media section.\nOutcome map row title.\nPreset list: applies to image files.\nShortcuts app: intent category.\nShortcuts: images parameter title.\nSidebar quality subsection label.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -14101,6 +14400,12 @@
           }
         }
       }
+    },
+    "Images: converts to %@" : {
+      "comment" : "Compression confirm: fixed image format; argument is format name."
+    },
+    "Images: converts to AVIF for photos and WebP for most other images (Auto)" : {
+      "comment" : "Compression confirm: image formats."
     },
     "In the neighborhood of a minute or two of 1080p video." : {
       "comment" : "Batch summary savings perspective; rough size analogy."
@@ -14810,6 +15115,9 @@
         }
       }
     },
+    "Links: output follows your Settings for each file after download." : {
+      "comment" : "Compression confirm: remote-only queue."
+    },
     "Loving Dinky? Leave a review" : {
       "comment" : "Review prompt banner: link to GitHub Discussions reviews.",
       "localizations" : {
@@ -15453,6 +15761,9 @@
     },
     "Manual mode: files stay queued until you tap Compress Now in the toolbar or bottom bar, right-click a row, or use File ▸ Compress Now (%@)." : {
       "comment" : "Manual mode banner; argument is shortcut."
+    },
+    "Manual mode: new files stay queued until you choose Compress Now" : {
+      "comment" : "Compression confirm: manual mode."
     },
     "Manual tier is a fallback when smart analysis can’t run. Turn off Smart quality under Compression to fix Low / Medium / High." : {
       "comment" : "Settings UI.",
@@ -16329,6 +16640,9 @@
         }
       }
     },
+    "New files stay queued until you tap Compress Now. Turn off to compress automatically when files are added." : {
+      "comment" : "Settings UI."
+    },
     "New Tab" : {
       "comment" : "System shortcut name for conflict warning.",
       "localizations" : {
@@ -17030,6 +17344,9 @@
     },
     "No space saved (outputs were already small or similar size)." : {
       "comment" : "Batch summary when saved bytes zero."
+    },
+    "None" : {
+      "comment" : "Compression confirm: no preset."
     },
     "Nothing to paste" : {
       "comment" : "Alert title when clipboard has no compressible item.",
@@ -18138,6 +18455,9 @@
         }
       }
     },
+    "Open Settings…" : {
+      "comment" : "Compression confirm: open Settings."
+    },
     "Open Summary…" : {
       "comment" : "History row: reopen stored batch completion dialog."
     },
@@ -19001,6 +19321,20 @@
         }
       }
     },
+    "Output: .mp4 using %@ at %@ quality." : {
+      "comment" : "Results row: video policy tooltip; codec then quality.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Output: .mp4 using %1$@ at %2$@ quality."
+          }
+        }
+      }
+    },
+    "Output: .mp4 using %@. Smart Quality picks encoder strength per clip (HDR may use HEVC)." : {
+      "comment" : "Results row: video policy tooltip."
+    },
     "Overrides macOS:" : {
       "comment" : "Prefix when shortcut may override a system shortcut.",
       "localizations" : {
@@ -19159,7 +19493,7 @@
       "comment" : "Results row: generic PDF chip until page count is known."
     },
     "PDF" : {
-      "comment" : "Settings UI: media type segment.\nShortcuts app: PDF intent category.\nSidebar quality subsection label.",
+      "comment" : "Compression confirm: media section.\nSettings UI: media type segment.\nShortcuts app: PDF intent category.\nSidebar quality subsection label.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19238,8 +19572,17 @@
     "PDF %@" : {
       "comment" : "Preset list: flattened PDF quality tier."
     },
+    "PDF → Flatten (%@)" : {
+      "comment" : "Compression confirm: PDF row flatten; argument is tier."
+    },
+    "PDF → Preserve text" : {
+      "comment" : "Compression confirm: PDF row preserve."
+    },
     "PDF document" : {
       "comment" : "Tooltip for generic PDF type chip."
+    },
+    "PDF output" : {
+      "comment" : "Compression confirm: PDF output picker accessibility."
     },
     "PDF output mode" : {
       "comment" : "VoiceOver: PDF mode picker.",
@@ -19324,11 +19667,38 @@
     "PDF: flatten or keep text (All options…); tier chosen per file when flattening." : {
       "comment" : "Simple outcome: PDFs with smart quality."
     },
+    "PDF: flatten, %@ quality" : {
+      "comment" : "VoiceOver: PDF flatten chip; tier."
+    },
+    "PDF: preserve text and links" : {
+      "comment" : "VoiceOver: PDF preserve chip."
+    },
     "PDF: preserve vs flatten, quality, and grayscale in All options… below." : {
       "comment" : "Simple outcome: PDFs without smart quality."
     },
     "PDFs" : {
       "comment" : "Outcome map row title.\nPreset list: applies to PDF files.\nShortcuts: PDFs parameter title."
+    },
+    "PDFs and videos: use your current Settings and sidebar options (Smart Quality may adjust tiers)." : {
+      "comment" : "Compression confirm: PDF/video."
+    },
+    "PDFs: flatten pages (%@ JPEG)" : {
+      "comment" : "Compression confirm: PDF flatten tier; argument is tier name."
+    },
+    "PDFs: flatten with Smart Quality (manual fallback: %@)" : {
+      "comment" : "Compression confirm: PDF flatten + smart; argument is PDF tier."
+    },
+    "PDFs: grayscale for flatten when appropriate" : {
+      "comment" : "Compression confirm: PDF grayscale."
+    },
+    "PDFs: preserve text and links when smaller (qpdf + PDFKit)" : {
+      "comment" : "Compression confirm: PDF preserve mode."
+    },
+    "PDFs: search scanned pages (OCR) when needed" : {
+      "comment" : "Compression confirm: PDF OCR."
+    },
+    "PDFs: step down tiers to try to stay under %.1f MB" : {
+      "comment" : "Compression confirm: PDF max size cap."
     },
     "Per-preset compression & media…" : {
       "comment" : "Settings UI.",
@@ -19572,9 +19942,6 @@
     },
     "Picks encoder strength per image from content (photo vs. graphic). Turn off Smart quality under Compression to choose Photo, Graphic, or Mixed." : {
       "comment" : "Settings UI."
-    },
-    "Picks WebP or AVIF; you set the overall strength style in All options." : {
-      "comment" : "Outcome map friendly: images, fixed tiers, auto format."
     },
     "Play sound when done" : {
       "comment" : "Settings UI.",
@@ -19892,7 +20259,7 @@
       }
     },
     "Preserve" : {
-      "comment" : "Preset list: PDF preserve links."
+      "comment" : "Preset list: PDF preserve links.\nResults row: short PDF preserve chip."
     },
     "Preserve Finder comments" : {
       "comment" : "Settings UI."
@@ -20058,6 +20425,9 @@
     "Preserve text and links" : {
       "comment" : "Sidebar PDF mode title."
     },
+    "Preset" : {
+      "comment" : "Compression confirm: preset picker accessibility.\nCompression confirm: preset section."
+    },
     "Preset %@" : {
       "comment" : "VoiceOver preset suffix; argument is preset name.\nVoiceOver: preset badge; argument is name."
     },
@@ -20216,7 +20586,10 @@
       }
     },
     "Preset: %@" : {
-      "comment" : "Tooltip: row uses this preset; argument is preset name."
+      "comment" : "Compression confirm: preset name in queue summary.\nTooltip: row uses this preset; argument is preset name."
+    },
+    "Preset: None — settings below apply" : {
+      "comment" : "Compression confirm: no preset in queue summary."
     },
     "Presets" : {
       "comment" : "Settings UI.",
@@ -20999,6 +21372,9 @@
           }
         }
       }
+    },
+    "Rasterize pages to JPEG (%@ tier)." : {
+      "comment" : "Results row: PDF flatten tooltip; tier."
     },
     "Rasterizes each page to JPEG for reliable smaller files. No selectable text or links." : {
       "comment" : "PDF flatten mode description."
@@ -23442,6 +23818,9 @@
         }
       }
     },
+    "Saved in a different format than the original — not a same-file recompress." : {
+      "comment" : "Tooltip: format conversion chip."
+    },
     "Saves next to originals" : {
       "comment" : "Output summary: save location."
     },
@@ -24708,7 +25087,10 @@
     "Shows a menu to choose which file types use this preset." : {
       "comment" : "VoiceOver: preset Applies to menu."
     },
-    "Shows a short summary after a successful batch (space saved, time, folder opened or not). Sounds and notifications follow their own settings." : {
+    "Shows a review sheet before starting — covers drag-and-drop, Open, the Dock, Services, and Clipboard. Watch Folder is not affected." : {
+      "comment" : "Settings UI."
+    },
+    "Shows space saved and time after each successful batch." : {
       "comment" : "Settings UI."
     },
     "Side by Side" : {
@@ -25355,6 +25737,9 @@
     },
     "Smallest file (flatten)" : {
       "comment" : "Settings UI: PDF output mode."
+    },
+    "Smart" : {
+      "comment" : "Compression confirm: smart quality short label.\nResults row: smart quality short label on chip."
     },
     "Smart quality" : {
       "comment" : "Settings UI.",
@@ -27527,6 +27912,9 @@
         }
       }
     },
+    "Type unknown — will detect when compressing" : {
+      "comment" : "Compression confirm: unknown media."
+    },
     "Undo" : {
       "comment" : "Batch summary per file: revert this compression.\nSystem shortcut name for conflict warning.",
       "localizations" : {
@@ -27604,6 +27992,9 @@
         }
       }
     },
+    "Undo %lld compressions" : {
+      "comment" : "Context menu: revert multiple compressions."
+    },
     "Undo All" : {
       "comment" : "Batch summary: revert all compressions in this batch."
     },
@@ -27611,7 +28002,7 @@
       "comment" : "VoiceOver: undo available on batch summary row."
     },
     "Undo compression" : {
-      "comment" : "VoiceOver: Undo on batch summary row."
+      "comment" : "Context menu: revert one compression.\nVoiceOver: Undo on batch summary row."
     },
     "Unique folder: new files are compressed with this preset’s saved options, independent of the sidebar." : {
       "comment" : "Settings UI.",
@@ -28463,11 +28854,14 @@
         }
       }
     },
-    "Uses your format chip and still tweaks strength per image." : {
+    "Uses your format chip — outputs that format and tweaks strength per image." : {
       "comment" : "Outcome map friendly: images, smart, manual format."
     },
     "Uses your format chips; strength style lives in All options." : {
       "comment" : "Outcome map friendly: images, fixed tiers, manual format."
+    },
+    "Using preset “%@” — choose None to adjust settings here." : {
+      "comment" : "Compression confirm: preset locked hint; argument is preset name."
     },
     "v%@" : {
       "comment" : "A version number in the update banner.",
@@ -28797,7 +29191,7 @@
       "comment" : "Default filename stem for Shortcuts video output when source has no name.\nResults row: generic video chip when content type was not classified (e.g. Smart Quality off)."
     },
     "Video" : {
-      "comment" : "Settings UI: media type segment.\nShortcuts app: video intent category.\nSidebar quality subsection label.",
+      "comment" : "Compression confirm: media section.\nSettings UI: media type segment.\nShortcuts app: video intent category.\nSidebar quality subsection label.",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28873,11 +29267,29 @@
         }
       }
     },
+    "Video → %@ · .mp4" : {
+      "comment" : "Compression confirm: video row; codec."
+    },
     "Video file" : {
       "comment" : "Tooltip for generic video type chip."
     },
     "Videos" : {
       "comment" : "Outcome map row title.\nPreset list: applies to video files.\nShortcuts: videos parameter title."
+    },
+    "Videos: %@ → .mp4" : {
+      "comment" : "Compression confirm: video codec and container."
+    },
+    "Videos: audio stripped from output" : {
+      "comment" : "Compression confirm: video strip audio."
+    },
+    "Videos: fixed encoder strength — %@" : {
+      "comment" : "Compression confirm: video manual quality; argument is tier name."
+    },
+    "Videos: max height %lldp" : {
+      "comment" : "Compression confirm: video resolution cap."
+    },
+    "Videos: Smart Quality picks Balanced or High per clip (HDR uses HEVC when needed)." : {
+      "comment" : "Compression confirm: video smart quality."
     },
     "Visit dinkyfiles.com" : {
       "comment" : "Help menu: open marketing site.",
@@ -29732,6 +30144,9 @@
         }
       }
     },
+    "What’s queued" : {
+      "comment" : "Compression confirm: pending list section."
+    },
     "When a document looks like a scan, Dinky adds a text layer first, then compresses. Born-digital PDFs skip this step." : {
       "comment" : "Settings UI: PDF OCR helper."
     },
@@ -29895,16 +30310,8 @@
         }
       }
     },
-    "When on, new files stay queued until you compress them. When off, new files compress automatically. After Undoing a finished batch, use Compress Now (toolbar, bottom bar, or File menu) — that always runs when you ask, regardless of this setting." : {
-      "comment" : "Settings UI.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "When on, new files stay queued until you compress them. When off, new files compress automatically. After Undoing a finished batch, use Compress Now (toolbar, bottom bar, or File menu) — that always runs when you ask, regardless of this setting."
-          }
-        }
-      }
+    "When on, Dinky picks encoder strength per file (images, PDF flatten, video). Turn off for manual choices in each section below." : {
+      "comment" : "Compression confirm: smart quality footnote."
     },
     "When Smart quality is on, flatten may use grayscale for PDFs that look like black-and-white office scans, even if Grayscale PDF is off." : {
       "comment" : "Settings UI: PDF auto mono helper."
@@ -30228,6 +30635,9 @@
     },
     "You pick codec, quality, and max resolution in All options." : {
       "comment" : "Outcome map friendly: video fixed."
+    },
+    "You’re about to add files to the queue." : {
+      "comment" : "Compression confirm lead fallback."
     },
     "You’re on Dinky %@ — the latest and dinkyest." : {
       "comment" : "Manual update: up to date; argument is version.",

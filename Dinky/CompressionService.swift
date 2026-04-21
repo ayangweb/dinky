@@ -370,7 +370,7 @@ actor CompressionService {
             progressHandler?(min(1, max(0, v)))
         }
 
-        let outputURL = OutputPathUniqueness.uniqueOutputURL(
+        var outputURL = OutputPathUniqueness.uniqueOutputURL(
             desired: outputURL,
             sourceURL: source,
             style: collisionNamingStyle,
@@ -412,6 +412,12 @@ actor CompressionService {
             let tEncodeAnim = CFAbsoluteTimeGetCurrent()
             let q = quality(for: format, content: detected)
             report(0.38)
+            outputURL = OutputPathUniqueness.refreshUniqueOutput(
+                currentCandidate: outputURL,
+                sourceURL: source,
+                style: collisionNamingStyle,
+                customPattern: collisionCustomPattern
+            )
             let ph = progressHandler
             try await Task.detached {
                 try compressAnimatedGIFToWebP(
@@ -473,6 +479,12 @@ actor CompressionService {
         defer { if isTempWork { try? FileManager.default.removeItem(at: workURL) } }
 
         // Step 3: compress — lossless formats skip quality targeting
+        outputURL = OutputPathUniqueness.refreshUniqueOutput(
+            currentCandidate: outputURL,
+            sourceURL: source,
+            style: collisionNamingStyle,
+            customPattern: collisionCustomPattern
+        )
         let tEncode = CFAbsoluteTimeGetCurrent()
         if format == .png {
             report(0.38)
@@ -485,8 +497,11 @@ actor CompressionService {
             report(0.34)
             try await compressToTargetSize(
                 source: workURL, targetBytes: Int64(targetKB) * 1024,
-                format: format, strip: stripMetadata, output: outputURL,
+                format: format, strip: stripMetadata, output: &outputURL,
                 qualityFloor: floor, content: detected, avifJobs: avifJobs,
+                sourceURLForUniqueness: source,
+                collisionNamingStyle: collisionNamingStyle,
+                collisionCustomPattern: collisionCustomPattern,
                 progressHandler: progressHandler
             )
         } else {
@@ -561,10 +576,13 @@ actor CompressionService {
 
     private func compressToTargetSize(
         source: URL, targetBytes: Int64,
-        format: CompressionFormat, strip: Bool, output: URL,
+        format: CompressionFormat, strip: Bool, output: inout URL,
         qualityFloor: Int = 10,
         content: ContentType?,
         avifJobs: Int,
+        sourceURLForUniqueness: URL,
+        collisionNamingStyle: CollisionNamingStyle,
+        collisionCustomPattern: String,
         progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws {
         let fm = FileManager.default
@@ -599,7 +617,14 @@ actor CompressionService {
                 }
             }
             if let best = bestURL {
-                try fm.moveItem(at: best, to: output)
+                output = try OutputPathUniqueness.moveTempItemToUniqueOutput(
+                    temp: best,
+                    desiredOutput: output,
+                    sourceURL: sourceURLForUniqueness,
+                    style: collisionNamingStyle,
+                    customPattern: collisionCustomPattern,
+                    fileManager: fm
+                )
                 progressHandler?(1)
                 return
             }
@@ -628,11 +653,24 @@ actor CompressionService {
         }
 
         if let best = bestURL {
-            try fm.moveItem(at: best, to: output)
+            output = try OutputPathUniqueness.moveTempItemToUniqueOutput(
+                temp: best,
+                desiredOutput: output,
+                sourceURL: sourceURLForUniqueness,
+                style: collisionNamingStyle,
+                customPattern: collisionCustomPattern,
+                fileManager: fm
+            )
             progressHandler?(1)
         } else {
             // Nothing met the target — use floor quality and let caller decide
             bumpEncode()
+            output = OutputPathUniqueness.refreshUniqueOutput(
+                currentCandidate: output,
+                sourceURL: sourceURLForUniqueness,
+                style: collisionNamingStyle,
+                customPattern: collisionCustomPattern
+            )
             try await compressAtQuality(source: source, quality: qualityFloor,
                                         format: format, strip: strip, output: output,
                                         content: content, avifJobs: avifJobs)
@@ -812,13 +850,22 @@ actor CompressionService {
         preserveQpdfSteps: [PDFPreserveQpdfStep] = [.base],
         targetBytes: Int64? = nil,
         resolutionDownsampling: Bool = false,
+        collisionNamingStyle: CollisionNamingStyle = .finderDuplicate,
+        collisionCustomPattern: String = "",
         progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> CompressionResult {
         let tPDF = CFAbsoluteTimeGetCurrent()
         let originalSize = fileSize(source)
 
+        var effOut = OutputPathUniqueness.uniqueOutputURL(
+            desired: outputURL,
+            sourceURL: source,
+            style: collisionNamingStyle,
+            customPattern: collisionCustomPattern
+        )
+
         try FileManager.default.createDirectory(
-            at: outputURL.deletingLastPathComponent(),
+            at: effOut.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
 
@@ -863,18 +910,27 @@ actor CompressionService {
                     }
                 }
                 if let best = bestQpdfURL {
-                    if fm.fileExists(atPath: outputURL.path) { try fm.removeItem(at: outputURL) }
-                    try fm.moveItem(at: best, to: outputURL)
+                    effOut = try OutputPathUniqueness.moveTempItemToUniqueOutput(
+                        temp: best,
+                        desiredOutput: effOut,
+                        sourceURL: source,
+                        style: collisionNamingStyle,
+                        customPattern: collisionCustomPattern,
+                        fileManager: fm
+                    )
                     usedQpdf = true
                 }
             }
             if !usedQpdf {
                 let ph = progressHandler
-                try await Task.detached {
+                effOut = try await Task.detached {
                     try PDFCompressor.preserveStructure(
                         source: source,
                         stripMetadata: stripMetadata,
-                        outputURL: outputURL,
+                        outputURL: effOut,
+                        collisionSourceURL: source,
+                        collisionNamingStyle: collisionNamingStyle,
+                        collisionCustomPattern: collisionCustomPattern,
                         progress: ph
                     )
                 }.value
@@ -882,28 +938,34 @@ actor CompressionService {
                 progressHandler?(1)
             }
 
-            if resolutionDownsampling, fm.fileExists(atPath: outputURL.path),
-               let structureDoc = PDFDocument(url: outputURL) {
+            if resolutionDownsampling, fm.fileExists(atPath: effOut.path),
+               let structureDoc = PDFDocument(url: effOut) {
                 let dsURL = fm.temporaryDirectory.appendingPathComponent("dinky_pdf_ds_\(UUID().uuidString).pdf")
                 if let mixed = PDFImageDownsampler.downsample(source: source, structureDoc: structureDoc, stripMetadata: stripMetadata),
                    mixed.write(to: dsURL) {
                     let dsSz = fileSize(dsURL)
-                    if dsSz > 0 && dsSz < fileSize(outputURL) {
-                        try? fm.removeItem(at: outputURL)
-                        try? fm.moveItem(at: dsURL, to: outputURL)
+                    if dsSz > 0 && dsSz < fileSize(effOut) {
+                        try? fm.removeItem(at: effOut)
+                        try fm.moveItem(at: dsURL, to: effOut)
                     } else {
                         try? fm.removeItem(at: dsURL)
                     }
                 }
             }
         case .flattenPages:
+            effOut = OutputPathUniqueness.refreshUniqueOutput(
+                currentCandidate: effOut,
+                sourceURL: source,
+                style: collisionNamingStyle,
+                customPattern: collisionCustomPattern
+            )
             let ph = progressHandler
             let ultra = flattenUltra
             let lastResort = flattenLastResort && !ultra
             try await Task.detached {
                 try PDFCompressor.compressFlattened(
                     source: source, quality: quality, grayscale: grayscale,
-                    stripMetadata: stripMetadata, outputURL: outputURL,
+                    stripMetadata: stripMetadata, outputURL: effOut,
                     lastResortFlatten: lastResort,
                     ultraLastResortFlatten: ultra,
                     progress: ph
@@ -912,11 +974,11 @@ actor CompressionService {
         }
         CompressionTiming.logPhase("pdf.compress.\(outputMode == .flattenPages ? "flatten" : "preserve")", startedAt: tPDF)
 
-        guard FileManager.default.fileExists(atPath: outputURL.path) else {
+        guard FileManager.default.fileExists(atPath: effOut.path) else {
             throw CompressionError.outputMissing
         }
 
-        let outSz = fileSize(outputURL)
+        let outSz = fileSize(effOut)
         let chainIds = preserveQpdfSteps.isEmpty ? "base" : preserveQpdfSteps.map(\.id).joined(separator: ">")
         PDFCompressionMetrics.logOutcome(
             outputMode: outputMode,
@@ -928,7 +990,7 @@ actor CompressionService {
             preserveQpdfWinningStep: winningPreserveQpdfStepId
         )
 
-        return CompressionResult(outputURL: outputURL,
+        return CompressionResult(outputURL: effOut,
                                  originalSize: originalSize,
                                  outputSize: outSz,
                                  detectedContentType: nil)

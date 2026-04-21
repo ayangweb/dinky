@@ -128,8 +128,11 @@ enum PDFCompressor {
         source: URL,
         stripMetadata: Bool,
         outputURL: URL,
+        collisionSourceURL: URL,
+        collisionNamingStyle: CollisionNamingStyle,
+        collisionCustomPattern: String,
         progress: (@Sendable (Float) -> Void)? = nil
-    ) throws {
+    ) throws -> URL {
         progress?(0.12)
         guard let document = PDFDocument(url: source) else {
             throw PDFCompressionError.loadFailed
@@ -155,15 +158,19 @@ enum PDFCompressor {
         let srcBytes = resourceByteCount(source)
         let dstBytes = resourceByteCount(tmp)
         if dstBytes < srcBytes {
-            if FileManager.default.fileExists(atPath: outputURL.path) {
-                try FileManager.default.removeItem(at: outputURL)
-            }
-            try FileManager.default.moveItem(at: tmp, to: outputURL)
+            let out = try OutputPathUniqueness.moveTempItemToUniqueOutput(
+                temp: tmp,
+                desiredOutput: outputURL,
+                sourceURL: collisionSourceURL,
+                style: collisionNamingStyle,
+                customPattern: collisionCustomPattern
+            )
+            progress?(1)
+            return out
         } else {
             try? FileManager.default.removeItem(at: tmp)
             throw PDFCompressionError.rewriteNotSmallerThanOriginal(attemptedSize: dstBytes)
         }
-        progress?(1)
     }
 
     /// Rasterizes each page to JPEG (legacy “compress” behavior).

@@ -1,7 +1,63 @@
 import Foundation
+import Darwin
 
 /// Picks an available filename in the same directory when the desired path is already taken.
 enum OutputPathUniqueness {
+
+    /// Re-run uniqueness after long-running work so another job cannot claim the same path between the first check and the write/move.
+    static func refreshUniqueOutput(
+        currentCandidate: URL,
+        sourceURL: URL,
+        style: CollisionNamingStyle,
+        customPattern: String
+    ) -> URL {
+        uniqueOutputURL(
+            desired: currentCandidate,
+            sourceURL: sourceURL,
+            style: style,
+            customPattern: customPattern
+        )
+    }
+
+    /// Moves a finished temp file into `desiredOutput`’s directory, re-resolving a free basename until the move succeeds (handles TOCTOU races).
+    static func moveTempItemToUniqueOutput(
+        temp: URL,
+        desiredOutput: URL,
+        sourceURL: URL,
+        style: CollisionNamingStyle,
+        customPattern: String,
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        let maxAttempts = 64
+        var lastError: Error?
+        for _ in 0..<maxAttempts {
+            let finalURL = uniqueOutputURL(
+                desired: desiredOutput,
+                sourceURL: sourceURL,
+                style: style,
+                customPattern: customPattern
+            )
+            do {
+                try fileManager.moveItem(at: temp, to: finalURL)
+                return finalURL
+            } catch {
+                lastError = error
+                guard isDestinationExistsCollision(error) else { throw error }
+            }
+        }
+        try? fileManager.removeItem(at: temp)
+        throw lastError ?? CocoaError(.fileWriteFileExists)
+    }
+
+    private static func isDestinationExistsCollision(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain, ns.code == NSFileWriteFileExistsError { return true }
+        if ns.domain == NSPOSIXErrorDomain, ns.code == EEXIST { return true }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return isDestinationExistsCollision(underlying)
+        }
+        return false
+    }
 
     /// Returns `desired` if it does not exist, or the first free path using `style` disambiguation.
     /// When `desired` is the same file as `sourceURL`, returns `desired` so in-place replace can proceed.

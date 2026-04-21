@@ -170,6 +170,8 @@ final class DinkyPreferences: ObservableObject {
     @AppStorage("notifyWhenDone")       var notifyWhenDone: Bool = false
     @AppStorage("sanitizeFilenames")    var sanitizeFilenames: Bool = false
     @AppStorage("manualMode")           var manualMode: Bool = false
+    /// When true (default), show the pre-compression confirmation for user-initiated adds. User can turn off in the sheet or Settings. Watch folder is unaffected.
+    @AppStorage("confirmBeforeEveryCompression") var confirmBeforeEveryCompression: Bool = true
     /// Empties finished rows from the queue after a short delay when a batch completes.
     /// Failed/skipped rows are kept so the user can act on them.
     @AppStorage("autoClearWhenDone")    var autoClearWhenDone: Bool = false
@@ -685,5 +687,198 @@ final class DinkyPreferences: ObservableObject {
         let lines = d.object(forKey: "videoMaxResolutionLines") as? Int ?? 1080
         let maxRes: Int? = maxOn ? lines : nil
         return (quality, codec, removeAudio, maxRes)
+    }
+
+    // MARK: - Compression confirmation summary (shared with sidebar output hints)
+
+    /// One line: where outputs are saved (matches sidebar “Where files go”).
+    func outputDestinationSummaryLine() -> String {
+        switch saveLocation {
+        case .sameFolder:
+            return String(localized: "Saves next to originals", comment: "Output summary: save location.")
+        case .downloads:
+            return String(localized: "Saves to Downloads", comment: "Output summary: save location.")
+        case .custom:
+            return customFolderDisplayPath.isEmpty
+                ? String(localized: "Custom folder (not set in Settings)", comment: "Output summary: custom folder unset.")
+                : URL(fileURLWithPath: customFolderDisplayPath).lastPathComponent
+        }
+    }
+
+    /// One line: filename handling (matches sidebar).
+    func outputFilenameSummaryLine() -> String {
+        switch filenameHandling {
+        case .appendSuffix:
+            return String(localized: "Adds “-dinky” before the extension", comment: "Output summary: filename handling.")
+        case .replaceOrigin:
+            return String(localized: "Replaces the original", comment: "Output summary: filename handling.")
+        case .customSuffix:
+            return String.localizedStringWithFormat(
+                String(localized: "Custom suffix: %@", comment: "Output summary; argument is suffix string."),
+                customSuffix
+            )
+        }
+    }
+
+    func originalsAfterSuccessSummaryLine() -> String {
+        switch originalsAction {
+        case .keep:
+            return String(localized: "After success: originals stay where they are", comment: "Compression confirm: originals policy.")
+        case .trash:
+            return String(localized: "After success: originals move to Trash", comment: "Compression confirm: originals policy.")
+        case .backup:
+            return String(localized: "After success: originals move to your Backup folder", comment: "Compression confirm: originals policy.")
+        }
+    }
+
+    /// Still-image policy for the confirmation sheet (convert-first).
+    func imageCompressionPolicySummaryLine(selectedFormat: CompressionFormat) -> String {
+        if autoFormat {
+            return String(localized: "Images: converts to AVIF for photos and WebP for most other images (Auto)", comment: "Compression confirm: image formats.")
+        }
+        return String.localizedStringWithFormat(
+            String(localized: "Images: converts to %@", comment: "Compression confirm: fixed image format; argument is format name."),
+            selectedFormat.displayName
+        )
+    }
+
+    /// PDF + video one-liner (legacy; prefer ``videoCompressionPolicySummaryRows()`` / ``pdfCompressionPolicySummaryRows()``).
+    func pdfAndVideoCompressionSummaryLine() -> String {
+        let v = videoCompressionPolicySummaryRows().joined(separator: " ")
+        let p = pdfCompressionPolicySummaryRows().joined(separator: " ")
+        if v.isEmpty, p.isEmpty {
+            return String(localized: "PDFs and videos: use your current Settings and sidebar options (Smart Quality may adjust tiers).", comment: "Compression confirm: PDF/video.")
+        }
+        return [v, p].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    /// Short lines for the pre-compression sheet when the queue includes videos (container is always `.mp4`).
+    func videoCompressionPolicySummaryRows() -> [String] {
+        let codec = videoCodecFamily
+        var rows: [String] = [
+            String.localizedStringWithFormat(
+                String(localized: "Videos: %@ → .mp4", comment: "Compression confirm: video codec and container."),
+                codec.chipLabel
+            ),
+        ]
+        if smartQuality {
+            rows.append(
+                String(localized: "Videos: Smart Quality picks Balanced or High per clip (HDR uses HEVC when needed).", comment: "Compression confirm: video smart quality.")
+            )
+        } else {
+            rows.append(
+                String.localizedStringWithFormat(
+                    String(localized: "Videos: fixed encoder strength — %@", comment: "Compression confirm: video manual quality; argument is tier name."),
+                    videoQuality.displayName
+                )
+            )
+        }
+        if videoMaxResolutionEnabled {
+            rows.append(
+                String.localizedStringWithFormat(
+                    String(localized: "Videos: max height %lldp", comment: "Compression confirm: video resolution cap."),
+                    Int64(videoMaxResolutionLines)
+                )
+            )
+        }
+        if videoRemoveAudio {
+            rows.append(String(localized: "Videos: audio stripped from output", comment: "Compression confirm: video strip audio."))
+        }
+        return rows
+    }
+
+    /// Short lines for the pre-compression sheet when the queue includes PDFs.
+    func pdfCompressionPolicySummaryRows() -> [String] {
+        switch pdfOutputMode {
+        case .preserveStructure:
+            var rows: [String] = [
+                String(localized: "PDFs: preserve text and links when smaller (qpdf + PDFKit)", comment: "Compression confirm: PDF preserve mode."),
+            ]
+            if pdfEnableOCR {
+                rows.append(String(localized: "PDFs: search scanned pages (OCR) when needed", comment: "Compression confirm: PDF OCR."))
+            }
+            return rows
+        case .flattenPages:
+            var rows: [String] = []
+            if smartQuality {
+                rows.append(
+                    String.localizedStringWithFormat(
+                        String(localized: "PDFs: flatten with Smart Quality (manual fallback: %@)", comment: "Compression confirm: PDF flatten + smart; argument is PDF tier."),
+                        pdfQuality.displayName
+                    )
+                )
+            } else {
+                rows.append(
+                    String.localizedStringWithFormat(
+                        String(localized: "PDFs: flatten pages (%@ JPEG)", comment: "Compression confirm: PDF flatten tier; argument is tier name."),
+                        pdfQuality.displayName
+                    )
+                )
+            }
+            if pdfGrayscale {
+                rows.append(String(localized: "PDFs: grayscale for flatten when appropriate", comment: "Compression confirm: PDF grayscale."))
+            }
+            if pdfMaxFileSizeEnabled {
+                rows.append(
+                    String.localizedStringWithFormat(
+                        String(localized: "PDFs: step down tiers to try to stay under %.1f MB", comment: "Compression confirm: PDF max size cap."),
+                        pdfMaxFileSizeMB
+                    )
+                )
+            }
+            return rows
+        }
+    }
+
+    /// When the queue is links only (types unknown until download).
+    func remoteLinksCompressionPolicySummaryLine() -> String {
+        String(localized: "Links: output follows your Settings for each file after download.", comment: "Compression confirm: remote-only queue.")
+    }
+
+    /// Per-row subtitle for a queued video (matches global prefs).
+    func videoPendingRowSubtitleLine() -> String {
+        let codec = videoCodecFamily
+        let head = String.localizedStringWithFormat(
+            String(localized: "Video → %@ · .mp4", comment: "Compression confirm: video row; codec."),
+            codec.chipLabel
+        )
+        if smartQuality {
+            return head + " · " + String(localized: "Smart", comment: "Compression confirm: smart quality short label.")
+        }
+        return head + " · " + videoQuality.displayName
+    }
+
+    /// Per-row subtitle for a queued PDF (matches global prefs).
+    func pdfPendingRowSubtitleLine() -> String {
+        switch pdfOutputMode {
+        case .preserveStructure:
+            return String(localized: "PDF → Preserve text", comment: "Compression confirm: PDF row preserve.")
+        case .flattenPages:
+            return String.localizedStringWithFormat(
+                String(localized: "PDF → Flatten (%@)", comment: "Compression confirm: PDF row flatten; argument is tier."),
+                pdfQuality.displayName
+            )
+        }
+    }
+
+    /// Manual mode hint when enabled.
+    func manualModeQueueSummaryLine() -> String? {
+        guard manualMode else { return nil }
+        return String(localized: "Manual mode: new files stay queued until you choose Compress Now", comment: "Compression confirm: manual mode.")
+    }
+
+    /// Bullets for the pre-compression sheet (order matters). Kept for compatibility; the sheet uses typed rows instead.
+    func compressionConfirmationBulletLines(selectedFormat: CompressionFormat) -> [String] {
+        var lines: [String] = [
+            outputDestinationSummaryLine(),
+            outputFilenameSummaryLine(),
+            originalsAfterSuccessSummaryLine(),
+            imageCompressionPolicySummaryLine(selectedFormat: selectedFormat),
+            pdfAndVideoCompressionSummaryLine(),
+        ]
+        if let m = manualModeQueueSummaryLine() {
+            lines.append(m)
+        }
+        return lines
     }
 }

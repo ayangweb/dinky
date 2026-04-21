@@ -7,12 +7,6 @@ import PDFKit
 import AVFoundation
 import CoreMedia
 
-enum PasteClipboardResult {
-    case added
-    case emptyClipboard
-    case duplicateInQueue
-}
-
 // MARK: - AsyncSemaphore
 
 private actor AsyncSemaphore {
@@ -309,26 +303,12 @@ final class ContentViewModel: ObservableObject {
         if items.isEmpty { phase = .idle }
     }
 
-    func pasteClipboard() -> PasteClipboardResult {
-        guard let imp = ClipboardImporter.importFromClipboard() else { return .emptyClipboard }
-        switch imp {
-        case .localFile(let url):
-            if items.contains(where: { $0.sourceURL.path == url.path }) { return .duplicateInQueue }
-            addAndCompress([url])
-            return .added
-        case .remoteURL(let url):
-            if items.contains(where: { $0.pendingRemoteURL == url }) { return .duplicateInQueue }
-            queueRemoteDownload(urls: [url], force: false)
-            return .added
-        }
-    }
-
     /// Download remote `http(s)` media URLs (max 4 concurrent), then queue for compression.
-    func queueRemoteDownload(urls: [URL], force: Bool) {
+    func queueRemoteDownload(urls: [URL], force: Bool, presetID: UUID? = nil) {
         for url in urls {
             let placeholder = FileManager.default.temporaryDirectory
                 .appendingPathComponent("dinky_dl_placeholder_\(UUID().uuidString)")
-            let item = CompressionItem(sourceURL: placeholder, presetID: nil, mediaType: .image)
+            let item = CompressionItem(sourceURL: placeholder, presetID: presetID, mediaType: .image)
             item.pendingRemoteURL = url
             item.isURLDownloadSource = true
             item.status = .downloading(progress: 0, bytesReceived: 0, totalBytes: nil, displayHost: url.host ?? "…")
@@ -666,18 +646,28 @@ final class ContentViewModel: ObservableObject {
         let hint = preset?.contentTypeHintRaw ?? prefs.contentTypeHintRaw
         let strip = preset?.stripMetadata ?? prefs.stripMetadata
 
-        var format = item.formatOverride ?? preset?.format ?? selectedFormat
+        var classifiedForResolver: ContentType? = nil
         var preclassifiedForSmartQ: ContentType? = nil
         if autoFmt, item.formatOverride == nil {
             let ct = ContentClassifier.classify(item.sourceURL)
+            classifiedForResolver = ct
             await MainActor.run { item.detectedContentType = ct }
-            format = ct == .photo ? .avif : .webp
             if smartQ { preclassifiedForSmartQ = ct }
         } else if smartQ {
             let ct = ContentClassifier.classify(item.sourceURL)
+            classifiedForResolver = ct
             await MainActor.run { item.detectedContentType = ct }
             preclassifiedForSmartQ = ct
         }
+
+        let format = ImageCompressionFormatResolver.resolvedFormat(
+            sourceURL: item.sourceURL,
+            formatOverride: item.formatOverride,
+            preset: preset,
+            globalAutoFormat: prefs.autoFormat,
+            globalSelectedFormat: selectedFormat,
+            classifiedContent: classifiedForResolver
+        )
 
         let srcExt = item.sourceURL.pathExtension.lowercased()
         let pngSourceOK = srcExt == "png" || srcExt == "heic" || srcExt == "heif"
@@ -953,6 +943,8 @@ final class ContentViewModel: ObservableObject {
                     preserveQpdfSteps: preserveQpdfSteps,
                     targetBytes: pdfTargetBytes,
                     resolutionDownsampling: pdfResolutionDownsampling,
+                    collisionNamingStyle: collisionStyle,
+                    collisionCustomPattern: collisionCustomPattern(for: item),
                     progressHandler: pdfProgress
                 )
                 let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
@@ -993,6 +985,8 @@ final class ContentViewModel: ObservableObject {
                             flattenLastResort: pass.lastResort,
                             flattenUltra: pass.ultra,
                             preserveQpdfSteps: preserveQpdfSteps,
+                            collisionNamingStyle: collisionStyle,
+                            collisionCustomPattern: collisionCustomPattern(for: item),
                             progressHandler: pdfProgress
                         )
                         let outSize = (try? workURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
@@ -1034,8 +1028,13 @@ final class ContentViewModel: ObservableObject {
                         action: prefs.originalsAction,
                         backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
                     )
-                    try FileManager.default.moveItem(at: workURL, to: finalURL)
-                    producedURL = finalURL
+                    producedURL = try OutputPathUniqueness.moveTempItemToUniqueOutput(
+                        temp: workURL,
+                        desiredOutput: finalURL,
+                        sourceURL: sourceURL,
+                        style: collisionStyle,
+                        customPattern: collisionCustomPattern(for: item)
+                    )
                 } catch {
                     try? FileManager.default.removeItem(at: workURL)
                     await MainActor.run { item.status = .failed(error) }
@@ -1218,8 +1217,13 @@ final class ContentViewModel: ObservableObject {
                         action: prefs.originalsAction,
                         backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
                     )
-                    try FileManager.default.moveItem(at: workURL, to: finalURL)
-                    producedURL = finalURL
+                    producedURL = try OutputPathUniqueness.moveTempItemToUniqueOutput(
+                        temp: workURL,
+                        desiredOutput: finalURL,
+                        sourceURL: sourceURL,
+                        style: collisionStyle,
+                        customPattern: collisionCustomPattern(for: item)
+                    )
                 } catch {
                     try? FileManager.default.removeItem(at: workURL)
                     await MainActor.run { item.status = .failed(error) }
@@ -1372,6 +1376,8 @@ struct ContentView: View {
     @AppStorage("reviewPromptBelowUpdateDismissed") private var reviewPromptBelowUpdateDismissed = false
     /// Stacked over the batch summary sheet when the user opens skipped / zero-gain / error detail from the summary list.
     @State private var batchSummaryFollowUp: BatchSummaryFollowUpSheet?
+    /// First-run (or “always confirm”) sheet before user-initiated files enter the queue.
+    @State private var pendingCompressionConfirmation: PendingCompressionConfirmation?
 
     private enum BatchSummaryFollowUpSheet: Identifiable {
         case zeroGain(itemId: UUID, filename: String, originalSize: Int64, attemptedSize: Int64, isPDF: Bool, pdfOutputMode: PDFOutputMode?)
@@ -1428,13 +1434,51 @@ struct ContentView: View {
     }
 
     private func handlePasteFromUser() {
-        switch vm.pasteClipboard() {
-        case .added: break
-        case .emptyClipboard:
+        guard let imp = ClipboardImporter.importFromClipboard() else {
             showPasteAlert(title: S.pasteEmptyTitle, message: S.pasteEmptyMessage)
-        case .duplicateInQueue:
-            showPasteAlert(title: S.pasteDuplicateTitle, message: S.pasteDuplicateMessage)
+            return
         }
+        switch imp {
+        case .localFile(let url):
+            if vm.items.contains(where: { $0.sourceURL.path == url.path }) {
+                showPasteAlert(title: S.pasteDuplicateTitle, message: S.pasteDuplicateMessage)
+                return
+            }
+            userInitiatedAdd(localURLs: [url], remoteURLs: [], force: false, presetID: nil)
+        case .remoteURL(let url):
+            if vm.items.contains(where: { $0.pendingRemoteURL == url }) {
+                showPasteAlert(title: S.pasteDuplicateTitle, message: S.pasteDuplicateMessage)
+                return
+            }
+            userInitiatedAdd(localURLs: [], remoteURLs: [url], force: false, presetID: nil)
+        }
+    }
+
+    private func shouldShowCompressionConfirmation() -> Bool {
+        prefs.confirmBeforeEveryCompression
+    }
+
+    /// Drop, Open, Dock/Services, Clipboard — not watch folder.
+    private func userInitiatedAdd(localURLs: [URL], remoteURLs: [URL], force: Bool, presetID: UUID?) {
+        let hasWork = !localURLs.isEmpty || !remoteURLs.isEmpty
+        guard hasWork else { return }
+        guard shouldShowCompressionConfirmation() else {
+            if !localURLs.isEmpty { vm.addAndCompress(localURLs, force: force, presetID: presetID) }
+            if !remoteURLs.isEmpty {
+                vm.queueRemoteDownload(
+                    urls: remoteURLs,
+                    force: force,
+                    presetID: UUID(uuidString: prefs.activePresetID)
+                )
+            }
+            return
+        }
+        pendingCompressionConfirmation = PendingCompressionConfirmation(
+            localURLs: localURLs,
+            remoteURLs: remoteURLs,
+            force: force,
+            presetID: presetID
+        )
     }
 
     private func showPasteAlert(title: String, message: String) {
@@ -1633,7 +1677,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .dinkyOpenPanel)) { _ in openPanel() }
         .onReceive(NotificationCenter.default.publisher(for: .dinkyOpenFiles)) { note in
             guard let urls = note.object as? [URL] else { return }
-            vm.addAndCompress(urls)
+            userInitiatedAdd(localURLs: urls, remoteURLs: [], force: false, presetID: nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .dinkyPasteClipboard)) { _ in
             handlePasteFromUser()
@@ -1701,6 +1745,29 @@ struct ContentView: View {
         }
         .sheet(item: $batchSummaryFollowUp) { follow in
             batchSummaryFollowUpSheetContent(follow)
+        }
+        .sheet(item: $pendingCompressionConfirmation) { pending in
+            CompressionConfirmationSheet(
+                selectedFormat: Binding(
+                    get: { vm.selectedFormat },
+                    set: { vm.selectedFormat = $0 }
+                ),
+                localURLs: pending.localURLs,
+                remoteURLs: pending.remoteURLs,
+                openPreferences: revealPreferences,
+                onCancel: { pendingCompressionConfirmation = nil },
+                onContinue: {
+                    let batchPresetID = UUID(uuidString: prefs.activePresetID)
+                    if !pending.localURLs.isEmpty {
+                        vm.addAndCompress(pending.localURLs, force: pending.force, presetID: batchPresetID)
+                    }
+                    if !pending.remoteURLs.isEmpty {
+                        vm.queueRemoteDownload(urls: pending.remoteURLs, force: pending.force, presetID: batchPresetID)
+                    }
+                    pendingCompressionConfirmation = nil
+                }
+            )
+            .environmentObject(prefs)
         }
         .onChange(of: vm.pendingBatchSummary?.id) { _, newId in
             if newId == nil {
@@ -1824,6 +1891,29 @@ struct ContentView: View {
                             Divider()
                         }
                     } else {
+                        let undoTargets: [CompressionItem] = {
+                            if selectedIDs.contains(item.id) {
+                                return vm.items.filter { selectedIDs.contains($0.id) && $0.undoSnapshot != nil }
+                            }
+                            return item.undoSnapshot != nil ? [item] : []
+                        }()
+                        if !undoTargets.isEmpty {
+                            Button {
+                                for t in undoTargets.reversed() {
+                                    vm.undoCompression(t)
+                                }
+                            } label: {
+                                if undoTargets.count == 1 {
+                                    Label(String(localized: "Undo compression", comment: "Context menu: revert one compression."), systemImage: "arrow.uturn.backward")
+                                } else {
+                                    Label(String.localizedStringWithFormat(
+                                        String(localized: "Undo %lld compressions", comment: "Context menu: revert multiple compressions."),
+                                        Int64(undoTargets.count)
+                                    ), systemImage: "arrow.uturn.backward")
+                                }
+                            }
+                            Divider()
+                        }
                         if case .skipped = item.status {
                             Button { vm.forceCompress(item) } label: {
                                 Label(String(localized: "Compress Anyway", comment: "Context menu."), systemImage: "arrow.clockwise")
@@ -2006,8 +2096,8 @@ struct ContentView: View {
         }
 
         group.notify(queue: .main) {
-            if !collected.isEmpty { vm.addAndCompress(collected, force: force) }
-            if !remoteURLs.isEmpty { vm.queueRemoteDownload(urls: remoteURLs, force: force) }
+            if collected.isEmpty, remoteURLs.isEmpty { return }
+            userInitiatedAdd(localURLs: collected, remoteURLs: remoteURLs, force: force, presetID: nil)
         }
         return true
     }
@@ -2059,7 +2149,7 @@ struct ContentView: View {
         panel.canChooseDirectories    = true
         panel.allowedContentTypes     = [.jpeg, .png, .webP, .heic, .heif, .image, .pdf, .mpeg4Movie, .quickTimeMovie, .movie]
         if panel.runModal() == .OK {
-            vm.addAndCompress(panel.urls)
+            userInitiatedAdd(localURLs: panel.urls, remoteURLs: [], force: false, presetID: nil)
         }
     }
 }

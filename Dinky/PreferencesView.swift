@@ -141,19 +141,11 @@ private struct GeneralTab: View {
                     }
                 }
 
-                Toggle(String(localized: "Auto-clear queue when done", comment: "Settings UI."), isOn: Binding(
-                    get: { prefs.autoClearWhenDone },
-                    set: { prefs.autoClearWhenDone = $0 }
+                Toggle(String(localized: "Always confirm before compressing", comment: "Settings UI."), isOn: Binding(
+                    get: { prefs.confirmBeforeEveryCompression },
+                    set: { prefs.confirmBeforeEveryCompression = $0 }
                 ))
-                Text(String(localized: "Removes finished rows shortly after a batch completes. Failed or skipped files stay so you can act on them.", comment: "Settings UI."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Toggle(String(localized: "Show batch summary when done", comment: "Settings UI."), isOn: Binding(
-                    get: { prefs.showBatchSummaryDialog },
-                    set: { prefs.showBatchSummaryDialog = $0 }
-                ))
-                Text(String(localized: "Shows a short summary after a successful batch (space saved, time, folder opened or not). Sounds and notifications follow their own settings.", comment: "Settings UI."))
+                Text(String(localized: "Shows a review sheet before starting — covers drag-and-drop, Open, the Dock, Services, and Clipboard. Watch Folder is not affected.", comment: "Settings UI."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -161,7 +153,7 @@ private struct GeneralTab: View {
                     get: { prefs.manualMode },
                     set: { prefs.manualMode = $0 }
                 ))
-                Text(String(localized: "When on, new files stay queued until you compress them. When off, new files compress automatically. After Undoing a finished batch, use Compress Now (toolbar, bottom bar, or File menu) — that always runs when you ask, regardless of this setting.", comment: "Settings UI."))
+                Text(String(localized: "New files stay queued until you tap Compress Now. Turn off to compress automatically when files are added.", comment: "Settings UI."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -176,6 +168,22 @@ private struct GeneralTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 PreferencesRelatedTabLink(title: String(localized: "Change shortcut in Keyboard Shortcuts…", comment: "Settings UI."), tab: .shortcuts)
+
+                Toggle(String(localized: "Show batch summary when done", comment: "Settings UI."), isOn: Binding(
+                    get: { prefs.showBatchSummaryDialog },
+                    set: { prefs.showBatchSummaryDialog = $0 }
+                ))
+                Text(String(localized: "Shows space saved and time after each successful batch.", comment: "Settings UI."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle(String(localized: "Auto-clear queue when done", comment: "Settings UI."), isOn: Binding(
+                    get: { prefs.autoClearWhenDone },
+                    set: { prefs.autoClearWhenDone = $0 }
+                ))
+                Text(String(localized: "Removes finished rows shortly after a batch completes. Failed or skipped files stay so you can act on them.", comment: "Settings UI."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Text(String(localized: "Behavior", comment: "Settings UI."))
             }

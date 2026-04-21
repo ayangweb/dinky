@@ -48,6 +48,12 @@ struct ResultsRowView: View {
                             .help(String(localized: "Animation or other frames were omitted; only the first frame was compressed.", comment: "Tooltip: first-frame-only chip."))
                             .accessibilityLabel(String(localized: "First frame only", comment: "VoiceOver: first-frame-only chip."))
                     }
+                    if showsImageFormatConversionChip {
+                        mediaChip(imageFormatConversionChipLabel())
+                            .fixedSize()
+                            .help(String(localized: "Saved in a different format than the original — not a same-file recompress.", comment: "Tooltip: format conversion chip."))
+                            .accessibilityLabel(imageFormatConversionAccessibilityLabel())
+                    }
                 } else if item.mediaType == .pdf {
                     if let pages = item.pageCount {
                         mediaChip("\(pages)p")
@@ -56,6 +62,10 @@ struct ResultsRowView: View {
                         mediaChip(String(localized: "pdf", comment: "Results row: generic PDF chip until page count is known."))
                             .help(String(localized: "PDF document", comment: "Tooltip for generic PDF type chip."))
                     }
+                    mediaChip(pdfExportPolicyChipText())
+                        .fixedSize()
+                        .help(pdfExportPolicyChipTooltip())
+                        .accessibilityLabel(pdfExportPolicyAccessibilityLabel())
                 } else if item.mediaType == .video {
                     if let type = item.detectedVideoContentType {
                         videoContentTypeChip(type)
@@ -76,6 +86,10 @@ struct ResultsRowView: View {
                         mediaChip(formattedDuration(secs))
                             .help(String(localized: "Duration", comment: "Tooltip for video duration chip."))
                     }
+                    mediaChip(videoExportPolicyChipText())
+                        .fixedSize()
+                        .help(videoExportPolicyChipTooltip())
+                        .accessibilityLabel(videoExportPolicyAccessibilityLabel())
                 }
 
                 VStack(alignment: .leading, spacing: 1) {
@@ -109,6 +123,9 @@ struct ResultsRowView: View {
                 .animation(.easeInOut(duration: 0.2), value: item.detectedVideoContentType)
                 .animation(.easeInOut(duration: 0.2), value: item.videoIsHDR)
                 .animation(.easeInOut(duration: 0.2), value: item.usedFirstFrameOnly)
+                .animation(.easeInOut(duration: 0.2), value: showsImageFormatConversionChip)
+                .animation(.easeInOut(duration: 0.2), value: videoExportPolicyChipText())
+                .animation(.easeInOut(duration: 0.2), value: pdfExportPolicyChipText())
 
                 sizeInfo
                 statusChip
@@ -175,6 +192,102 @@ struct ResultsRowView: View {
         return prefs.savedPresets.first(where: { $0.id == id })
     }
 
+    // MARK: - Video / PDF export policy chips (preset when set, else global prefs)
+
+    private var effectiveVideoCodecFamily: VideoCodecFamily {
+        if let p = appliedPreset {
+            return VideoCodecFamily(rawValue: p.videoCodecFamilyRaw) ?? .h264
+        }
+        return prefs.videoCodecFamily
+    }
+
+    private var effectiveVideoSmartQuality: Bool {
+        appliedPreset?.smartQuality ?? prefs.smartQuality
+    }
+
+    private var effectiveVideoQuality: VideoQuality {
+        if let p = appliedPreset {
+            return VideoQuality.resolve(p.videoQualityRaw)
+        }
+        return prefs.videoQuality
+    }
+
+    private func videoExportPolicyChipText() -> String {
+        let codec = effectiveVideoCodecFamily.chipLabel
+        if effectiveVideoSmartQuality {
+            return "\(codec) · " + String(localized: "Smart", comment: "Results row: smart quality short label on chip.")
+        }
+        return "\(codec) · \(effectiveVideoQuality.displayName)"
+    }
+
+    private func videoExportPolicyChipTooltip() -> String {
+        if effectiveVideoSmartQuality {
+            return String.localizedStringWithFormat(
+                String(localized: "Output: .mp4 using %@. Smart Quality picks encoder strength per clip (HDR may use HEVC).", comment: "Results row: video policy tooltip."),
+                effectiveVideoCodecFamily.chipLabel
+            )
+        }
+        return String.localizedStringWithFormat(
+            String(localized: "Output: .mp4 using %@ at %@ quality.", comment: "Results row: video policy tooltip; codec then quality."),
+            effectiveVideoCodecFamily.chipLabel,
+            effectiveVideoQuality.displayName
+        )
+    }
+
+    private func videoExportPolicyAccessibilityLabel() -> String {
+        videoExportPolicyChipTooltip()
+    }
+
+    private var effectivePDFOutputMode: PDFOutputMode {
+        if let p = appliedPreset {
+            return PDFOutputMode(rawValue: p.pdfOutputModeRaw) ?? .flattenPages
+        }
+        return prefs.pdfOutputMode
+    }
+
+    private var effectivePDFQuality: PDFQuality {
+        if let p = appliedPreset {
+            return PDFQuality(rawValue: p.pdfQualityRaw) ?? .medium
+        }
+        return prefs.pdfQuality
+    }
+
+    private func pdfExportPolicyChipText() -> String {
+        switch effectivePDFOutputMode {
+        case .preserveStructure:
+            return String(localized: "Preserve", comment: "Results row: short PDF preserve chip.")
+        case .flattenPages:
+            return String.localizedStringWithFormat(
+                String(localized: "Flatten · %@", comment: "Results row: PDF flatten chip; tier name."),
+                effectivePDFQuality.displayName
+            )
+        }
+    }
+
+    private func pdfExportPolicyChipTooltip() -> String {
+        switch effectivePDFOutputMode {
+        case .preserveStructure:
+            return String(localized: "Best-effort smaller file while keeping selectable text and links.", comment: "Results row: PDF preserve tooltip.")
+        case .flattenPages:
+            return String.localizedStringWithFormat(
+                String(localized: "Rasterize pages to JPEG (%@ tier).", comment: "Results row: PDF flatten tooltip; tier."),
+                effectivePDFQuality.displayName
+            )
+        }
+    }
+
+    private func pdfExportPolicyAccessibilityLabel() -> String {
+        switch effectivePDFOutputMode {
+        case .preserveStructure:
+            return String(localized: "PDF: preserve text and links", comment: "VoiceOver: PDF preserve chip.")
+        case .flattenPages:
+            return String.localizedStringWithFormat(
+                String(localized: "PDF: flatten, %@ quality", comment: "VoiceOver: PDF flatten chip; tier."),
+                effectivePDFQuality.displayName
+            )
+        }
+    }
+
     private func presetBadge(_ preset: CompressionPreset) -> some View {
         let matchesActive = (prefs.activePresetID == preset.id.uuidString)
         return Text(preset.name)
@@ -199,6 +312,15 @@ struct ResultsRowView: View {
         if item.mediaType == .image, item.usedFirstFrameOnly, case .done = item.status {
             base += ", " + String(localized: "First frame only", comment: "VoiceOver: first-frame-only chip.")
         }
+        if item.mediaType == .image, showsImageFormatConversionChip {
+            base += ", " + imageFormatConversionAccessibilityLabel()
+        }
+        if item.mediaType == .video {
+            base += ", " + videoExportPolicyAccessibilityLabel()
+        }
+        if item.mediaType == .pdf {
+            base += ", " + pdfExportPolicyAccessibilityLabel()
+        }
         return base
     }
 
@@ -209,7 +331,13 @@ struct ResultsRowView: View {
            let preset = prefs.savedPresets.first(where: { $0.id == pid }) {
             switch item.mediaType {
             case .image:
-                let fmt = item.formatOverride ?? preset.format
+                let fmt = ImageCompressionFormatResolver.resolvedFormat(
+                    sourceURL: item.sourceURL,
+                    formatOverride: item.formatOverride,
+                    preset: preset,
+                    globalAutoFormat: prefs.autoFormat,
+                    globalSelectedFormat: selectedFormat
+                )
                 return preset.outputURL(for: item.sourceURL, format: fmt, globalPrefs: prefs, isFromURLDownload: urlDL).lastPathComponent
             case .pdf:
                 return preset.outputURL(for: item.sourceURL, mediaType: .pdf, globalPrefs: prefs, isFromURLDownload: urlDL).lastPathComponent
@@ -219,10 +347,64 @@ struct ResultsRowView: View {
         }
         switch item.mediaType {
         case .image:
-            return prefs.outputURL(for: item.sourceURL, format: item.formatOverride ?? selectedFormat, isFromURLDownload: urlDL).lastPathComponent
+            let fmt = ImageCompressionFormatResolver.resolvedFormat(
+                sourceURL: item.sourceURL,
+                formatOverride: item.formatOverride,
+                preset: nil,
+                globalAutoFormat: prefs.autoFormat,
+                globalSelectedFormat: selectedFormat
+            )
+            return prefs.outputURL(for: item.sourceURL, format: fmt, isFromURLDownload: urlDL).lastPathComponent
         case .pdf, .video:
             return prefs.outputURL(for: item.sourceURL, mediaType: item.mediaType, isFromURLDownload: urlDL).lastPathComponent
         }
+    }
+
+    private func canonicalImageExtension(_ ext: String) -> String {
+        let e = ext.lowercased()
+        if e == "jpeg" { return "jpg" }
+        if e == "heif" { return "heic" }
+        return e
+    }
+
+    /// Output file extension for display: actual file when done, otherwise resolved from settings (matches compression).
+    private func imageOutputExtensionForDisplay() -> String? {
+        guard item.mediaType == .image else { return nil }
+        if case .done(let outURL, _, _) = item.status {
+            return outURL.pathExtension
+        }
+        let fmt = ImageCompressionFormatResolver.resolvedFormat(
+            sourceURL: item.sourceURL,
+            formatOverride: item.formatOverride,
+            preset: appliedPreset,
+            globalAutoFormat: prefs.autoFormat,
+            globalSelectedFormat: selectedFormat
+        )
+        return fmt.outputExtension
+    }
+
+    private var showsImageFormatConversionChip: Bool {
+        guard item.mediaType == .image,
+              !item.sourceURL.pathExtension.isEmpty,
+              let out = imageOutputExtensionForDisplay() else { return false }
+        return canonicalImageExtension(item.sourceURL.pathExtension) != canonicalImageExtension(out)
+    }
+
+    private func imageFormatConversionChipLabel() -> String {
+        let src = canonicalImageExtension(item.sourceURL.pathExtension).uppercased()
+        guard let outExt = imageOutputExtensionForDisplay() else { return "" }
+        let dst = canonicalImageExtension(outExt).uppercased()
+        return "\(src) → \(dst)"
+    }
+
+    private func imageFormatConversionAccessibilityLabel() -> String {
+        let src = canonicalImageExtension(item.sourceURL.pathExtension).uppercased()
+        guard let outExt = imageOutputExtensionForDisplay() else { return "" }
+        let dst = canonicalImageExtension(outExt).uppercased()
+        return String.localizedStringWithFormat(
+            String(localized: "Converts %1$@ to %2$@", comment: "VoiceOver: format conversion chip; arguments are uppercase source extension, uppercase output extension."),
+            src, dst
+        )
     }
 
     // MARK: Size diff

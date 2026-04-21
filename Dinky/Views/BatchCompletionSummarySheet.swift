@@ -166,13 +166,13 @@ struct BatchCompletionSummarySheet: View {
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 10) {
-                summaryStatRow(
+                SummaryStatRow(
                     icon: "square.stack.3d.up.fill",
                     text: batchCompressedLabel(summary.doneCount)
                 )
 
                 if summary.savedBytes > 0 {
-                    summaryStatRow(
+                    SummaryStatRow(
                         icon: "arrow.down.circle.fill",
                         text: String.localizedStringWithFormat(
                             String(localized: "%@ saved", comment: "Batch summary; argument is formatted byte size."),
@@ -180,17 +180,17 @@ struct BatchCompletionSummarySheet: View {
                         )
                     )
                     if let p = SavingsPerspective.perspective(savedBytes: summary.savedBytes, seed: summary.id) {
-                        summaryStatRow(icon: p.icon, text: p.text)
+                        SummaryStatRow(icon: p.icon, text: p.text)
                     }
                 } else {
-                    summaryStatRow(
+                    SummaryStatRow(
                         icon: "equal.circle",
                         text: String(localized: "No space saved (outputs were already small or similar size).", comment: "Batch summary when saved bytes zero."),
                         textSecondary: true
                     )
                 }
 
-                summaryStatRow(
+                SummaryStatRow(
                     icon: "clock",
                     text: String.localizedStringWithFormat(
                         String(localized: "Time: %@", comment: "Batch summary; argument is formatted duration."),
@@ -199,7 +199,7 @@ struct BatchCompletionSummarySheet: View {
                 )
 
                 if summary.skippedCount > 0 {
-                    summaryStatRow(
+                    SummaryStatRow(
                         icon: "minus.circle",
                         text: String.localizedStringWithFormat(
                             String(localized: "%lld skipped (below savings threshold or unchanged)", comment: "Batch summary; argument is skipped count."),
@@ -210,7 +210,7 @@ struct BatchCompletionSummarySheet: View {
                 }
 
                 if failedRowCount > 0 {
-                    summaryStatRow(
+                    SummaryStatRow(
                         icon: "exclamationmark.triangle.fill",
                         text: String.localizedStringWithFormat(
                             String(localized: "%lld failed", comment: "Batch summary; argument is failure count."),
@@ -221,7 +221,7 @@ struct BatchCompletionSummarySheet: View {
                 }
 
                 if zeroGainRowCount > 0 {
-                    summaryStatRow(
+                    SummaryStatRow(
                         icon: "arrow.uturn.backward.circle",
                         text: String.localizedStringWithFormat(
                             String(localized: "%lld no size gain", comment: "Batch summary; argument is zero-gain count."),
@@ -232,7 +232,7 @@ struct BatchCompletionSummarySheet: View {
                 }
 
                 if summary.pdfOCRAppliedCount > 0 {
-                    summaryStatRow(
+                    SummaryStatRow(
                         icon: "doc.text.magnifyingglass",
                         text: {
                             let n = summary.pdfOCRAppliedCount
@@ -249,7 +249,7 @@ struct BatchCompletionSummarySheet: View {
                 }
 
                 if summary.openedFolder {
-                    summaryStatRow(
+                    SummaryStatRow(
                         icon: "folder.fill",
                         text: String(localized: "Opened the output folder in Finder.", comment: "Batch summary: folder was opened."),
                         textSecondary: true,
@@ -301,26 +301,6 @@ struct BatchCompletionSummarySheet: View {
         }
         .padding(20)
         .frame(minWidth: 440)
-    }
-
-    /// Icon + label rows aligned with sidebar-style chrome (14pt medium symbols).
-    @ViewBuilder
-    private func summaryStatRow(
-        icon: String,
-        text: String,
-        textSecondary: Bool = false,
-        subheadline: Bool = false
-    ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 22, alignment: .center)
-            Text(text)
-                .font(subheadline ? .subheadline : .body)
-                .foregroundStyle(textSecondary ? .secondary : .primary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// When the batch did not auto-open Finder — accent link matches sidebar plain `Button` + `Color.accentColor` style.

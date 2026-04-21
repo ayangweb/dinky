@@ -213,7 +213,7 @@ struct SidebarView: View {
                     }
                 ))
                 .font(.system(size: 11))
-                .accessibilityHint(String(localized: "Dinky picks format and compression for each file automatically. Turn off to configure each setting manually.", comment: "VoiceOver: simple mode automatic toggle."))
+                .accessibilityHint(String(localized: "Dinky picks WebP, AVIF, or another output format per image — new files, not a same-format JPEG squeeze. Turn off Quick choices to configure manually.", comment: "VoiceOver: simple mode automatic toggle."))
 
                 simpleModeOutcomeMap
 
@@ -402,12 +402,12 @@ struct SidebarView: View {
     private func simpleModeImageOutcomeFriendly() -> String {
         if prefs.smartQuality {
             if prefs.autoFormat {
-                return String(localized: "Chooses a modern format and strength for each photo automatically.", comment: "Outcome map friendly: images, smart, auto format.")
+                return String(localized: "Converts each image to a modern format (AVIF or WebP when Auto is on) and sets strength automatically.", comment: "Outcome map friendly: images, smart, auto format.")
             }
-            return String(localized: "Uses your format chip and still tweaks strength per image.", comment: "Outcome map friendly: images, smart, manual format.")
+            return String(localized: "Uses your format chip — outputs that format and tweaks strength per image.", comment: "Outcome map friendly: images, smart, manual format.")
         }
         if prefs.autoFormat {
-            return String(localized: "Picks WebP or AVIF; you set the overall strength style in All options.", comment: "Outcome map friendly: images, fixed tiers, auto format.")
+            return String(localized: "Converts to WebP or AVIF; you set the overall strength style in All options.", comment: "Outcome map friendly: images, fixed tiers, auto format.")
         }
         return String(localized: "Uses your format chips; strength style lives in All options.", comment: "Outcome map friendly: images, fixed tiers, manual format.")
     }
@@ -415,7 +415,7 @@ struct SidebarView: View {
     private func simpleModeImageOutcomeTechnical() -> String {
         if prefs.smartQuality {
             if prefs.autoFormat {
-                return String(localized: "Auto WebP or AVIF from each image; compression strength adapts per file.", comment: "Simple outcome: images, smart on, auto format on.")
+                return String(localized: "Converts each image to WebP or AVIF (new files); compression strength adapts per file.", comment: "Simple outcome: images, smart on, auto format on.")
             }
             return String(
                 format: String(localized: "%@ from the chips; compression strength adapts per file.", comment: "Simple outcome: images, smart on, manual format; argument is format name."),
@@ -423,7 +423,7 @@ struct SidebarView: View {
             )
         }
         if prefs.autoFormat {
-            return String(localized: "Auto WebP or AVIF; strength style (Photo / Graphic / Mixed) in All options… below.", comment: "Simple outcome: images, smart off, auto format.")
+            return String(localized: "Converts to WebP or AVIF; strength style (Photo / Graphic / Mixed) in All options… below.", comment: "Simple outcome: images, smart off, auto format.")
         }
         return String(
             format: String(localized: "%@ from the chips; strength style in All options… below.", comment: "Simple outcome: images, smart off, manual format; argument is format name."),
@@ -582,32 +582,9 @@ struct SidebarView: View {
         }
     }
 
-    private var outputDestinationLine: String {
-        switch prefs.saveLocation {
-        case .sameFolder:
-            return String(localized: "Saves next to originals", comment: "Output summary: save location.")
-        case .downloads:
-            return String(localized: "Saves to Downloads", comment: "Output summary: save location.")
-        case .custom:
-            return prefs.customFolderDisplayPath.isEmpty
-                ? String(localized: "Custom folder (not set in Settings)", comment: "Output summary: custom folder unset.")
-                : URL(fileURLWithPath: prefs.customFolderDisplayPath).lastPathComponent
-        }
-    }
+    private var outputDestinationLine: String { prefs.outputDestinationSummaryLine() }
 
-    private var outputFilenameLine: String {
-        switch prefs.filenameHandling {
-        case .appendSuffix:
-            return String(localized: "Adds “-dinky” before the extension", comment: "Output summary: filename handling.")
-        case .replaceOrigin:
-            return String(localized: "Replaces the original", comment: "Output summary: filename handling.")
-        case .customSuffix:
-            return String.localizedStringWithFormat(
-                String(localized: "Custom suffix: %@", comment: "Output summary; argument is suffix string."),
-                prefs.customSuffix
-            )
-        }
-    }
+    private var outputFilenameLine: String { prefs.outputFilenameSummaryLine() }
 
     private var effectiveScope: SidebarScope {
         let cur = SidebarScope(rawValue: scopeRaw) ?? .output
@@ -1192,7 +1169,7 @@ struct FormatChipPicker: View {
     var showActiveDescription: Bool = true
 
     private let options: [(label: String, format: CompressionFormat?, description: String)] = [
-        ("Auto",  nil,   "Uses AVIF for photos and WebP for most other images."),
+        ("Auto",  nil,   "Converts to AVIF for photos and WebP for most other images — new files, not a same-format JPEG squeeze."),
         ("WebP",  .webp, "Broad support and solid compression."),
         ("AVIF",  .avif, "Smallest files; encoding takes longer."),
         ("PNG",   .png,  "Lossless; best for screenshots and graphics."),

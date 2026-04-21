@@ -12,7 +12,7 @@ A tiny macOS app that shrinks images, videos, and PDFs. Drag, drop, get smaller 
 
 ## Highlights
 
-- **Honest compression** — images convert to modern formats (not same-format squeeze); PDFs offer flatten vs best-effort preserve with clear tradeoffs ([see site](https://dinkyfiles.com/) callout)
+- **Honest compression** — still images **convert** to WebP, AVIF, HEIC, or lossless PNG (new files; not same-extension JPEG/PNG squeeze like ImageOptim); PDFs offer flatten vs best-effort preserve with clear tradeoffs ([see site](https://dinkyfiles.com/) callout, FAQ “Why doesn’t Dinky output JPEG?”)
 - **Drag and drop** — images, videos, or PDFs on the window, Dock, or file picker
 - **Clipboard compress** — paste a copied image with ⌘⇧V; the hotkey works system-wide, even when Dinky isn't focused
 - **Compress from a URL** — drop or paste a direct media link and Dinky downloads it (max 500 MB) before compressing

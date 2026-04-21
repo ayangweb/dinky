@@ -57,6 +57,8 @@ The sidebar on the right of the main window is where you tell Dinky **what** to 
 
 Three plain-language choices: **Image**, **Video**, **PDF**. Pick one per category and drop. Dinky figures out a sensible encoder, quality, and size.
 
+**Still images:** Dinky **converts** to WebP, AVIF, lossless PNG, or HEIC — new files with that extension, not an in-place JPEG recompress. **Auto** picks AVIF for most photos and WebP for graphics; turn off **Auto** in the full sidebar or use **Settings → Presets** to lock one format.
+
 ### Full sidebar
 
 Toggle **Settings → General → Use simple sidebar** off (or flip individual sections on) to expose every control:
