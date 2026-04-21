@@ -331,11 +331,11 @@ struct PostCrashReportSheet: View {
 
             HStack {
                 Button(String(localized: "Email Report…", comment: "Post-crash sheet: send report by email.")) {
-                    NSWorkspace.shared.open(diagnostics.postCrashEmailURL())
+                    NSWorkspace.shared.open(diagnostics.postCrashEmailURL(for: report))
                     diagnostics.dismissPendingReport()
                 }
                 Button(String(localized: "GitHub Issue…", comment: "Post-crash sheet: open GitHub issue.")) {
-                    NSWorkspace.shared.open(diagnostics.postCrashGitHubURL())
+                    NSWorkspace.shared.open(diagnostics.postCrashGitHubURL(for: report))
                     diagnostics.dismissPendingReport()
                 }
                 Spacer()

@@ -85,22 +85,43 @@ final class DiagnosticsReporter: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Post-crash URLs (uses pending report context)
+    // MARK: - Post-crash URLs
 
-    func postCrashEmailURL() -> URL {
-        var extra = ""
-        if let s = pendingCrashReport?.metricKitSummary, !s.isEmpty {
-            extra = String(localized: "## Apple diagnostic summary\n\n\(s)\n\n", comment: "Email body: Markdown heading and MetricKit crash text. Argument is diagnostic dump.")
+    private static let urlBodyThreshold = 1800
+
+    func postCrashEmailURL(for report: CrashReport) -> URL {
+        let crashExtra = Self.crashExtraBody(for: report)
+        let fullBody = Self.diagnosticContextBlock() + crashExtra
+        let extraBody: String
+        if fullBody.count > Self.urlBodyThreshold {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(fullBody, forType: .string)
+            extraBody = String(localized: "Full crash details copied to your clipboard — paste here.\n\n", comment: "Email body fallback when crash text is too long for a URL.")
+        } else {
+            extraBody = crashExtra
         }
-        return Self.emailURL(subject: String(localized: "Crash report — Dinky", comment: "Email subject for crash report."), extraBody: extra)
+        return Self.emailURL(subject: String(localized: "Crash report — Dinky", comment: "Email subject for crash report."), extraBody: extraBody)
     }
 
-    func postCrashGitHubURL() -> URL {
-        var extra = ""
-        if let s = pendingCrashReport?.metricKitSummary, !s.isEmpty {
-            extra = String(localized: "## Apple diagnostic summary\n\n\(s)\n\n", comment: "GitHub issue body: Markdown heading and MetricKit crash text. Argument is diagnostic dump.")
+    func postCrashGitHubURL(for report: CrashReport) -> URL {
+        let crashExtra = Self.crashExtraBody(for: report)
+        let fullBody = Self.diagnosticContextBlock() + "## What happened\n\n" + crashExtra + "\n\n## Steps to reproduce\n\n1. \n\n"
+        let extraBody: String
+        if fullBody.count > Self.urlBodyThreshold {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(fullBody, forType: .string)
+            extraBody = String(localized: "Full crash details copied to your clipboard — paste here.\n\n", comment: "GitHub issue body fallback when crash text is too long for a URL.")
+        } else {
+            extraBody = crashExtra
         }
-        return Self.githubIssueURL(title: String(localized: "Crash — Dinky", comment: "GitHub issue title for crash report."), extraBody: extra)
+        return Self.githubIssueURL(title: String(localized: "Crash — Dinky", comment: "GitHub issue title for crash report."), extraBody: extraBody)
+    }
+
+    private static func crashExtraBody(for report: CrashReport) -> String {
+        if let s = report.metricKitSummary, !s.isEmpty {
+            return "## Apple diagnostic summary\n\n\(s)\n\n"
+        }
+        return String(localized: "Previous session ended unexpectedly; no Apple diagnostic payload is attached yet.\n\n", comment: "Crash body note when MetricKit summary is unavailable.")
     }
 
     // MARK: - Shared diagnostic text + URL builders
