@@ -25,15 +25,13 @@ struct DinkyApp: App {
             ContentView(prefs: root.prefs, vm: root.contentVM)
                 .environmentObject(root.prefs)
                 .environmentObject(updater)
-                // Two-part guard against SwiftUI spawning extra windows for each file URL:
-                // The scene-level modifier (matching: []) prevents new scenes from being created;
-                // preferring: ["*"] makes this window actively claim all incoming external events.
+                // preferring: ["*"] makes this window actively claim all incoming external events,
+                // so SwiftUI routes Finder "Open With" to the existing window instead of spawning new ones.
                 .handlesExternalEvents(preferring: Set(["*"]), allowing: Set(["*"]))
                 .background(.ultraThinMaterial)        // frosted glass fill
                 .background(TransparentWindow())       // makes NSWindow itself see-through
                 .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         }
-        .handlesExternalEvents(matching: Set<String>())
         .windowStyle(.titleBar)
         .windowResizability(.contentMinSize)
         .defaultSize(width: 440, height: 440)
