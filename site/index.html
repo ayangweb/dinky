@@ -178,25 +178,28 @@
       overflow: visible;
     }
 
-    /* Padding gives the wiggle + shadow room; filter lives on the wrapper so WebKit
-       does not clip the transformed img (same-element filter + transform bug on iOS). */
+    /* Padding gives the wiggle + shadow room. Drop-shadow stays on the img only; the wiggle
+       transform runs on this wrapper. Pairing filter + transform on the same node (or filter
+       on parent + transform on child) makes iOS Safari paint an opaque backing behind the
+       icon during the animation instead of true transparency. */
     .app-icon-wrap {
       margin-bottom: 24px;
       padding: 20px 22px;
-      filter:
-        drop-shadow(0 1px 1px var(--shadow-xs))
-        drop-shadow(0 10px 20px var(--shadow-md));
+      /* Same pivot as .app-icon 50% 85%: padding-top + 85% of icon height */
+      transform-origin: 50% 101.6px;
+    }
+
+    .app-icon-wrap.is-wiggling {
+      animation: app-icon-wiggle 1.1s ease-out 1 both;
     }
 
     .app-icon {
       display: block;
-      width: 104px;
-      height: 104px;
-      transform-origin: 50% 85%;
-    }
-
-    .app-icon.is-wiggling {
-      animation: app-icon-wiggle 1.1s ease-out 1 both;
+      width: 96px;
+      height: 96px;
+      filter:
+        drop-shadow(0 1px 1px var(--shadow-xs))
+        drop-shadow(0 10px 20px var(--shadow-md));
     }
 
     @keyframes app-icon-wiggle {
@@ -210,7 +213,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .app-icon.is-wiggling { animation: none; }
+      .app-icon-wrap.is-wiggling { animation: none; }
     }
 
     /* GitHub hover star burst — count grows gently with stargazers (sqrt curve, capped) */
@@ -1167,11 +1170,12 @@
       .app-icon-wrap {
         margin-bottom: 20px;
         padding: 16px 18px;
+        transform-origin: 50% 77.2px;
       }
 
       .app-icon {
-        width: 88px;
-        height: 88px;
+        width: 72px;
+        height: 72px;
       }
 
       .screenshots {
@@ -1850,15 +1854,15 @@
 
   <script>
     (function () {
-      const icon = document.querySelector('.app-icon');
-      if (!icon) return;
+      const wrap = document.querySelector('.app-icon-wrap');
+      if (!wrap) return;
       let armed = false;
 
       function wiggle() {
-        icon.classList.remove('is-wiggling');
+        wrap.classList.remove('is-wiggling');
         // Force reflow so re-adding the class restarts the animation
-        void icon.offsetWidth;
-        icon.classList.add('is-wiggling');
+        void wrap.offsetWidth;
+        wrap.classList.add('is-wiggling');
       }
 
       function trigger(initial) {
