@@ -262,23 +262,28 @@ private func showAboutPanel() {
     NSApplication.shared.activate(ignoringOtherApps: true)
 }
 
-/// Computes the real size of the installed app bundle, rounded to 1 decimal in MB.
-/// Walks the bundle tree at runtime so this stays accurate as the app evolves.
+/// Real installed bundle size, formatted like Finder’s **Size** for the `.app` (logical byte
+/// total of regular files — not per-file allocation rounding). Uses `ByteCountFormatter` so
+/// the About line matches what you see in Applications / Get Info.
 private func bundleSizeString() -> String {
     let url = Bundle.main.bundleURL
-    let keys: Set<URLResourceKey> = [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey]
+    let keys: Set<URLResourceKey> = [.fileSizeKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey]
     var total: Int64 = 0
     if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Array(keys)) {
         for case let fileURL as URL in enumerator {
             let values = try? fileURL.resourceValues(forKeys: keys)
-            if values?.isRegularFile == true {
-                let size = values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0
-                total += Int64(size)
+            guard values?.isRegularFile == true else { continue }
+            if let logical = values?.fileSize, logical > 0 {
+                total += Int64(logical)
+            } else {
+                let alloc = values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0
+                total += Int64(alloc)
             }
         }
     }
-    let mb = Double(total) / 1_048_576.0
-    return String(format: "%.1f MB", mb)
+    let formatter = ByteCountFormatter()
+    formatter.countStyle = .file
+    return formatter.string(fromByteCount: total)
 }
 
 // MARK: - Post-crash / MetricKit prompt

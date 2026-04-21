@@ -7,7 +7,7 @@
 #
 # What it does:
 #   1. Bumps MARKETING_VERSION + CURRENT_PROJECT_VERSION in the Xcode project
-#   2. Updates version + download URLs in site/index.html, site/llms.txt, site/homepage.md
+#   2. Updates version + download URLs in site/index.html, site/llms.txt, site/homepage.md, site/compare/*/index.html
 #   3. Builds the Release scheme
 #   4. Creates the DMG (+ zip for in-app updater)
 #   5. Commits, tags, pushes, and publishes the GitHub release
@@ -93,6 +93,15 @@ if [ "$OLD_MARKETING" != "$VERSION" ]; then
     sed -i '' "s/v$OLD_MARKETING/v$VERSION/g" site/homepage.md
     sed -i '' "s/Dinky-$OLD_MARKETING\.dmg/Dinky-$VERSION.dmg/g" site/homepage.md
   fi
+
+  if compgen -G "site/compare/*/index.html" > /dev/null || [ -f site/compare/index.html ]; then
+    echo "→ Updating site/compare/**/index.html…"
+    for f in site/compare/*/index.html site/compare/index.html; do
+      [ -f "$f" ] || continue
+      sed -i '' "s/v$OLD_MARKETING · Requires/v$VERSION · Requires/g" "$f"
+      sed -i '' "s/v$OLD_MARKETING\/Dinky-$OLD_MARKETING.dmg/v$VERSION\/Dinky-$VERSION.dmg/g" "$f"
+    done
+  fi
 else
   echo "→ Site strings already match v$VERSION (skipping site sed)"
 fi
@@ -144,6 +153,10 @@ ditto -c -k --sequesterRsrc --keepParent \
 echo "→ Committing version files (if changed by this run)…"
 git add Dinky.xcodeproj/project.pbxproj site/index.html site/llms.txt README.md
 [ -f site/homepage.md ] && git add site/homepage.md
+if compgen -G "site/compare/*/index.html" > /dev/null; then
+  git add site/compare/*/index.html
+fi
+[ -f site/compare/index.html ] && git add site/compare/index.html
 if git diff --cached --quiet; then
   echo "  (nothing to commit — version already in repo)"
 else

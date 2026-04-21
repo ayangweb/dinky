@@ -12,7 +12,7 @@ A tiny macOS app that shrinks images, videos, and PDFs. Drag, drop, get smaller 
 
 ## Highlights
 
-- **Honest compression** — still images **convert** to WebP, AVIF, HEIC, or lossless PNG (new files; not same-extension JPEG/PNG squeeze like ImageOptim); PDFs offer flatten vs best-effort preserve with clear tradeoffs ([see site](https://dinkyfiles.com/) callout, FAQ “Why doesn’t Dinky output JPEG?”)
+- **Honest compression** — still images **convert** to WebP, AVIF, HEIC, or lossless PNG (new files; not same-extension JPEG/PNG squeeze like ImageOptim); PDFs offer flatten vs best-effort preserve with clear tradeoffs ([comparison pages](https://dinkyfiles.com/compare/imageoptim/) cover ImageOptim, TinyPNG, HandBrake, Acrobat, and more)
 - **Drag and drop** — images, videos, or PDFs on the window, Dock, or file picker
 - **Clipboard compress** — paste a copied image with ⌘⇧V; the hotkey works system-wide, even when Dinky isn't focused
 - **Compress from a URL** — drop or paste a direct media link and Dinky downloads it (max 500 MB) before compressing
@@ -38,6 +38,8 @@ xattr -dr com.apple.quarantine /Applications/Dinky.app
 ## More
 
 Full marketing page with screenshots and comparison table: [dinkyfiles.com](https://dinkyfiles.com/)
+
+Comparison pages — Images: [ImageOptim](https://dinkyfiles.com/compare/imageoptim/), [Optimage](https://dinkyfiles.com/compare/optimage/), [TinyPNG](https://dinkyfiles.com/compare/tinypng/), [Squoosh](https://dinkyfiles.com/compare/squoosh/), [Preview (Apple)](https://dinkyfiles.com/compare/macos-preview/). Video: [HandBrake](https://dinkyfiles.com/compare/handbrake/), [Compressor](https://dinkyfiles.com/compare/compressor/), [Permute](https://dinkyfiles.com/compare/permute/), [FFmpeg](https://dinkyfiles.com/compare/ffmpeg/). PDF: [Acrobat](https://dinkyfiles.com/compare/adobe-acrobat/), [Preview](https://dinkyfiles.com/compare/macos-preview/), [PDF Squeezer](https://dinkyfiles.com/compare/pdf-squeezer/), [Smallpdf](https://dinkyfiles.com/compare/smallpdf/). All-in-one (images, video & PDF): [Clop](https://dinkyfiles.com/compare/clop/), [Picmal](https://dinkyfiles.com/compare/picmal/).
 
 Machine-readable site summary: [llms.txt](https://dinkyfiles.com/llms.txt)
 
