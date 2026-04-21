@@ -160,6 +160,19 @@ final class UpdateChecker: ObservableObject {
             }
 
             try launchDeferredBundleReplace(stagedApp: stagedApp, destination: dest, cleanupPaths: cleanupPaths)
+
+            // Clear the sentinel now so a forced exit below doesn't produce a false crash report.
+            DiagnosticsReporter.shared.clearSentinel()
+
+            // Hard-exit fallback: NSApp.terminate's terminateLater reply sometimes
+            // never fires when called from a Swift concurrency Task on @MainActor,
+            // leaving the app stuck on "Installing…". A background thread guarantees
+            // the process exits so the installer script can replace the bundle.
+            Thread.detachNewThread {
+                Thread.sleep(forTimeInterval: 4)
+                exit(0)
+            }
+
             NSApp.terminate(nil)
 
         } catch {
