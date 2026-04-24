@@ -169,7 +169,7 @@
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
-      padding: 64px 24px 40px;
+      padding: 40px 24px 40px;
     }
 
     .hero {
@@ -186,7 +186,7 @@
        iOS Safari does not promote separate layers (filtered img vs transformed parent), which
        showed as one or two opaque rectangles behind the icon. */
     .app-icon-wrap {
-      margin-bottom: 24px;
+      margin-bottom: 12px;
       padding: 20px 22px;
     }
 
@@ -312,6 +312,10 @@
       line-height: 1.4;
     }
 
+    .btn:has(> svg) {
+      padding-left: 11px;
+    }
+
     .btn-primary {
       background: var(--brand);
       color: var(--text-on-brand);
@@ -339,7 +343,9 @@
     .version {
       font-size: 13px;
       color: var(--text-secondary);
-      margin-top: 8px;
+      margin: 8px auto 0;
+      max-width: 320px;
+      line-height: 1.5;
     }
 
     .screenshots {
@@ -605,6 +611,10 @@
       text-underline-offset: 2px;
     }
     .install-fallback a:hover { color: var(--text); }
+    /* Opened from hero “how to install” or MCP — no “download didn’t start” line */
+    #install-modal.install-modal--help .install-fallback {
+      display: none;
+    }
     .install-step-stack {
       flex: 1;
       min-width: 0;
@@ -889,6 +899,17 @@
     }
     .faq-inline-link:hover {
       color: var(--text);
+    }
+    .faq-inline-link.version-install-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      vertical-align: -0.2em;
+    }
+    .faq-inline-link.version-install-link svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
     }
     .gatekeeper-lead,
     .install-modal-sublead {
@@ -1358,7 +1379,7 @@
 
     @media (max-width: 700px) {
       body {
-        padding: 48px 20px 32px;
+        padding: 32px 20px 32px;
       }
 
       h1 {
@@ -1370,7 +1391,7 @@
       }
 
       .app-icon-wrap {
-        margin-bottom: 20px;
+        margin-bottom: 10px;
         padding: 16px 18px;
       }
 
@@ -1439,7 +1460,9 @@
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         execute: function () {
           var modal = document.getElementById('install-modal');
-          if (modal) modal.classList.add('open');
+          if (modal) {
+            modal.classList.add('install-modal--help', 'open');
+          }
           return Promise.resolve({ ok: true });
         }
       }, toolOpts);
@@ -1490,7 +1513,7 @@
     </p>
 
     <div class="buttons">
-      <a class="btn btn-primary" href="https://github.com/heyderekj/dinky/releases/download/v2.7.12/Dinky-2.7.12.dmg" onclick="fathom.trackEvent('Download macOS'); document.getElementById('install-modal').classList.add('open')">
+      <a class="btn btn-primary" href="https://github.com/heyderekj/dinky/releases/download/v2.7.12/Dinky-2.7.12.dmg" onclick="fathom.trackEvent('Download macOS'); var im=document.getElementById('install-modal'); im.classList.remove('install-modal--help'); im.classList.add('open')">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
           <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
         </svg>
@@ -1503,13 +1526,13 @@
         GitHub<span id="gh-stars"> · <span class="gh-star-anchor" aria-hidden="true">★</span><span id="gh-stars-count"></span></span>
       </a>
     </div>
-    <p class="version">33 MB · v2.7.12 · Requires macOS 15 Sequoia</p>
+    <p class="version">33 MB · v2.7.12 · Requires macOS 15 Sequoia · <button type="button" class="faq-inline-link version-install-link" onclick="if(typeof fathom!=='undefined')fathom.trackEvent('install_modal_from_version'); document.getElementById('install-modal').classList.add('install-modal--help','open')" aria-haspopup="dialog" aria-controls="install-modal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>How to Install</button></p>
   </section>
 
   <!-- Install modal -->
-  <div class="modal-overlay" id="install-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-overlay" id="install-modal" onclick="if(event.target===this)this.classList.remove('open','install-modal--help')">
     <div class="modal">
-      <button class="modal-close" onclick="document.getElementById('install-modal').classList.remove('open')" aria-label="Close">✕</button>
+      <button class="modal-close" onclick="document.getElementById('install-modal').classList.remove('open','install-modal--help')" aria-label="Close">✕</button>
       <h2>How to install Dinky</h2>
       <p class="install-modal-lead">Pick the path that fits you — both put Dinky in Applications.</p>
       <div class="install-modal-tabstrip">
@@ -2220,7 +2243,7 @@
 
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        document.getElementById('install-modal').classList.remove('open');
+        document.getElementById('install-modal').classList.remove('open', 'install-modal--help');
         document.getElementById('gatekeeper-modal').classList.remove('open');
       }
     });

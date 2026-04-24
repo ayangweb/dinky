@@ -251,6 +251,10 @@ body {
   line-height: 1.4;
 }
 
+.btn:has(> svg) {
+  padding-left: 11px;
+}
+
 .btn-primary {
   background: var(--brand);
   color: var(--text-on-brand);
