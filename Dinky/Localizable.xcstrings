@@ -493,13 +493,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "## 苹果诊断总结\n\n%@"
+            "value" : "## Apple 诊断摘要\n\n%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "## 蘋果診斷總結\n\n%@"
+            "value" : "## Apple 診斷摘要\n\n%@"
           }
         }
       }
@@ -1637,13 +1637,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1920年"
+            "value" : "1920"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1920年"
+            "value" : "1920"
           }
         }
       }
@@ -2058,13 +2058,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先进的"
+            "value" : "高级"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先進的"
+            "value" : "進階"
           }
         }
       }
@@ -2224,13 +2224,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "都追上了。"
+            "value" : "全部处理完毕。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "都追上了。"
+            "value" : "全部處理完畢。"
           }
         }
       }
@@ -2846,13 +2846,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "外貌"
+            "value" : "外观"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "外貌"
+            "value" : "外觀"
           }
         }
       }
@@ -3000,13 +3000,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "苹果诊断总结"
+            "value" : "Apple 诊断摘要"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "蘋果診斷總結"
+            "value" : "Apple 診斷摘要"
           }
         }
       }
@@ -3235,13 +3235,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在系统设置→常规→登录项目中批准Dinky。"
+            "value" : "在系统设置 → 通用 → 登录项中批准 Dinky。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在系統設定→常規→登入項目中批准Dinky。"
+            "value" : "在系統設定 → 一般 → 登入項目中批准 Dinky。"
           }
         }
       }
@@ -3558,13 +3558,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "批量速度"
+            "value" : "批处理速度"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "大量速度"
+            "value" : "批次速度"
           }
         }
       }
@@ -4105,13 +4105,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "漏洞："
+            "value" : "错误："
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "漏洞："
+            "value" : "錯誤："
           }
         }
       }
@@ -4490,13 +4490,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上限输出分辨率"
+            "value" : "限制输出分辨率"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上限輸出分辨率"
+            "value" : "限制輸出解析度"
           }
         }
       }
@@ -8232,13 +8232,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "碰撞诊断"
+            "value" : "崩溃诊断"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "碰撞診斷"
+            "value" : "崩潰診斷"
           }
         }
       }
@@ -8623,7 +8623,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "定制"
+            "value" : "自定义"
           }
         },
         "zh-Hant" : {
@@ -8700,13 +8700,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "切"
+            "value" : "剪切"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "切"
+            "value" : "剪下"
           }
         }
       }
@@ -9426,13 +9426,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上次Dinky摔坏了"
+            "value" : "Dinky 上次崩溃了"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上次Dinky摔壞了"
+            "value" : "Dinky 上次崩潰了"
           }
         }
       }
@@ -9667,13 +9667,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解雇"
+            "value" : "关闭"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解僱"
+            "value" : "關閉"
           }
         }
       }
@@ -9747,13 +9747,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "完毕"
+            "value" : "完成"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "完畢"
+            "value" : "完成"
           }
         }
       }
@@ -10224,13 +10224,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "期间"
+            "value" : "时长"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "期間"
+            "value" : "時長"
           }
         }
       }
@@ -11021,13 +11021,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抓取"
+            "value" : "获取中"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抓取"
+            "value" : "獲取中"
           }
         }
       }
@@ -11253,7 +11253,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "寻找"
+            "value" : "查找"
           }
         },
         "zh-Hant" : {
@@ -11993,13 +11993,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一般的"
+            "value" : "通用"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一般的"
+            "value" : "一般"
           }
         }
       }
@@ -12378,13 +12378,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全球的"
+            "value" : "全局"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全球的"
+            "value" : "全域"
           }
         }
       }
@@ -12455,13 +12455,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全球 (%@)"
+            "value" : "全局 (%@)"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全球 (%@)"
+            "value" : "全域 (%@)"
           }
         }
       }
@@ -13153,13 +13153,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "高动态范围"
+            "value" : "HDR"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "高動態範圍"
+            "value" : "HDR"
           }
         }
       }
@@ -15046,7 +15046,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "限製檔案大小"
+            "value" : "限制檔案大小"
           }
         }
       }
@@ -16565,13 +16565,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "姓名"
+            "value" : "名称"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "姓名"
+            "value" : "名稱"
           }
         }
       }
@@ -16642,13 +16642,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新的"
+            "value" : "新建"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新的"
+            "value" : "新增"
           }
         }
       }
@@ -17264,13 +17264,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "还没有会议。"
+            "value" : "暂无会话记录。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "還沒有會議。"
+            "value" : "暫無會話記錄。"
           }
         }
       }
@@ -17755,13 +17755,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "离开"
+            "value" : "关闭"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "離開"
+            "value" : "關閉"
           }
         }
       }
@@ -18938,13 +18938,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "原来的"
+            "value" : "原始"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "原來的"
+            "value" : "原始"
           }
         }
       }
@@ -20099,13 +20099,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "巴布亚新几内亚"
+            "value" : "PNG"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "巴布亞紐幾內亞"
+            "value" : "PNG"
           }
         }
       }
@@ -22326,13 +22326,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "消除"
+            "value" : "移除"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "消除"
+            "value" : "移除"
           }
         }
       }
@@ -22567,13 +22567,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更换原装"
+            "value" : "替换原文件"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更換原廠"
+            "value" : "取代原始檔案"
           }
         }
       }
@@ -23669,13 +23669,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "节省"
+            "value" : "保存"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "節省"
+            "value" : "儲存"
           }
         }
       }
@@ -24546,7 +24546,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "快速方式"
+            "value" : "捷徑"
           }
         }
       }
@@ -29530,13 +29530,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "手表"
+            "value" : "监视"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "手錶"
+            "value" : "監視"
           }
         }
       }
@@ -29607,13 +29607,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "观看文件夹"
+            "value" : "监视文件夹"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "觀看資料夾"
+            "value" : "監視資料夾"
           }
         }
       }
@@ -29684,13 +29684,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "观看文件夹"
+            "value" : "监视文件夹"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "觀看資料夾"
+            "value" : "監視資料夾"
           }
         }
       }
@@ -29838,13 +29838,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "观看此文件夹"
+            "value" : "监视此文件夹"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "觀看此資料夾"
+            "value" : "監視此資料夾"
           }
         }
       }
@@ -29915,13 +29915,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "网络P"
+            "value" : "WebP"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "網路P"
+            "value" : "WebP"
           }
         }
       }
@@ -30075,13 +30075,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "什么是新的"
+            "value" : "新功能"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "什麼是新的"
+            "value" : "新功能"
           }
         }
       }
@@ -30478,13 +30478,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在职的"
+            "value" : "处理中"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在職的"
+            "value" : "處理中"
           }
         }
       }
