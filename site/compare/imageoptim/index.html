@@ -58,7 +58,7 @@
             "name": "Does Dinky replace ImageOptim for every workflow?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. Dinky also compresses video and PDFs in the same Mac app. ImageOptim focuses on images. Use the tool that matches whether you need format conversion and broader media types or same-format lossless optimization."
+              "text": "No. Dinky also compresses video and PDFs in the same Mac app. Dinky now also ships a dinky compress CLI for scripting image jobs from the shell or CI, while ImageOptim focuses on same-format lossless optimization without a CLI. Use the tool that matches whether you need format conversion, broader media types, or scripting support."
             }
           },
           {
@@ -141,8 +141,13 @@
             </tr>
             <tr>
               <th scope="row">Batch &amp; automation</th>
-              <td class="col-dinky">Batch, watch folders, Finder Quick Actions, Shortcuts</td>
+              <td class="col-dinky">Batch, watch folders, Finder Quick Actions, Shortcuts, <code>dinky compress</code> CLI</td>
               <td>Batch via drag-and-drop and workflow integration</td>
+            </tr>
+            <tr>
+              <th scope="row">CLI / scripting</th>
+              <td class="col-dinky"><code>dinky compress *.png --format webp --json</code></td>
+              <td>No official CLI</td>
             </tr>
           </tbody>
         </table>

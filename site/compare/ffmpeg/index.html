@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dinky vs FFmpeg — GUI compression vs command-line encoding</title>
-  <meta name="description" content="FFmpeg is the industry CLI for media. Dinky wraps common shrink tasks in a native Mac app with images and PDFs—no terminal required." />
+  <title>Dinky vs FFmpeg — image &amp; video compression compared</title>
+  <meta name="description" content="FFmpeg is the industry CLI for video and media. Dinky covers image compression with a GUI and a dinky compress CLI, plus PDFs—compare scope, interface, and scripting options." />
 
   <link rel="canonical" href="https://dinkyfiles.com/compare/ffmpeg/" />
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="stylesheet" href="/compare.css" />
 
   <meta property="og:title" content="Dinky vs FFmpeg" />
-  <meta property="og:description" content="FFmpeg for unlimited CLI power; Dinky for drop-and-done compression on macOS." />
+  <meta property="og:description" content="FFmpeg for unlimited CLI video power; Dinky for images (GUI + CLI), PDFs, and watch folders on macOS." />
   <meta property="og:image" content="https://dinkyfiles.com/screenshots/og-image.png" />
   <meta property="og:url" content="https://dinkyfiles.com/compare/ffmpeg/" />
   <meta property="og:type" content="website" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Dinky vs FFmpeg" />
-  <meta name="twitter:description" content="FFmpeg for CLI encoding; Dinky for GUI batch shrink plus PDFs and images." />
+  <meta name="twitter:description" content="FFmpeg for video CLI encoding; Dinky for images (GUI + CLI), PDFs, and watch folders." />
   <meta name="twitter:image" content="https://dinkyfiles.com/screenshots/og-image.png" />
   <meta property="og:site_name" content="Dinky" />
   <meta property="og:locale" content="en_US" />
@@ -50,7 +50,15 @@
             "name": "Can Dinky replace FFmpeg?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Not for every use case. FFmpeg can express arbitrary filters, piping, and server-side automation. Dinky targets interactive shrink workflows on macOS with presets, batch UI, and PDF plus still-image pipelines FFmpeg does not address in one app."
+              "text": "For image compression yes: dinky compress handles WebP, AVIF, HEIC, and PNG from the command line or GUI. For video it depends — Dinky provides GUI presets via AVFoundation but lacks FFmpeg's full filter graph and codec surface. FFmpeg remains the right pick for complex video pipelines, arbitrary encoding flags, and server automation."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Dinky have a CLI?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. dinky compress processes one or more image files from the shell and outputs WebP, AVIF, HEIC, or PNG. It supports --format, --quality, --output-dir, --max-width, --max-size-kb, --strip-metadata, --json for machine-readable output, and parallel jobs via -j. dinky serve also exposes a local HTTP endpoint for CI integration."
             }
           },
           {
@@ -58,7 +66,7 @@
             "name": "Who should use FFmpeg instead?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Developers and video engineers who live in the terminal, need scripting, or require flags Dinky does not expose should use FFmpeg or tools built on top of it."
+              "text": "Anyone who needs custom video filters, piping, server-side video automation, or encoder settings Dinky's presets do not expose should use FFmpeg or tools built on top of it."
             }
           },
           {
@@ -90,16 +98,16 @@
       <header class="compare-hero">
         <h1 class="compare-hero-title">Dinky vs FFmpeg</h1>
         <p class="compare-intro">
-          <a href="https://ffmpeg.org/" target="_blank" rel="noopener">FFmpeg</a> is infinite control in the terminal. Dinky is presets, batches, and watch folders on the Mac—plus PDFs and stills, no flags to memorize.
+          <a href="https://ffmpeg.org/" target="_blank" rel="noopener">FFmpeg</a> is infinite control in the terminal—especially for video. Dinky covers image compression with both a GUI and a <code>dinky compress</code> CLI, plus PDFs and watch folders, without you having to build ffmpeg invocations.
         </p>
         <div class="compare-split">
           <div class="compare-split-col">
-            <p class="compare-split-title">Choose FFmpeg for scripts and maximum control</p>
-            <p class="compare-split-desc">When you need custom filters, piping, server automation, or encode settings only the CLI can express.</p>
+            <p class="compare-split-title">Choose FFmpeg for video encoding and custom filters</p>
+            <p class="compare-split-desc">When you need arbitrary video filters, piping, server automation, or encoder settings that only a full CLI can express—FFmpeg is the right tool.</p>
           </div>
           <div class="compare-split-col">
-            <p class="compare-split-title">Choose Dinky for GUI batch work on a Mac</p>
-            <p class="compare-split-desc">When you want H.264/HEVC presets, drag-and-drop, Finder integration, and PDF compression without maintaining ffmpeg invocations.</p>
+            <p class="compare-split-title">Choose Dinky for images, PDFs, and GUI batch work</p>
+            <p class="compare-split-desc">When you want <code>dinky compress</code> for CI pipelines or shell scripts, the GUI for drag-and-drop, Finder Quick Actions, watch folders, and PDF compression without maintaining ffmpeg invocations.</p>
           </div>
         </div>
       </header>
@@ -116,22 +124,32 @@
           <tbody>
             <tr>
               <th scope="row">Interface</th>
-              <td class="col-dinky">SwiftUI / AppKit app</td>
+              <td class="col-dinky">GUI app + <code>dinky compress</code> CLI (images)</td>
               <td>Command line</td>
             </tr>
             <tr>
-              <th scope="row">Flexibility</th>
-              <td class="col-dinky">Curated presets</td>
-              <td>Full encoder surface (expertise required)</td>
+              <th scope="row">Image compression</th>
+              <td class="col-dinky">GUI or CLI — WebP, AVIF, HEIC, PNG with smart quality</td>
+              <td>Possible via CLI; not a dedicated image optimizer</td>
             </tr>
             <tr>
-              <th scope="row">Still images / PDF</th>
-              <td class="col-dinky">Yes</td>
-              <td>Possible via CLI; not one unified Mac app</td>
+              <th scope="row">Video encoding</th>
+              <td class="col-dinky">GUI presets (H.264/HEVC via AVFoundation)</td>
+              <td>Full encoder surface—any codec, any flag</td>
+            </tr>
+            <tr>
+              <th scope="row">PDF</th>
+              <td class="col-dinky">Yes (flatten, preserve, optional OCR)</td>
+              <td>No</td>
+            </tr>
+            <tr>
+              <th scope="row">Scripting / CI</th>
+              <td class="col-dinky"><code>dinky compress *.jpg --format avif --json</code></td>
+              <td>Shell scripts, makefiles, any pipeline</td>
             </tr>
             <tr>
               <th scope="row">Batch</th>
-              <td class="col-dinky">In-app queue, watch folders</td>
+              <td class="col-dinky">In-app queue, watch folders, or CLI loop</td>
               <td>Shell loops, makefiles, servers</td>
             </tr>
             <tr>
@@ -195,9 +213,9 @@
             <img src="/screenshots/screenshot-drop-zone.webp" alt="Dinky drop zone window compressing files" loading="lazy" decoding="async" />
           </div>
           <div class="compare-cta-body">
-            <p class="compare-cta-eyebrow">GUI when you want it</p>
-            <h2 id="compare-cta-title-ffmpeg" class="compare-cta-title">Presets, not flags to memorize</h2>
-            <p class="compare-cta-lead">Keep FFmpeg for bespoke invocations—use Dinky for everyday shrink jobs, visible queues, and still images plus PDFs beside your video presets.</p>
+            <p class="compare-cta-eyebrow">GUI and CLI — your choice</p>
+            <h2 id="compare-cta-title-ffmpeg" class="compare-cta-title">Images from the terminal, PDFs from the app</h2>
+            <p class="compare-cta-lead">Run <code>dinky compress *.jpg --format avif</code> in CI, or drop a folder in the GUI. Watch folders, presets, and PDF compression all stay alongside your ffmpeg video workflows.</p>
             <div class="compare-cta-actions">
               <a class="btn btn-primary" href="https://github.com/heyderekj/dinky/releases/download/v2.8.0/Dinky-2.8.0.dmg" onclick="if(window.fathom)fathom.trackEvent('Download macOS compare-cta-ffmpeg');">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
