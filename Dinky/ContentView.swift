@@ -1,5 +1,5 @@
 import SwiftUI
-import DinkyPDFSignals
+import DinkyCoreShared
 import UniformTypeIdentifiers
 import UserNotifications
 import Darwin

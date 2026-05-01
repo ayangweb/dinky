@@ -1,4 +1,5 @@
 import CoreGraphics
+import DinkyCoreShared
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers

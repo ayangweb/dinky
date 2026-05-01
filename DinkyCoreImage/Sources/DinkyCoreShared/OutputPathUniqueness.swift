@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 public enum OutputPathUniqueness {
     public static func refreshUniqueOutput(

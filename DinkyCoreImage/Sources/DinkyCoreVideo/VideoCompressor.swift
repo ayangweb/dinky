@@ -1,21 +1,22 @@
-import Foundation
 import AVFoundation
+import DinkyCoreShared
+import Foundation
 
 /// Video codec family for MP4 export (container stays `.mp4`).
-enum VideoCodecFamily: String, CaseIterable, Identifiable {
+public enum VideoCodecFamily: String, CaseIterable, Identifiable, Sendable, Codable {
     case h264
     case hevc
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var chipLabel: String {
+    public var chipLabel: String {
         switch self {
         case .h264: return "H.264"
         case .hevc: return "H.265"
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .h264: return "Best compatibility — older devices, web, and TVs."
         case .hevc: return "Smaller files — great on recent Macs, iPhone, and iPad."
@@ -23,63 +24,60 @@ enum VideoCodecFamily: String, CaseIterable, Identifiable {
     }
 }
 
-enum VideoQuality: String, CaseIterable, Identifiable {
+public enum VideoQuality: String, CaseIterable, Identifiable, Sendable, Codable {
     case medium = "medium"
-    case high   = "high"
+    case high = "high"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     /// Decode a persisted raw value safely. Migrates the legacy `"low"` tier
     /// (removed because it produced unacceptable artifacts for a quality-first
     /// compressor) to `.medium` — the closest remaining tier, which preserves
     /// the user's "smaller" intent without silently promoting them to `.high`.
     /// Anything else falls back to `.medium` too.
-    static func resolve(_ rawValue: String) -> VideoQuality {
+    public static func resolve(_ rawValue: String) -> VideoQuality {
         if let v = VideoQuality(rawValue: rawValue) { return v }
         return .medium
     }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
-        // Display labels are decoupled from raw values so persisted prefs/presets keep loading.
-        // "Balanced" replaces the old "Medium" — with `.low` removed it's the more honest framing
-        // (smaller file, no obvious quality loss), not a "lower" tier.
         case .medium: return "Balanced"
-        case .high:   return "High"
+        case .high: return "High"
         }
     }
 
-    func exportPreset(for codec: VideoCodecFamily) -> String {
+    public func exportPreset(for codec: VideoCodecFamily) -> String {
         switch codec {
         case .h264:
             switch self {
             case .medium: return AVAssetExportPreset1280x720
-            case .high:   return AVAssetExportPresetHighestQuality
+            case .high: return AVAssetExportPresetHighestQuality
             }
         case .hevc:
             switch self {
             case .medium: return AVAssetExportPresetHEVC1920x1080
-            case .high:   return AVAssetExportPresetHEVCHighestQuality
+            case .high: return AVAssetExportPresetHEVCHighestQuality
             }
         }
     }
 
     /// Export preset that downscales to a chosen output height. Picks the closest *available* Apple preset and rounds
     /// up to the next supported height when no exact match exists. Returns `nil` for invalid input.
-    static func exportPreset(forMaxHeight lines: Int, codec: VideoCodecFamily) -> String? {
+    public static func exportPreset(forMaxHeight lines: Int, codec: VideoCodecFamily) -> String? {
         guard lines > 0 else { return nil }
         switch codec {
         case .h264:
             switch lines {
-            case ...480:        return AVAssetExportPreset640x480
-            case 481...720:     return AVAssetExportPreset1280x720
-            case 721...1080:    return AVAssetExportPreset1920x1080
-            default:            return AVAssetExportPreset3840x2160
+            case ...480: return AVAssetExportPreset640x480
+            case 481...720: return AVAssetExportPreset1280x720
+            case 721...1080: return AVAssetExportPreset1920x1080
+            default: return AVAssetExportPreset3840x2160
             }
         case .hevc:
             switch lines {
-            case ...1080:       return AVAssetExportPresetHEVC1920x1080
-            default:            return AVAssetExportPresetHEVC3840x2160
+            case ...1080: return AVAssetExportPresetHEVC1920x1080
+            default: return AVAssetExportPresetHEVC3840x2160
             }
         }
     }
@@ -89,38 +87,37 @@ enum VideoQuality: String, CaseIterable, Identifiable {
     /// pick a bitrate that actually shrinks the file rather than leaning on
     /// a preset's fixed bitrate (which can produce a *larger* file when the
     /// source is already efficiently encoded).
-    func targetSizeFactor(for codec: VideoCodecFamily) -> Double {
+    public func targetSizeFactor(for codec: VideoCodecFamily) -> Double {
         let base: Double
         switch self {
         case .medium: base = 0.55
-        case .high:   base = 0.75
+        case .high: base = 0.75
         }
         // HEVC is ~40% more efficient than H.264, so we can squeeze a bit more.
         return codec == .hevc ? base * 0.85 : base
     }
 
     /// Bitrate (bits/sec) below which we treat the source as already lean for this tier.
-    fileprivate var skipIfEstimatedBitrateBelow: Double {
+    var skipIfEstimatedBitrateBelow: Double {
         switch self {
         case .medium: return 5_000_000
-        case .high:   return 8_000_000
+        case .high: return 8_000_000
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .medium: return "Smaller file. No obvious quality loss."
-        case .high:   return "Closest to source. Minimal trim."
+        case .high: return "Closest to source. Minimal trim."
         }
     }
 }
 
-enum VideoCompressor {
+public enum VideoCompressor: Sendable {
 
     /// One-shot export: avoid polluting AVFoundation’s persistent asset cache.
-    static func makeURLAsset(url: URL) -> AVURLAsset {
+    public static func makeURLAsset(url: URL) -> AVURLAsset {
         let options: [String: Any] = [
-            // Not always exposed to Swift on macOS; string matches `AVURLAssetUsesNoPersistentCacheKey`.
             "AVURLAssetUsesNoPersistentCacheKey": true,
             AVURLAssetPreferPreciseDurationAndTimingKey: false,
         ]
@@ -128,15 +125,19 @@ enum VideoCompressor {
     }
 
     /// What `compress` actually used (after HDR-driven codec overrides). Lets callers report it in the UI.
-    struct ResolvedExport: Sendable {
-        let durationSeconds: Double?
-        /// Codec we actually exported with — may differ from the requested codec when the source is HDR
-        /// (HDR is force-promoted to HEVC because H.264 cannot carry HDR metadata in our pipeline).
-        let codec: VideoCodecFamily
-        let isHDR: Bool
+    public struct ResolvedExport: Sendable {
+        public let durationSeconds: Double?
+        public let codec: VideoCodecFamily
+        public let isHDR: Bool
+
+        public init(durationSeconds: Double?, codec: VideoCodecFamily, isHDR: Bool) {
+            self.durationSeconds = durationSeconds
+            self.codec = codec
+            self.isHDR = isHDR
+        }
     }
 
-    static func compress(
+    public static func compress(
         source: URL,
         quality: VideoQuality,
         codec: VideoCodecFamily,
@@ -158,7 +159,7 @@ enum VideoCompressor {
     }
 
     /// - Parameter maxResolutionLines: Optional output-height cap (mirrors images' Max width). `nil` keeps source resolution.
-    static func compress(
+    public static func compress(
         asset: AVURLAsset,
         sourceForMetadata: URL,
         quality: VideoQuality,
@@ -183,9 +184,6 @@ enum VideoCompressor {
         let originalBytes = (try? sourceForMetadata.resourceValues(forKeys: [.fileSizeKey]).fileSize)
             .flatMap { Int64($0) } ?? 0
 
-        // HDR safety guard: H.264 in our export pipeline does not carry HDR transfer / color
-        // metadata, so an HDR (HLG / PQ / Dolby Vision) source compressed as H.264 produces a
-        // washed / clipped SDR output. Force HEVC for HDR sources regardless of the user's choice.
         let isHDR = await sourceIsHDR(track: videoTrack, formatDescriptions: formatDescriptions)
         let effectiveCodec: VideoCodecFamily = isHDR ? .hevc : codec
 
@@ -235,8 +233,6 @@ enum VideoCompressor {
 
         session.shouldOptimizeForNetworkUse = true
 
-        // Two-pass encoding for `.medium` — gives the rate-controller a chance to allocate bits where
-        // they matter. `.high` already targets minimal compression so the extra pass doesn't help much.
         if !usePassthrough, quality == .medium {
             session.canPerformMultiplePassesOverSourceMediaData = true
         }
@@ -258,8 +254,6 @@ enum VideoCompressor {
         )
     }
 
-    /// Cheap HDR check: prefer the modern `.containsHDRVideo` characteristic, fall back to inspecting
-    /// the format description's transfer function (HLG / PQ) for older / unusual files.
     private static func sourceIsHDR(track: AVAssetTrack, formatDescriptions: [CMFormatDescription]) async -> Bool {
         if let characteristics = try? await track.load(.mediaCharacteristics),
            characteristics.contains(.containsHDRVideo) {
@@ -268,22 +262,22 @@ enum VideoCompressor {
         for desc in formatDescriptions {
             if let ext = CMFormatDescriptionGetExtension(desc, extensionKey: kCMFormatDescriptionExtension_TransferFunction) as? String {
                 let hlg = kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String
-                let pq  = kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String
+                let pq = kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String
                 if ext == hlg || ext == pq { return true }
             }
         }
         return false
     }
 
-    /// Runs `export` concurrently with `states(updateInterval:)` for progress updates.
     private static func exportWithProgress(
         session: AVAssetExportSession,
         outputURL: URL,
         progressHandler: (@Sendable (Float) -> Void)?
     ) async throws {
+        let sessionBox = AVExportSessionBox(session)
         if let progressHandler {
             let monitor = Task {
-                for await state in session.states(updateInterval: 0.1) {
+                for await state in sessionBox.session.states(updateInterval: 0.1) {
                     guard !Task.isCancelled else { break }
                     switch state {
                     case .pending, .waiting:
@@ -296,10 +290,10 @@ enum VideoCompressor {
                 }
             }
             defer { monitor.cancel() }
-            try await session.export(to: outputURL, as: .mp4)
+            try await sessionBox.session.export(to: outputURL, as: .mp4)
             progressHandler(1)
         } else {
-            try await session.export(to: outputURL, as: .mp4)
+            try await sessionBox.session.export(to: outputURL, as: .mp4)
         }
     }
 
@@ -347,16 +341,31 @@ enum VideoCompressor {
     }
 }
 
-enum VideoCompressionError: LocalizedError {
+private final class AVExportSessionBox: @unchecked Sendable {
+    let session: AVAssetExportSession
+    init(_ session: AVAssetExportSession) { self.session = session }
+}
+
+public enum VideoCompressionError: LocalizedError, Sendable {
     case exportSessionUnavailable
     case exportFailed(String)
     case alreadyOptimized
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .exportSessionUnavailable: return "Could not create export session for this video."
-        case .exportFailed(let msg):    return "Video export failed: \(msg)"
-        case .alreadyOptimized:         return "Video is already about as small as it’ll get for this setting."
+        case .exportFailed(let msg): return "Video export failed: \(msg)"
+        case .alreadyOptimized: return "Video is already about as small as it’ll get for this setting."
+        }
+    }
+}
+
+extension VideoQuality {
+    /// One-tier bump (`.high` is the ceiling).
+    var bumpedUp: VideoQuality {
+        switch self {
+        case .medium: return .high
+        case .high: return .high
         }
     }
 }

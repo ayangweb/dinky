@@ -1,5 +1,5 @@
 import AppIntents
-import DinkyPDFSignals
+import DinkyCoreShared
 import Foundation
 
 struct CompressPDFIntent: AppIntent {

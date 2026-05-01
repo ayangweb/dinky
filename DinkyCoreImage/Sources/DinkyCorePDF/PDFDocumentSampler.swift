@@ -1,13 +1,12 @@
-import Foundation
-import DinkyPDFSignals
-import PDFKit
-import CoreGraphics
 import AppKit
+import DinkyCoreShared
+import CoreGraphics
+import Foundation
+import PDFKit
 
 /// Shared PDF page sampling for Smart Quality flatten, preserve heuristics, and mono detection.
-enum PDFDocumentSampler {
-
-    static func sample(url: URL) -> PDFDocumentSignals? {
+public enum PDFDocumentSampler: Sendable {
+    public static func sample(url: URL) -> PDFDocumentSignals? {
         guard let document = PDFDocument(url: url) else { return nil }
         let pageCount = document.pageCount
         guard pageCount > 0 else { return nil }
@@ -43,7 +42,7 @@ enum PDFDocumentSampler {
         )
     }
 
-    static func samplePageIndices(pageCount: Int) -> [Int] {
+    public static func samplePageIndices(pageCount: Int) -> [Int] {
         let cap = 5
         if pageCount <= cap {
             return Array(0..<pageCount)
@@ -57,13 +56,12 @@ enum PDFDocumentSampler {
         return Array(set).sorted()
     }
 
-    fileprivate struct ThumbStats {
+    struct ThumbStats {
         let avgChromaSpread: Double
         let nonWhiteFraction: Double
     }
 
-    /// Renders a small bitmap and computes cheap color / coverage stats.
-    fileprivate static func thumbnailStats(for page: PDFPage) -> ThumbStats? {
+    static func thumbnailStats(for page: PDFPage) -> ThumbStats? {
         let bounds = page.bounds(for: .mediaBox)
         guard bounds.width > 1, bounds.height > 1 else { return nil }
 

@@ -1,32 +1,34 @@
-import Foundation
 import AVFoundation
+import DinkyCoreShared
+import Foundation
 import os
 
 /// Heuristic video export tier from track metadata + content type.
-enum VideoSmartQuality {
+public enum VideoSmartQuality: Sendable {
 
     private static let timingLog = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "dinky",
+        subsystem: "dinky",
         category: "VideoSmartQuality"
     )
 
-    /// What we picked + why. Surfaced in `CompressionResult` so the UI can show a chip.
-    struct Decision: Sendable {
-        let quality: VideoQuality
-        let contentType: VideoContentType
-        /// True when the source carries HDR (HLG / PQ / Dolby Vision). The compressor uses this to
-        /// force an HDR-preserving HEVC preset even if the user picked H.264.
-        let isHDR: Bool
+    /// What we picked + why.
+    public struct Decision: Sendable {
+        public let quality: VideoQuality
+        public let contentType: VideoContentType
+        public let isHDR: Bool
+
+        public init(quality: VideoQuality, contentType: VideoContentType, isHDR: Bool) {
+            self.quality = quality
+            self.contentType = contentType
+            self.isHDR = isHDR
+        }
     }
 
-    /// Picks a ``VideoQuality`` from resolution, estimated bitrate, and content type.
-    /// On failure, returns `fallback` with `.generic` content type and `isHDR == false`.
-    static func decide(source: URL, fallback: VideoQuality) async -> Decision {
+    public static func decide(source: URL, fallback: VideoQuality) async -> Decision {
         await decide(asset: VideoCompressor.makeURLAsset(url: source), fallback: fallback)
     }
 
-    /// Same as ``decide(source:fallback:)`` but reuses a loaded ``AVURLAsset`` (avoids a second file open).
-    static func decide(asset: AVURLAsset, fallback: VideoQuality) async -> Decision {
+    public static func decide(asset: AVURLAsset, fallback: VideoQuality) async -> Decision {
         let t0 = CFAbsoluteTimeGetCurrent()
         defer {
             let elapsed = CFAbsoluteTimeGetCurrent() - t0
@@ -61,10 +63,6 @@ enum VideoSmartQuality {
                 megapixels: megapixels, bitsPerSecond: rate
             )
 
-            // Content-aware adjustment: screen recordings AND animation / motion graphics get
-            // bumped up one tier so text and sub-pixel edges stay readable. The resolution /
-            // bitrate ladder is calibrated for film-style footage and tends to under-encode
-            // edge-heavy / flat-region content at the `.medium` tier.
             if contentType == .screenRecording || contentType == .animation {
                 quality = quality.bumpedUp
             }
@@ -75,19 +73,14 @@ enum VideoSmartQuality {
         }
     }
 
-    /// Convenience wrapper for callers that only need the tier.
-    static func inferQuality(asset: AVURLAsset, fallback: VideoQuality) async -> VideoQuality {
+    public static func inferQuality(asset: AVURLAsset, fallback: VideoQuality) async -> VideoQuality {
         await decide(asset: asset, fallback: fallback).quality
     }
 
-    static func inferQuality(source: URL, fallback: VideoQuality) async -> VideoQuality {
+    public static func inferQuality(source: URL, fallback: VideoQuality) async -> VideoQuality {
         await decide(source: source, fallback: fallback).quality
     }
 
-    // MARK: - HDR
-
-    /// Cheap HDR check via `.containsHDRVideo`. Falls back to inspecting the video format
-    /// description's transfer function (HLG / PQ) for older / unusual files.
     private static func detectHDR(asset: AVAsset) async -> Bool {
         do {
             let tracks = try await asset.loadTracks(withMediaType: .video)
@@ -100,7 +93,7 @@ enum VideoSmartQuality {
             for desc in descriptions {
                 if let ext = CMFormatDescriptionGetExtension(desc, extensionKey: kCMFormatDescriptionExtension_TransferFunction) as? String {
                     let hlg = kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String
-                    let pq  = kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String
+                    let pq = kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ as String
                     if ext == hlg || ext == pq { return true }
                 }
             }
@@ -118,9 +111,6 @@ enum VideoSmartQuality {
     ) -> VideoQuality {
         let rate = Double(bitsPerSecond)
 
-        // `.medium` is the floor — `.low` was removed because it produced unacceptable artifacts
-        // for a quality-first compressor. Tiny sub-540p clips therefore default to `.medium`,
-        // which is still aggressive on size but keeps text and faces legible.
         if maxDimension < 540 || megapixels < 0.22 {
             return .medium
         }
@@ -140,15 +130,5 @@ enum VideoSmartQuality {
         }
 
         return .high
-    }
-}
-
-private extension VideoQuality {
-    /// One-tier bump (`.high` is the ceiling).
-    var bumpedUp: VideoQuality {
-        switch self {
-        case .medium: return .high
-        case .high:   return .high
-        }
     }
 }

@@ -1,3 +1,4 @@
+import DinkyCoreShared
 import Foundation
 
 public enum DinkyImageCompressionError: LocalizedError, Sendable {

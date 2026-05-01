@@ -1,12 +1,12 @@
 import DinkyCoreImage
+import DinkyCoreShared
 import Foundation
 
 public enum DinkyCompressCommand {
     public static func run(_ args: [String]) async -> (Int32, Int) {
-        let opts: DinkyCompressOptions
-        let paths: [String]
+        let parse: DinkyCompressParseResult
         do {
-            (opts, paths) = try DinkyCompressArgParser.parse(args)
+            parse = try DinkyCompressArgParser.parse(args)
         } catch let e as DinkyCLIParseError {
             FileHandle.standardError.write(Data("dinky: \(e.message)\n".utf8))
             return (1, 0)
@@ -14,6 +14,24 @@ public enum DinkyCompressCommand {
             FileHandle.standardError.write(Data("dinky: \(error.localizedDescription)\n".utf8))
             return (1, 0)
         }
+
+        var opts = parse.options
+        let presetUsed: CompressionPreset?
+        do {
+            presetUsed = try DinkyCLIPresetSupport.applyImagePresetIfNeeded(
+                ref: parse.preset,
+                explicit: parse.explicit,
+                options: &opts
+            )
+        } catch let e as DinkyCLIPresetError {
+            FileHandle.standardError.write(Data("dinky: \(e.message)\n".utf8))
+            return (1, 0)
+        } catch {
+            FileHandle.standardError.write(Data("dinky: \(error.localizedDescription)\n".utf8))
+            return (1, 0)
+        }
+
+        let paths = parse.paths
 
         guard !paths.isEmpty else {
             FileHandle.standardError.write(Data("dinky compress: no input files (see: dinky help)\n".utf8))
@@ -30,13 +48,13 @@ public enum DinkyCompressCommand {
             return (1, 0)
         }
 
-        let (code, results) = await runWithOptions(opts, paths: paths)
+        let (code, results) = await runWithOptions(opts, paths: paths, preset: presetUsed)
         printResults(opts: opts, code: code, fileResults: results)
         return (code, results.count)
     }
 
-    /// Shared by the `compress` subcommand and `dinky serve`.
-    public static func runWithOptions(_ opts: DinkyCompressOptions, paths: [String]) async
+    /// Shared by the `compress-image` subcommand and `dinky serve`.
+    public static func runWithOptions(_ opts: DinkyCompressOptions, paths: [String], preset: CompressionPreset? = nil) async
         -> (Int32, [DinkyImageCompressFileResult])
     {
         guard let bin = DinkyEncoderPath.resolveBinDirectory() else {
@@ -76,7 +94,7 @@ public enum DinkyCompressCommand {
             if opts.format == "auto" || smartQ {
                 classified = ContentClassifier.classify(inURL)
             }
-            let format: DinkyCoreImage.CompressionFormat
+            let format: CompressionFormat
             do {
                 format = try resolveFormat(
                     from: opts.format,
@@ -99,11 +117,55 @@ public enum DinkyCompressCommand {
                 continue
             }
 
-            let outDir = (opts.outputDir ?? inURL.deletingLastPathComponent()).standardizedFileURL
+            let outDir: URL
+            do {
+                if let d = opts.outputDir {
+                    outDir = d.standardizedFileURL
+                } else {
+                    outDir = try DinkyCLIPresetSupport.outputDirectoryForSourceURL(
+                        preset: preset,
+                        source: inURL
+                    ).standardizedFileURL
+                }
+            } catch let e as DinkyCLIPresetError {
+                anyFailed = true
+                fileResults.append(
+                    DinkyImageCompressFileResult(
+                        input: p,
+                        output: nil,
+                        originalBytes: origSize,
+                        outputBytes: nil,
+                        savingsPercent: nil,
+                        detectedContent: classified?.rawValue,
+                        error: e.message
+                    )
+                )
+                continue
+            } catch {
+                anyFailed = true
+                fileResults.append(
+                    DinkyImageCompressFileResult(
+                        input: p,
+                        output: nil,
+                        originalBytes: origSize,
+                        outputBytes: nil,
+                        savingsPercent: nil,
+                        detectedContent: classified?.rawValue,
+                        error: error.localizedDescription
+                    )
+                )
+                continue
+            }
             try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
             let outName: String
-            if format == .png, inURL.pathExtension.lowercased() == "png" {
+            if let pr = preset {
+                outName = DinkyCLIPresetSupport.outputFilenameStem(
+                    preset: pr,
+                    source: inURL,
+                    mediaExtension: format.outputExtension
+                )
+            } else if format == .png, inURL.pathExtension.lowercased() == "png" {
                 let stem = inURL.deletingPathExtension().lastPathComponent
                 outName = stem + "-dinky." + format.outputExtension
             } else {
@@ -196,13 +258,13 @@ public enum DinkyCompressCommand {
         from: String,
         sourceURL: URL,
         classified: ContentType?
-    ) throws -> DinkyCoreImage.CompressionFormat {
+    ) throws -> CompressionFormat {
         let f = from.lowercased()
         if f == "auto" {
             let ct = classified ?? ContentClassifier.classify(sourceURL)
             return ct == .photo ? .avif : .webp
         }
-        guard let c = DinkyCoreImage.CompressionFormat(rawValue: f) else {
+        guard let c = CompressionFormat(rawValue: f) else {
             throw DinkyCLIParseError(message: "unknown --format: \(from)")
         }
         return c

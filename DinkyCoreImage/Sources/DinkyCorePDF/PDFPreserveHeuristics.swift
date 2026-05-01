@@ -1,30 +1,31 @@
-import DinkyPDFSignals
+import DinkyCoreShared
 import Foundation
 
 /// One qpdf attempt on the preserve path (`extraArgs` append after base `--optimize-images` args).
-struct PDFPreserveQpdfStep: Sendable, Equatable {
-    let id: String
-    let extraArgs: [String]
+public struct PDFPreserveQpdfStep: Sendable, Equatable {
+    public let id: String
+    public let extraArgs: [String]
 
-    static let base = PDFPreserveQpdfStep(id: "base", extraArgs: [])
+    public init(id: String, extraArgs: [String]) {
+        self.id = id
+        self.extraArgs = extraArgs
+    }
 
-    static func from(experimental: PDFPreserveExperimentalMode) -> PDFPreserveQpdfStep {
+    public static let base = PDFPreserveQpdfStep(id: "base", extraArgs: [])
+
+    public static func from(experimental: PDFPreserveExperimentalMode) -> PDFPreserveQpdfStep {
         PDFPreserveQpdfStep(id: "exp_\(experimental.rawValue)", extraArgs: experimental.extraQpdfArgs)
     }
 
-    func extrasWithoutJPEGQuality() -> [String] {
+    public func extrasWithoutJPEGQuality() -> [String] {
         extraArgs.filter { !$0.hasPrefix("--jpeg-quality=") }
     }
 }
 
-/// Ordered qpdf strategies for preserve mode when Smart Quality is on (no manual experimental override).
-enum PDFPreserveHeuristics {
-
-    /// Max attempts to keep batch jobs responsive.
+public enum PDFPreserveHeuristics: Sendable {
     private static let maxSteps = 4
 
-    /// Builds a short chain: base pass, then image- or structure-focused passes from document signals.
-    static func qpdfSteps(for s: PDFDocumentSignals) -> [PDFPreserveQpdfStep] {
+    public static func qpdfSteps(for s: PDFDocumentSignals) -> [PDFPreserveQpdfStep] {
         let textHeavy = s.totalTextCharsSampled >= 6000
         let imageHeavy = s.totalTextCharsSampled < 2000 && s.bytesPerPage > 100_000
 
@@ -47,10 +48,8 @@ enum PDFPreserveHeuristics {
     }
 }
 
-enum PDFPreserveQpdfStepsResolver {
-
-    /// Resolves which qpdf step chain to run. Manual experimental mode replaces the auto chain entirely.
-    static func steps(
+public enum PDFPreserveQpdfStepsResolver: Sendable {
+    public static func steps(
         sourceURL: URL,
         preserveExperimental: PDFPreserveExperimentalMode,
         smartQuality: Bool

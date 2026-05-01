@@ -1,19 +1,15 @@
 import Foundation
 
-/// Optional qpdf passes for **preserve** mode when normal optimization isn’t enough. Experimental: may affect tagged PDFs or image quality.
-enum PDFPreserveExperimentalMode: String, CaseIterable, Identifiable, Sendable {
-    /// Default: same as before (object streams, flate, `--optimize-images` when supported).
+/// Optional qpdf passes for **preserve** mode when normal optimization isn’t enough.
+public enum PDFPreserveExperimentalMode: String, CaseIterable, Identifiable, Sendable, Codable {
     case none = "none"
-    /// Drops structure tree / markup hints (`qpdf --remove-structure`). Can shrink tagged PDFs; accessibility tags may be affected.
     case stripNonEssentialStructure = "stripStructure"
-    /// Lower JPEG quality on image recompression (`--jpeg-quality=50` with `--optimize-images`). Visually lossier; may help image-heavy PDFs.
     case strongerImageRecompression = "strongerImages"
-    /// Applies both structure strip and stronger image settings.
     case maximum = "maximum"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .none:
             return String(localized: "Off (default)", comment: "PDF experimental preserve: disabled.")
@@ -26,7 +22,7 @@ enum PDFPreserveExperimentalMode: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var shortDescription: String {
+    public var shortDescription: String {
         switch self {
         case .none:
             return String(localized: "Standard qpdf + PDFKit preserve path.", comment: "PDF experimental preserve description.")
@@ -39,8 +35,7 @@ enum PDFPreserveExperimentalMode: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Extra qpdf arguments after base preserve args (before metadata flags).
-    var extraQpdfArgs: [String] {
+    public var extraQpdfArgs: [String] {
         switch self {
         case .none:
             return []
@@ -53,8 +48,7 @@ enum PDFPreserveExperimentalMode: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// When falling back without `--optimize-images`, omit `--jpeg-quality` (it only applies with image optimization).
-    var qpdfExtrasWithoutJPEGQuality: [String] {
+    public var qpdfExtrasWithoutJPEGQuality: [String] {
         extraQpdfArgs.filter { !$0.hasPrefix("--jpeg-quality=") }
     }
 }

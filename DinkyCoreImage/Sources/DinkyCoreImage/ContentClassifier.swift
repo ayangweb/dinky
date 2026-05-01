@@ -1,6 +1,7 @@
 // ContentClassifier.swift — multi-signal photo vs. graphic detection.
 // (Same logic as the Dinky app; used by the macOS app and DinkyCoreImage CLI.)
 import CoreGraphics
+import DinkyCoreShared
 import Foundation
 import ImageIO
 import Vision

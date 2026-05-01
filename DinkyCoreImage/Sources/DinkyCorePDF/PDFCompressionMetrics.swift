@@ -1,27 +1,19 @@
 import Foundation
 import os
 
-/// Structured PDF compression outcomes for Console.app (`subsystem`: app bundle id, `category`: `PDFMetrics`).
-/// Enable **Debug** for this subsystem to compare runs and validate shrink on fixture documents.
-enum PDFCompressionMetrics {
+/// Structured PDF compression outcomes for Console.app debugging.
+public enum PDFCompressionMetrics: Sendable {
     private static let log = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "dinky",
+        subsystem: "dinky",
         category: "PDFMetrics"
     )
 
-    // MARK: - Product / regression expectations (see docs/PDF_COMPRESSION.md)
+    public static let regressionNoteFlattenShouldShrinkTypicalScanPDF = true
+    public static let regressionNotePreserveMayShowNoGain = true
 
-    /// Interpretation aid: flatten should usually beat the source on typical scan / mixed raster PDFs when Smart Quality or tiers are set sanely.
-    /// Not enforced as a runtime gate in Release.
-    static let regressionNoteFlattenShouldShrinkTypicalScanPDF = true
-
-    /// Preserve mode may legitimately produce no savings on already-optimized exports; do not treat as a regression by itself.
-    static let regressionNotePreserveMayShowNoGain = true
-
-    /// Log line prefix for filtering in Console.
     private static let eventPrefix = "pdf_metrics"
 
-    static func logOutcome(
+    public static func logOutcome(
         outputMode: PDFOutputMode,
         originalBytes: Int64,
         outputBytes: Int64,
@@ -42,7 +34,7 @@ enum PDFCompressionMetrics {
         }
     }
 
-    static func logRejectedOutput(
+    public static func logRejectedOutput(
         outputMode: PDFOutputMode,
         originalBytes: Int64,
         attemptedBytes: Int64,

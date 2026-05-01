@@ -1,19 +1,17 @@
 import AppKit
 import CoreGraphics
 import CoreText
+import DinkyCoreShared
 import Foundation
 import PDFKit
 import Vision
 
 /// Adds a searchable (invisible) text layer to scanned-style PDF pages using Vision OCR.
-enum PDFOCRService {
-
+public enum PDFOCRService: Sendable {
     private static let renderDPI: CGFloat = 200
 
     /// Writes a new PDF with invisible text overlaid on rasterized page content.
-    /// - Parameters:
-    ///   - progressHandler: `(completedPage, totalPages)` — called on a background queue.
-    static func makeSearchableCopy(
+    public static func makeSearchableCopy(
         sourceURL: URL,
         outputURL: URL,
         languages: [String],
@@ -23,10 +21,10 @@ enum PDFOCRService {
             throw PDFOCRError.cannotOpenSource
         }
         let total = doc.pageCount
-        let langs = languages.isEmpty ? DinkyPreferences.defaultPdfOCRLanguages : languages
+        let langs = languages.isEmpty ? CompressionPreset.defaultPdfOCRLanguages : languages
         let maxConcurrent = maxConcurrentPageTasks(pageCount: total)
 
-        struct PagePayload {
+        struct PagePayload: Sendable {
             let index: Int
             let pdfData: Data
         }
@@ -73,13 +71,11 @@ enum PDFOCRService {
 
     private static func maxConcurrentPageTasks(pageCount: Int) -> Int {
         let cpu = max(1, ProcessInfo.processInfo.activeProcessorCount)
-        // Rough: cap concurrent 200 DPI renders by a fraction of physical RAM (no public “available memory” on macOS Swift).
         let ramBytes = ProcessInfo.processInfo.physicalMemory
         let memCap = max(1, min(cpu, Int(ramBytes / (512 * 1024 * 1024))))
         return max(1, min(pageCount, memCap))
     }
 
-    /// Single-page PDF `Data` with page image + invisible text.
     private static func pdfDataForPage(page: PDFPage, languages: [String]) throws -> Data {
         guard let cgImage = renderPageImage(page: page) else {
             throw PDFOCRError.renderFailed
@@ -192,13 +188,13 @@ enum PDFOCRService {
     }
 }
 
-enum PDFOCRError: LocalizedError {
+public enum PDFOCRError: LocalizedError, Sendable {
     case cannotOpenSource
     case renderFailed
     case pageBuildFailed
     case writeFailed
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .cannotOpenSource: return "Could not open the PDF for OCR."
         case .renderFailed: return "Could not render a PDF page for OCR."

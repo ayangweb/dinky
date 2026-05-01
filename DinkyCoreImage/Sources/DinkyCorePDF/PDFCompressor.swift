@@ -1,17 +1,18 @@
-import Foundation
 import AppKit
-import PDFKit
 import CoreGraphics
+import DinkyCoreShared
+import Foundation
 import ImageIO
+import PDFKit
 
 /// How PDFs are written: keep structure (text, links, forms) or rasterize pages for maximum shrink.
-enum PDFOutputMode: String, CaseIterable, Identifiable {
+public enum PDFOutputMode: String, CaseIterable, Identifiable, Sendable, Codable {
     case preserveStructure = "preserveStructure"
     case flattenPages = "flattenPages"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .preserveStructure:
             return String(localized: "Preserve text (best-effort size)", comment: "PDF output mode short label.")
@@ -20,7 +21,7 @@ enum PDFOutputMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var shortDescription: String {
+    public var shortDescription: String {
         switch self {
         case .preserveStructure:
             return String(localized: "qpdf + PDFKit when smaller; keeps text and links. Many PDFs won’t shrink.", comment: "PDF preserve mode description.")
@@ -30,61 +31,58 @@ enum PDFOutputMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum PDFQuality: String, CaseIterable, Identifiable {
+public enum PDFQuality: String, CaseIterable, Identifiable, Sendable, Codable {
     case smallest = "smallest"
-    case low    = "low"
+    case low = "low"
     case medium = "medium"
-    case high   = "high"
+    case high = "high"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .smallest: return String(localized: "Smallest", comment: "PDF flatten quality tier.")
-        case .low:    return "Low"
+        case .low: return "Low"
         case .medium: return "Medium"
-        case .high:   return "High"
+        case .high: return "High"
         }
     }
 
-    var dpi: CGFloat {
+    public var dpi: CGFloat {
         switch self {
         case .smallest: return 72
-        case .low:    return 88
+        case .low: return 88
         case .medium: return 120
-        case .high:   return 160
+        case .high: return 160
         }
     }
 
-    var jpegQuality: CGFloat {
+    public var jpegQuality: CGFloat {
         switch self {
         case .smallest: return 0.26
-        case .low:    return 0.34
+        case .low: return 0.34
         case .medium: return 0.48
-        case .high:   return 0.64
+        case .high: return 0.64
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .smallest: return String(localized: "Minimum size. 72 DPI — screen sharing and quick previews only.", comment: "PDF flatten quality tier description.")
-        case .low:    return String(localized: "Very small. ~88 DPI — fine for screen viewing.", comment: "PDF flatten quality tier description.")
+        case .low: return String(localized: "Very small. ~88 DPI — fine for screen viewing.", comment: "PDF flatten quality tier description.")
         case .medium: return String(localized: "Balanced. ~120 DPI — good for most purposes.", comment: "PDF flatten quality tier description.")
-        case .high:   return String(localized: "Sharper. ~160 DPI — better for print than Medium.", comment: "PDF flatten quality tier description.")
+        case .high: return String(localized: "Sharper. ~160 DPI — better for print than Medium.", comment: "PDF flatten quality tier description.")
         }
     }
 
-    /// From largest toward smallest output — used to retry flatten when a tier bloats the file.
     private static let flattenTierDescending: [PDFQuality] = [.high, .medium, .low, .smallest]
 
-    /// Tiers to try when flattening, starting at `first` and stepping down until `.smallest`.
-    static func flattenQualityFallbackChain(startingAt first: PDFQuality) -> [PDFQuality] {
+    public static func flattenQualityFallbackChain(startingAt first: PDFQuality) -> [PDFQuality] {
         guard let i = flattenTierDescending.firstIndex(of: first) else { return [first] }
         return Array(flattenTierDescending[i...])
     }
 
-    /// Starting tiers to show when a max-size target is on: tighter caps hide higher tiers (unlikely to hit the cap on the first pass).
-    static func flattenUIShowableTiers(maxFileSizeEnabled: Bool, pdfMaxFileSizeKB: Int) -> [PDFQuality] {
+    public static func flattenUIShowableTiers(maxFileSizeEnabled: Bool, pdfMaxFileSizeKB: Int) -> [PDFQuality] {
         guard maxFileSizeEnabled else { return PDFQuality.allCases }
         let mb = Double(pdfMaxFileSizeKB) / 1024.0
         if mb <= 6 {
@@ -96,8 +94,7 @@ enum PDFQuality: String, CaseIterable, Identifiable {
         return [.smallest, .low, .medium, .high]
     }
 
-    /// Picks the nearest allowed starting tier when the current one is hidden (walks down the flatten fallback chain).
-    static func snapFlattenStartTier(_ current: PDFQuality, allowed: [PDFQuality]) -> PDFQuality {
+    public static func snapFlattenStartTier(_ current: PDFQuality, allowed: [PDFQuality]) -> PDFQuality {
         guard !allowed.isEmpty else { return current }
         if allowed.contains(current) { return current }
         for q in flattenQualityFallbackChain(startingAt: current) {
@@ -107,24 +104,16 @@ enum PDFQuality: String, CaseIterable, Identifiable {
     }
 }
 
-enum PDFCompressor {
-
-    /// Caps flatten rasterization so huge `mediaBox` pages cannot allocate multi‑hundred‑megapixel bitmaps or explode output size.
-    /// Tighter than 8K so large physical pages don’t rasterize more pixels than needed for web/screen PDFs.
+public enum PDFCompressor: Sendable {
     private static let flattenMaxRasterEdgePixels = 5632
-    /// Tighter cap for the automatic last-resort flatten pass (after normal tiers fail to shrink).
     private static let flattenLastResortMaxRasterEdgePixels = 4096
-    /// Strongest automatic bailout when milder flatten tiers still do not beat the source (same color mode as the user chose).
     private static let flattenUltraMaxRasterEdgePixels = 2048
 
     private static func resourceByteCount(_ url: URL) -> Int64 {
         (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map { Int64($0) } ?? 0
     }
 
-    /// Rewrites the PDF without rasterizing: preserves text, annotations, links, and typical form structures.
-    /// The result is only committed when it is **smaller** than the source, so a round-trip rewrite never
-    /// replaces the user’s file with a larger one.
-    static func preserveStructure(
+    public static func preserveStructure(
         source: URL,
         stripMetadata: Bool,
         outputURL: URL,
@@ -173,11 +162,7 @@ enum PDFCompressor {
         }
     }
 
-    /// Rasterizes each page to JPEG (legacy “compress” behavior).
-    /// - Parameters:
-    ///   - lastResortFlatten: Harsher DPI/JPEG/cap after normal tiers could not beat the source size.
-    ///   - ultraLastResortFlatten: Strongest profile (lower DPI/JPEG, smaller raster cap). Implies last-resort if both are set.
-    static func compressFlattened(
+    public static func compressFlattened(
         source: URL,
         quality: PDFQuality,
         grayscale: Bool,
@@ -232,7 +217,6 @@ enum PDFCompressor {
             let pixelHeight = max(1, Int(rasterH.rounded(.down)))
             let renderScale = min(CGFloat(pixelWidth) / bounds.width, CGFloat(pixelHeight) / bounds.height)
 
-            // Render page to bitmap (grayscale saves ~60% on B&W documents)
             let colorSpace = grayscale ? CGColorSpaceCreateDeviceGray() : CGColorSpaceCreateDeviceRGB()
             let bitmapInfo = grayscale
                 ? CGImageAlphaInfo.none.rawValue
@@ -258,7 +242,6 @@ enum PDFCompressor {
 
             guard let cgImage = ctx.makeImage() else { continue }
 
-            // JPEG in memory — avoids disk + extra color-management roundtrip through `NSImage(contentsOf:)`.
             let jpegData = NSMutableData()
             guard let dest = CGImageDestinationCreateWithData(jpegData, "public.jpeg" as CFString, 1, nil) else {
                 continue
@@ -273,17 +256,13 @@ enum PDFCompressor {
 
             guard let nsImage = NSImage(data: jpegData as Data),
                   let renderedPage = PDFPage(image: nsImage) else { continue }
-            // Restore page bounds to original size (PDFPage from image defaults to pixel size at 72dpi)
             renderedPage.setBounds(bounds, for: .mediaBox)
             output.insert(renderedPage, at: output.pageCount)
             progress?(0.1 + 0.78 * Float(i + 1) / Float(pageCount))
         }
 
         if stripMetadata {
-            // PDFDocument doesn't expose per-attribute stripping; we skip writing
-            // the document attributes by not copying them to `output`.
         } else {
-            // Copy non-identifying attributes (subject, keywords)
             if let attrs = document.documentAttributes {
                 var safeAttrs = attrs
                 safeAttrs.removeValue(forKey: PDFDocumentAttribute.authorAttribute)
@@ -300,20 +279,19 @@ enum PDFCompressor {
     }
 }
 
-enum PDFCompressionError: LocalizedError {
+public enum PDFCompressionError: LocalizedError, Sendable {
     case loadFailed
     case noPages
     case renderFailed(Int)
     case writeFailed
-    /// PDFKit’s rewrite was not smaller than the source; `attemptedSize` is the would-be output on disk.
     case rewriteNotSmallerThanOriginal(attemptedSize: Int64)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
-        case .loadFailed:        return "Could not open the PDF file."
-        case .noPages:           return "The PDF has no pages."
+        case .loadFailed: return "Could not open the PDF file."
+        case .noPages: return "The PDF has no pages."
         case .renderFailed(let p): return "Could not render page \(p + 1)."
-        case .writeFailed:       return "Could not write the compressed PDF."
+        case .writeFailed: return "Could not write the compressed PDF."
         case .rewriteNotSmallerThanOriginal:
             return String(localized: "Saving the PDF did not reduce its size compared to the original.", comment: "PDF preserve: rewrite was larger or the same size.")
         }

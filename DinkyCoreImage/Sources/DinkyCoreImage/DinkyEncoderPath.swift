@@ -1,3 +1,4 @@
+import DinkyCoreShared
 import Foundation
 
 /// Resolves the directory that contains `cwebp`, `avifenc`, and `oxipng` (same layout as Dinky.app Resources).
@@ -27,5 +28,19 @@ public enum DinkyEncoderPath: Sendable {
         return names.allSatisfy {
             FileManager.default.isExecutableFile(atPath: url.appendingPathComponent($0).path)
         }
+    }
+
+    /// `qpdf` in the same directory as the image encoders (Dinky.app Resources layout).
+    public static func qpdfExecutable(inBinDirectory dir: URL) -> URL? {
+        let u = dir.appendingPathComponent("qpdf")
+        guard FileManager.default.isExecutableFile(atPath: u.path) else { return nil }
+        return u
+    }
+
+    /// Encoder directory that also includes an executable `qpdf` (needed for preserve-mode qpdf passes).
+    public static func resolveBinDirectoryWithQpdf() -> URL? {
+        guard let dir = resolveBinDirectory() else { return nil }
+        guard qpdfExecutable(inBinDirectory: dir) != nil else { return nil }
+        return dir
     }
 }

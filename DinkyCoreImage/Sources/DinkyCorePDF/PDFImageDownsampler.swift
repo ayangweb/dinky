@@ -1,28 +1,16 @@
-import Foundation
 import AppKit
-import PDFKit
 import CoreGraphics
+import Foundation
 import ImageIO
+import PDFKit
 
 /// Mixed-mode PDF: rasterizes image-heavy pages at 144 DPI while keeping text pages from a structure-preserved source.
-/// Use in preserve mode when embedded images are over-resoluted (e.g. 300/600 DPI scans in a screen-bound PDF).
-enum PDFImageDownsampler {
-
-    /// Pages with fewer text chars than this are treated as image-heavy and rasterized.
+public enum PDFImageDownsampler: Sendable {
     private static let imagePageTextThreshold = 500
-
-    /// 144 DPI — retina-screen quality; halves data vs a 300 DPI scan without visible degradation on screen.
     private static let rasterDPI: CGFloat = 144
-
-    /// High JPEG quality: resolution reduction is the gain, not aggressive lossy compression.
     private static let jpegQuality: CGFloat = 0.72
 
-    /// Returns a mixed PDFDocument, or nil if downsampling produced no benefit.
-    /// - Parameters:
-    ///   - source:        Original PDF (used to render image pages at full fidelity then downsample).
-    ///   - structureDoc:  qpdf-compressed document (used as-is for text pages).
-    ///   - stripMetadata: When false, copies PDF document attributes from the source (except author/creator), matching ``PDFCompressor``.
-    static func downsample(source: URL, structureDoc: PDFDocument, stripMetadata: Bool) -> PDFDocument? {
+    public static func downsample(source: URL, structureDoc: PDFDocument, stripMetadata: Bool) -> PDFDocument? {
         guard let sourceDoc = PDFDocument(url: source) else { return nil }
         let pageCount = sourceDoc.pageCount
         guard pageCount > 0, structureDoc.pageCount == pageCount else { return nil }

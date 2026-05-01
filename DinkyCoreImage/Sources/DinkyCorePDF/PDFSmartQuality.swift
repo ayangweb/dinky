@@ -1,20 +1,17 @@
-import Foundation
-import DinkyPDFSignals
-import PDFKit
-import CoreGraphics
 import AppKit
+import DinkyCoreShared
+import CoreGraphics
+import Foundation
+import PDFKit
 
 /// Heuristic PDF flatten quality tier from quick page sampling (runs off the main thread).
-enum PDFSmartQuality {
-
-    /// Picks a ``PDFQuality`` from document structure and rendered thumbnails. On any failure, returns `fallback`.
-    static func inferQuality(url: URL, fallback: PDFQuality) -> PDFQuality {
+public enum PDFSmartQuality: Sendable {
+    public static func inferQuality(url: URL, fallback: PDFQuality) -> PDFQuality {
         guard let s = PDFDocumentSampler.sample(url: url) else { return fallback }
         return inferQualityFromSignals(s, fallback: fallback)
     }
 
-    /// Single sample pass: flatten tier + monochrome likelihood (for auto-grayscale and tier bias).
-    static func inferFlattenQualityAndMono(
+    public static func inferFlattenQualityAndMono(
         url: URL,
         fallback: PDFQuality,
         autoGrayscaleMonoScans: Bool

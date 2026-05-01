@@ -1,9 +1,8 @@
-import DinkyCoreImage
-import Foundation
 import AVFoundation
 import CoreGraphics
+import DinkyCoreImage
+import Foundation
 import ImageIO
-import PDFKit
 import UniformTypeIdentifiers
 
 struct CompressionResult {
@@ -116,89 +115,6 @@ actor CompressionService {
         }
     }
 
-    // MARK: - Process runner (qpdf + other CLIs)
-
-    private func run(_ binary: URL, args: [String]) async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            let process = Process()
-            process.executableURL = binary
-            process.arguments     = args
-
-            var env = ProcessInfo.processInfo.environment
-            let existing = env["DYLD_LIBRARY_PATH"].flatMap { $0.isEmpty ? nil : $0 }
-            env["DYLD_LIBRARY_PATH"] = ["/opt/homebrew/lib", existing].compactMap { $0 }.joined(separator: ":")
-            process.environment = env
-
-            let errPipe = Pipe()
-            process.standardError  = errPipe
-            process.standardOutput = Pipe()
-            process.terminationHandler = { p in
-                let stderr = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(),
-                                    encoding: .utf8) ?? ""
-                if p.terminationStatus == 0 {
-                    cont.resume()
-                } else {
-                    cont.resume(throwing: CompressionError.processFailed(p.terminationStatus, stderr))
-                }
-            }
-            do    { try process.run() }
-            catch { cont.resume(throwing: error) }
-        }
-    }
-
-    // MARK: - PDF compression
-
-    private func qpdfBinaryURL() -> URL? {
-        let u = binDir.appendingPathComponent("qpdf")
-        guard FileManager.default.isExecutableFile(atPath: u.path) else { return nil }
-        return u
-    }
-
-    /// Structural/stream optimization via bundled `qpdf` (smaller output only when `originalSize` check passes in caller).
-    private func runQpdfPreserve(
-        source: URL,
-        output: URL,
-        stripMetadata: Bool,
-        binary: URL,
-        extraQpdfArgs: [String]
-    ) async throws {
-        var args: [String] = [
-            source.path,
-            output.path,
-            "--object-streams=generate",
-            "--compress-streams=y",
-            "--recompress-flate",
-            "--compression-level=9",
-            "--remove-unreferenced-resources=yes",
-            "--coalesce-contents",
-            "--optimize-images",
-        ]
-        args.append(contentsOf: extraQpdfArgs)
-        if stripMetadata {
-            args.append(contentsOf: ["--remove-metadata", "--remove-info"])
-        }
-        do {
-            try await run(binary, args: args)
-        } catch {
-            let withoutJpeg = extraQpdfArgs.filter { !$0.hasPrefix("--jpeg-quality=") }
-            var fallback = [
-                source.path,
-                output.path,
-                "--object-streams=generate",
-                "--compress-streams=y",
-                "--recompress-flate",
-                "--compression-level=9",
-                "--remove-unreferenced-resources=yes",
-                "--coalesce-contents",
-            ]
-            fallback.append(contentsOf: withoutJpeg)
-            if stripMetadata {
-                fallback.append(contentsOf: ["--remove-metadata", "--remove-info"])
-            }
-            try await run(binary, args: fallback)
-        }
-    }
-
     func compressPDF(
         source: URL,
         outputMode: PDFOutputMode,
@@ -215,146 +131,30 @@ actor CompressionService {
         collisionCustomPattern: String = "",
         progressHandler: (@Sendable (Float) -> Void)? = nil
     ) async throws -> CompressionResult {
-        let tPDF = CFAbsoluteTimeGetCurrent()
-        let originalSize = fileSize(source)
-
-        var effOut = OutputPathUniqueness.uniqueOutputURL(
-            desired: outputURL,
-            sourceURL: source,
-            style: collisionNamingStyle,
-            customPattern: collisionCustomPattern
-        )
-
-        try FileManager.default.createDirectory(
-            at: effOut.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-
-        var winningPreserveQpdfStepId: String? = nil
-        switch outputMode {
-        case .preserveStructure:
-            progressHandler?(0.06)
-            let fm = FileManager.default
-            var usedQpdf = false
-            if let qpdfBin = qpdfBinaryURL() {
-                let steps = preserveQpdfSteps.isEmpty ? [PDFPreserveQpdfStep.base] : preserveQpdfSteps
-                let n = max(steps.count, 1)
-                var bestQpdfURL: URL? = nil
-                var bestQpdfSize: Int64 = originalSize
-                for (idx, step) in steps.enumerated() {
-                    let qpdfTmp = fm.temporaryDirectory.appendingPathComponent("dinky_qpdf_\(UUID().uuidString).pdf")
-                    progressHandler?(0.06 + 0.08 * Float(idx + 1) / Float(n))
-                    do {
-                        try await runQpdfPreserve(
-                            source: source,
-                            output: qpdfTmp,
-                            stripMetadata: stripMetadata,
-                            binary: qpdfBin,
-                            extraQpdfArgs: step.extraArgs
-                        )
-                        let qSz = fileSize(qpdfTmp)
-                        if qSz > 0 && qSz < bestQpdfSize {
-                            if let prev = bestQpdfURL { try? fm.removeItem(at: prev) }
-                            bestQpdfURL = qpdfTmp
-                            bestQpdfSize = qSz
-                            winningPreserveQpdfStepId = step.id
-                            // Without a size target, first improvement is good enough.
-                            // With a target, keep trying steps until we're under it.
-                            let targetMet = targetBytes.map { qSz <= $0 } ?? true
-                            if targetMet { break }
-                        } else {
-                            try? fm.removeItem(at: qpdfTmp)
-                        }
-                    } catch {
-                        try? fm.removeItem(at: qpdfTmp)
-                        continue
-                    }
-                }
-                if let best = bestQpdfURL {
-                    effOut = try OutputPathUniqueness.moveTempItemToUniqueOutput(
-                        temp: best,
-                        desiredOutput: effOut,
-                        sourceURL: source,
-                        style: collisionNamingStyle,
-                        customPattern: collisionCustomPattern,
-                        fileManager: fm
-                    )
-                    usedQpdf = true
-                }
-            }
-            if !usedQpdf {
-                let ph = progressHandler
-                effOut = try await Task.detached {
-                    try PDFCompressor.preserveStructure(
-                        source: source,
-                        stripMetadata: stripMetadata,
-                        outputURL: effOut,
-                        collisionSourceURL: source,
-                        collisionNamingStyle: collisionNamingStyle,
-                        collisionCustomPattern: collisionCustomPattern,
-                        progress: ph
-                    )
-                }.value
-            } else {
-                progressHandler?(1)
-            }
-
-            if resolutionDownsampling, fm.fileExists(atPath: effOut.path),
-               let structureDoc = PDFDocument(url: effOut) {
-                let dsURL = fm.temporaryDirectory.appendingPathComponent("dinky_pdf_ds_\(UUID().uuidString).pdf")
-                if let mixed = PDFImageDownsampler.downsample(source: source, structureDoc: structureDoc, stripMetadata: stripMetadata),
-                   mixed.write(to: dsURL) {
-                    let dsSz = fileSize(dsURL)
-                    if dsSz > 0 && dsSz < fileSize(effOut) {
-                        try? fm.removeItem(at: effOut)
-                        try fm.moveItem(at: dsURL, to: effOut)
-                    } else {
-                        try? fm.removeItem(at: dsURL)
-                    }
-                }
-            }
-        case .flattenPages:
-            effOut = OutputPathUniqueness.refreshUniqueOutput(
-                currentCandidate: effOut,
-                sourceURL: source,
-                style: collisionNamingStyle,
-                customPattern: collisionCustomPattern
-            )
-            let ph = progressHandler
-            let ultra = flattenUltra
-            let lastResort = flattenLastResort && !ultra
-            try await Task.detached {
-                try PDFCompressor.compressFlattened(
-                    source: source, quality: quality, grayscale: grayscale,
-                    stripMetadata: stripMetadata, outputURL: effOut,
-                    lastResortFlatten: lastResort,
-                    ultraLastResortFlatten: ultra,
-                    progress: ph
-                )
-            }.value
-        }
-        CompressionTiming.logPhase("pdf.compress.\(outputMode == .flattenPages ? "flatten" : "preserve")", startedAt: tPDF)
-
-        guard FileManager.default.fileExists(atPath: effOut.path) else {
-            throw CompressionError.outputMissing
-        }
-
-        let outSz = fileSize(effOut)
-        let chainIds = preserveQpdfSteps.isEmpty ? "base" : preserveQpdfSteps.map(\.id).joined(separator: ">")
-        PDFCompressionMetrics.logOutcome(
+        let qpdf = DinkyEncoderPath.qpdfExecutable(inBinDirectory: binDir)
+        let pdfResult = try await DinkyPDFPipeline.compress(
+            source: source,
             outputMode: outputMode,
-            originalBytes: originalSize,
-            outputBytes: outSz,
+            quality: quality,
+            grayscale: grayscale,
+            stripMetadata: stripMetadata,
+            outputURL: outputURL,
             flattenLastResort: flattenLastResort,
             flattenUltra: flattenUltra,
-            preserveQpdfChain: outputMode == .preserveStructure ? chainIds : nil,
-            preserveQpdfWinningStep: winningPreserveQpdfStepId
+            preserveQpdfSteps: preserveQpdfSteps,
+            targetBytes: targetBytes,
+            resolutionDownsampling: resolutionDownsampling,
+            collisionNamingStyle: collisionNamingStyle,
+            collisionCustomPattern: collisionCustomPattern,
+            qpdfBinary: qpdf,
+            progressHandler: progressHandler
         )
-
-        return CompressionResult(outputURL: effOut,
-                                 originalSize: originalSize,
-                                 outputSize: outSz,
-                                 detectedContentType: nil)
+        return CompressionResult(
+            outputURL: pdfResult.outputURL,
+            originalSize: pdfResult.originalSize,
+            outputSize: pdfResult.outputSize,
+            detectedContentType: nil
+        )
     }
 
     // MARK: - Video compression

@@ -1,6 +1,7 @@
+import Foundation
 import UniformTypeIdentifiers
 
-enum MediaType: Hashable {
+public enum MediaType: Hashable, Sendable {
     case image
     case pdf
     case video
@@ -9,10 +10,10 @@ enum MediaType: Hashable {
 // MARK: - Preset “Applies to” encoding (`CompressionPreset.presetMediaScopeRaw`)
 
 /// Parses and writes `presetMediaScopeRaw`: `"all"`, a single token (`image` / `video` / `pdf`), or comma-separated pairs/triples in canonical order.
-enum PresetMediaScopeRawCodec {
-    static let allTypes: Set<MediaType> = [.image, .video, .pdf]
+public enum PresetMediaScopeRawCodec: Sendable {
+    public static let allTypes: Set<MediaType> = [.image, .video, .pdf]
 
-    static func includedTypes(from raw: String) -> Set<MediaType> {
+    public static func includedTypes(from raw: String) -> Set<MediaType> {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return allTypes }
         if trimmed == "all" { return allTypes }
@@ -31,7 +32,7 @@ enum PresetMediaScopeRawCodec {
     }
 
     /// Serializes a non-empty subset. Callers must ensure `set` is non-empty.
-    static func serialize(_ set: Set<MediaType>) -> String {
+    public static func serialize(_ set: Set<MediaType>) -> String {
         precondition(!set.isEmpty, "preset media scope must include at least one type")
         if set == allTypes { return "all" }
         if set.count == 1, let only = set.first {
@@ -60,15 +61,15 @@ enum PresetMediaScopeRawCodec {
 }
 
 /// Which file types a preset applies to (stored on ``CompressionPreset``).
-enum PresetMediaScope: String, CaseIterable, Identifiable {
+public enum PresetMediaScope: String, CaseIterable, Identifiable, Sendable {
     case all
     case image
     case video
     case pdf
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .all: return "All"
         case .image: return "Images"
@@ -78,31 +79,12 @@ enum PresetMediaScope: String, CaseIterable, Identifiable {
     }
 }
 
-extension MediaType {
-    /// Plural label for “applies to” summaries (preset list, sidebar).
-    var presetAppliesToSummaryWord: String {
-        switch self {
-        case .image: return String(localized: "Images", comment: "Preset list: applies to image files.")
-        case .video: return String(localized: "Videos", comment: "Preset list: applies to video files.")
-        case .pdf: return String(localized: "PDFs", comment: "Preset list: applies to PDF files.")
-        }
-    }
-
-    /// Singular label for Applies-to multi-select (Image / Video / PDF).
-    var presetAppliesToSegmentLabel: String {
-        switch self {
-        case .image: return String(localized: "Image", comment: "Settings UI: media type segment.")
-        case .video: return String(localized: "Video", comment: "Settings UI: media type segment.")
-        case .pdf: return String(localized: "PDF", comment: "Settings UI: media type segment.")
-        }
-    }
-}
-
-enum MediaTypeDetector {
+/// Classify files by extension / UTI for dispatch (CLI single-queue or `preset run`).
+public enum MediaTypeDetector: Sendable {
     private static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "avif", "tiff", "bmp", "heic", "heif", "gif"]
     private static let videoExtensions: Set<String> = ["mp4", "mov", "m4v", "avi"]
 
-    static func detect(_ url: URL) -> MediaType? {
+    public static func detect(_ url: URL) -> MediaType? {
         let ext = url.pathExtension.lowercased()
         if imageExtensions.contains(ext) { return .image }
         if ext == "pdf" { return .pdf }

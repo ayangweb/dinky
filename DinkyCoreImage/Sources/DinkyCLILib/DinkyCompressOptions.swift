@@ -1,4 +1,5 @@
 import DinkyCoreImage
+import DinkyCoreShared
 import Foundation
 
 public struct DinkyCompressOptions: Sendable {

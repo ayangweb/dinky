@@ -3,22 +3,24 @@ import XCTest
 
 final class ArgumentParserTests: XCTestCase {
     func testPositionalFiles() throws {
-        let (o, files) = try DinkyCompressArgParser.parse(["a.png", "b.jpg"])
-        XCTAssertEqual(o.format, "auto")
-        XCTAssertEqual(files, ["a.png", "b.jpg"])
+        let r = try DinkyCompressArgParser.parse(["a.png", "b.jpg"])
+        XCTAssertEqual(r.options.format, "auto")
+        XCTAssertEqual(r.paths, ["a.png", "b.jpg"])
+        XCTAssertTrue(r.preset.isEmpty)
     }
 
     func testDoubleDash() throws {
-        let (o, files) = try DinkyCompressArgParser.parse(["--format", "webp", "--", "-weird name.png"])
-        XCTAssertEqual(o.format, "webp")
-        XCTAssertEqual(files, ["-weird name.png"])
+        let r = try DinkyCompressArgParser.parse(["--format", "webp", "--", "-weird name.png"])
+        XCTAssertEqual(r.options.format, "webp")
+        XCTAssertEqual(r.paths, ["-weird name.png"])
     }
 
     func testFlags() throws {
-        let (o, files) = try DinkyCompressArgParser.parse([
+        let r = try DinkyCompressArgParser.parse([
             "-f", "avif", "-w", "800", "-q", "90", "-o", "/tmp/out", "--max-size-kb", "200",
             "--no-smart-quality", "--json", "-j", "4", "--strip", "in.png",
         ])
+        let o = r.options
         XCTAssertEqual(o.format, "avif")
         XCTAssertEqual(o.maxWidth, 800)
         XCTAssertEqual(o.quality, 90)
@@ -28,7 +30,8 @@ final class ArgumentParserTests: XCTestCase {
         XCTAssertTrue(o.json)
         XCTAssertEqual(o.parallelLimit, 4)
         XCTAssertTrue(o.stripMetadata)
-        XCTAssertEqual(files, ["in.png"])
+        XCTAssertEqual(r.paths, ["in.png"])
+        XCTAssertTrue(r.explicit.contains("quality"))
     }
 
     func testHelpThrows() {
@@ -43,5 +46,11 @@ final class ArgumentParserTests: XCTestCase {
             let e = err as? DinkyCLIParseError
             XCTAssertEqual(e?.message, "unknown option: --nope")
         }
+    }
+
+    func testPresetFlagsParsed() throws {
+        let r = try DinkyCompressArgParser.parse(["--preset", "Web", "--preset-file", "/tmp/p.json", "a.png"])
+        XCTAssertEqual(r.preset.name, "Web")
+        XCTAssertEqual(r.preset.file, "/tmp/p.json")
     }
 }
