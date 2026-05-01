@@ -127,7 +127,7 @@ enum PDFOCRService {
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         try handler.perform([request])
-        return (request.results as? [VNRecognizedTextObservation]) ?? []
+        return request.results ?? []
     }
 
     private static func buildSinglePagePDF(

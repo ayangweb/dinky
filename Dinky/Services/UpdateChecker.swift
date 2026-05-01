@@ -149,13 +149,13 @@ final class UpdateChecker: ObservableObject {
                 }
                 let mountedApp = URL(fileURLWithPath: mountPoint).appendingPathComponent("Dinky.app")
                 guard fm.fileExists(atPath: mountedApp.path) else {
-                    try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
+                    _ = try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
                     throw UpdateError.missingAppInArchive
                 }
                 let stagedCopy = tmp.appendingPathComponent("Dinky-staged-\(UUID().uuidString).app")
                 _ = try? fm.removeItem(at: stagedCopy)
                 try await shell("/usr/bin/ditto", [mountedApp.path, stagedCopy.path])
-                try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
+                _ = try? await shell("/usr/bin/hdiutil", ["detach", mountPoint, "-force"])
                 stagedApp = stagedCopy
                 cleanupPaths.append(stagedCopy.path)
             }
