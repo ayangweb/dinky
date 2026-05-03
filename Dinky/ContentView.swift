@@ -2360,6 +2360,16 @@ private func presentManualUpdateResult(_ result: UpdateChecker.CheckResult,
             NSWorkspace.shared.open(url)
         }
 
+    case .updateAvailableMissingAsset(let version):
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Update is published but not installable yet.", comment: "Manual update: release exists but missing downloadable asset.")
+        alert.informativeText = String(localized: "Version \(version) is on GitHub, but this release doesn't include a zip or DMG yet. Try again in a minute, or open the release page.", comment: "Manual update: missing release assets; argument is version.")
+        alert.addButton(withTitle: String(localized: "What’s new", comment: "Manual update alert: open release page."))
+        alert.addButton(withTitle: String(localized: "OK", comment: "Alert dismiss."))
+        if alert.runModal() == .alertFirstButtonReturn, let url = updater.releaseURL {
+            NSWorkspace.shared.open(url)
+        }
+
     case .upToDate:
         alert.messageText = String(localized: "All caught up.", comment: "Manual update: no update available.")
         alert.informativeText = String(localized: "You’re on Dinky \(currentAppVersion()) — the latest and dinkyest.", comment: "Manual update: up to date; argument is version.")
