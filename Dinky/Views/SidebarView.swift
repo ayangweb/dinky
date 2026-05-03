@@ -1,4 +1,5 @@
 import SwiftUI
+import DinkyCoreShared
 
 private struct SidebarContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -20,13 +21,14 @@ private struct SidebarMeasuredHeight: ViewModifier {
 }
 
 private enum SidebarScope: String, CaseIterable, Identifiable {
-    case images, videos, pdfs, output
+    case images, videos, audio, pdfs, output
     var id: String { rawValue }
     var title: String {
         switch self {
         case .images: return "Images"
         case .pdfs: return "PDFs"
         case .videos: return "Videos"
+        case .audio: return "Audio"
         case .output: return "Output"
         }
     }
@@ -35,6 +37,7 @@ private enum SidebarScope: String, CaseIterable, Identifiable {
         case .images: return "photo"
         case .pdfs: return "doc.text"
         case .videos: return "video"
+        case .audio: return "waveform"
         case .output: return "square.and.arrow.up"
         }
     }
@@ -44,6 +47,7 @@ private enum SidebarScope: String, CaseIterable, Identifiable {
         switch self {
         case .images: return "Images"
         case .videos: return "Video"
+        case .audio: return "Audio"
         case .pdfs: return "PDFs"
         case .output: return "Output"
         }
@@ -69,6 +73,7 @@ struct SidebarView: View {
         var list: [SidebarScope] = []
         if prefs.showImagesSection { list.append(.images) }
         if prefs.showVideosSection { list.append(.videos) }
+        if prefs.showAudioSection { list.append(.audio) }
         if prefs.showPDFsSection { list.append(.pdfs) }
         list.append(.output)
         return list
@@ -126,7 +131,9 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.showImagesSection)
         .animation(.easeInOut(duration: 0.2), value: prefs.showPDFsSection)
         .animation(.easeInOut(duration: 0.2), value: prefs.showVideosSection)
-        .animation(.easeInOut(duration: 0.2), value: prefs.pdfGrayscale)
+        .animation(.easeInOut(duration: 0.2), value: prefs.showAudioSection)
+        .animation(.easeInOut(duration: 0.2), value: prefs.audioFormatRaw)
+        .animation(.easeInOut(duration: 0.2), value: prefs.audioQualityTierRaw)
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfMaxFileSizeEnabled)
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfOutputModeRaw)
         .animation(.easeInOut(duration: 0.2), value: prefs.pdfEnableOCR)
@@ -134,13 +141,16 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.2), value: prefs.videoCodecFamilyRaw)
         .animation(.easeInOut(duration: 0.2), value: prefs.videoMaxResolutionEnabled)
         .animation(.easeInOut(duration: 0.2), value: prefs.videoMaxResolutionLines)
+        .animation(.easeInOut(duration: 0.2), value: prefs.videoMaxFPSEnabled)
+        .animation(.easeInOut(duration: 0.2), value: prefs.videoMaxFPS)
         .animation(.easeInOut(duration: 0.2), value: prefs.sidebarSimpleMode)
         .animation(.easeInOut(duration: 0.2), value: scopeRaw)
         .accessibilityLabel(String(localized: "Compression settings", comment: "VoiceOver: sidebar."))
-        .accessibilityHint("Choose format, quality, and output options for images, videos, and PDFs.")
+        .accessibilityHint("Choose format, quality, and output options for images, videos, audio, and PDFs.")
         .onChange(of: prefs.showImagesSection) { _, _ in syncScopeIfNeeded() }
         .onChange(of: prefs.showPDFsSection) { _, _ in syncScopeIfNeeded() }
         .onChange(of: prefs.showVideosSection) { _, _ in syncScopeIfNeeded() }
+        .onChange(of: prefs.showAudioSection) { _, _ in syncScopeIfNeeded() }
         .onAppear { snapPdfFlattenQualityIfNeeded() }
         .onChange(of: prefs.pdfMaxFileSizeEnabled) { _, _ in snapPdfFlattenQualityIfNeeded() }
         .onChange(of: prefs.pdfMaxFileSizeKB) { _, _ in snapPdfFlattenQualityIfNeeded() }
@@ -291,7 +301,7 @@ struct SidebarView: View {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(
                         String(
-                            localized: "What to expect, collapsed. How Dinky handles photos, documents, video, and saved files. Activate the header to show friendly and technical details.",
+                            localized: "What to expect, collapsed. How Dinky handles photos, documents, video, optional audio tracks, and saved files. Activate the header to show friendly and technical details.",
                             comment: "VoiceOver: collapsed What to expect block."
                         )
                     )
@@ -326,7 +336,11 @@ struct SidebarView: View {
             )
 
             if !expandedOutcomeMap {
-                Text(String(localized: "How Dinky handles photos, documents, video, and saved files — expand for details.", comment: "Collapsed teaser under What to expect header."))
+                Text(
+                    prefs.showAudioSection
+                        ? String(localized: "How Dinky handles photos, documents, video, audio, and saved files — expand for details.", comment: "Collapsed teaser under What to expect header (audio section on).")
+                        : String(localized: "How Dinky handles photos, documents, video, and saved files — expand for details.", comment: "Collapsed teaser under What to expect header.")
+                )
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -353,6 +367,14 @@ struct SidebarView: View {
                         friendly: simpleModeVideoFriendly(),
                         technical: simpleModeVideoTechnical()
                     )
+                    if prefs.showAudioSection {
+                        simpleModeOutcomeRow(
+                            icon: "waveform",
+                            title: String(localized: "Audio", comment: "Outcome map row title."),
+                            friendly: simpleModeAudioFriendly(),
+                            technical: simpleModeAudioTechnical()
+                        )
+                    }
                     simpleModeOutcomeRow(
                         icon: "square.and.arrow.up",
                         title: String(localized: "Output", comment: "Outcome map row title; matches Output scope tab."),
@@ -471,6 +493,25 @@ struct SidebarView: View {
         return String(localized: "MP4: codec (H.264 / HEVC), quality, and resolution cap in All options… below.", comment: "Simple outcome: videos without smart quality.")
     }
 
+    private func simpleModeAudioFriendly() -> String {
+        let fmt = prefs.audioConversionFormat
+        if prefs.smartQuality {
+            return String(localized: "Exports each track using Smart Quality picks from bitrate when helpful; otherwise respects your chosen format.", comment: "Simple outcome: audio with smart quality.")
+        }
+        return String.localizedStringWithFormat(
+            String(localized: "Exports to %@ with your chosen bitrate tier.", comment: "Simple outcome: audio without smart quality; argument is format name."),
+            fmt.displayName
+        )
+    }
+
+    private func simpleModeAudioTechnical() -> String {
+        let fmt = prefs.audioConversionFormat
+        if fmt == .mp3 {
+            return String(localized: "MP3 uses bundled LAME; other formats use macOS audio conversion.", comment: "Simple outcome: audio technical with MP3.")
+        }
+        return String(localized: "Cross-converts with macOS conversion tools.", comment: "Simple outcome: audio technical non-MP3.")
+    }
+
     private func simpleModeOutputFriendly() -> String {
         String(localized: "Saves where you chose in Settings; optionally reveals the folder when done.", comment: "Outcome map friendly: output.")
     }
@@ -500,6 +541,7 @@ struct SidebarView: View {
                 case .images:  imagesPanel
                 case .pdfs:    pdfsPanel
                 case .videos:  videosPanel
+                case .audio:   audioPanel
                 case .output:  outputPanel
                 }
             }
@@ -510,7 +552,7 @@ struct SidebarView: View {
 
     /// Segmented control — clearer than ultra-small tab labels in a narrow sidebar.
     private var scopeTabBar: some View {
-        Picker(String(localized: "Adjust scope", comment: "Accessibility: sidebar Images/PDFs/Videos/Output scope."), selection: $scopeRaw) {
+        Picker(String(localized: "Adjust scope", comment: "Accessibility: sidebar segmented scope (Images, Video, Audio, PDFs, Output)."), selection: $scopeRaw) {
             ForEach(availableScopes) { scope in
                 Text(scope.tabShortTitle)
                     .tag(scope.rawValue)
@@ -597,6 +639,7 @@ struct SidebarView: View {
     private var imagesPanel: some View { imagesContent }
     private var pdfsPanel: some View { pdfsContent }
     private var videosPanel: some View { videosContent }
+    private var audioPanel: some View { audioContent }
     private var outputPanel: some View { outputContent }
 
     // MARK: - Type section contents
@@ -954,6 +997,29 @@ struct SidebarView: View {
 
         SettingsSectionDivider()
 
+        settingsSubHeader(icon: "gauge.with.dots.needle.33percent", String(localized: "Frame rate", comment: "Sidebar Video: FPS subsection."))
+        Toggle(String(localized: "Cap frame rate", comment: "Sidebar: video FPS cap toggle."), isOn: Binding(
+            get: { prefs.videoMaxFPSEnabled }, set: { prefs.videoMaxFPSEnabled = $0 }
+        )).toggleStyle(.switch).font(.system(size: 11))
+        if prefs.videoMaxFPSEnabled {
+            VStack(alignment: .leading, spacing: 8) {
+                settingsChipGrid(
+                    presets: settingsVideoFPSCapPresets,
+                    current: VideoFPSCapPreset.normalizeStored(prefs.videoMaxFPS),
+                    fixedColumnCount: 4
+                ) { prefs.videoMaxFPS = $0 }
+                settingsHelperText(String(localized: "Lowers output FPS when the source runs faster than the cap (great for screen recordings). Unchanged when the source is already at or below this rate.", comment: "Sidebar Video: FPS cap helper."))
+            }
+            .transition(.asymmetric(
+                insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+            ))
+        } else {
+            settingsHelperText(String(localized: "Off keeps the source frame rate.", comment: "Sidebar Video: FPS cap off."))
+        }
+
+        SettingsSectionDivider()
+
         settingsSubHeader(icon: "speaker.wave.2", "Audio")
         Toggle("Strip audio track", isOn: Binding(
             get: { prefs.videoRemoveAudio }, set: { prefs.videoRemoveAudio = $0 }
@@ -964,6 +1030,44 @@ struct SidebarView: View {
                     insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
                     removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
                 ))
+        }
+    }
+
+    @ViewBuilder
+    private var audioContent: some View {
+        settingsSubHeader(icon: "waveform", "Format")
+        Picker(String(localized: "Output format", comment: "Sidebar Audio: format."), selection: Binding(
+            get: { prefs.audioFormatRaw }, set: { prefs.audioFormatRaw = $0 }
+        )) {
+            ForEach(AudioConversionFormat.allCases, id: \.rawValue) { f in
+                Text(f.displayName).tag(f.rawValue)
+            }
+        }
+        if (AudioConversionFormat(rawValue: prefs.audioFormatRaw) ?? .aacM4A) == .mp3 {
+            settingsHelperText(String(localized: "MP3 encoding uses the bundled LAME encoder (LGPL). WAV, AIFF, AAC/M4A, ALAC, and FLAC use macOS audio tools.", comment: "Sidebar Audio: LAME note."))
+        }
+
+        SettingsSectionDivider()
+
+        settingsSubHeader(icon: "wand.and.stars", "Quality")
+        Toggle(String(localized: "Smart quality (all types)", comment: "Sidebar: global smart quality for images, PDF, and video."), isOn: Binding(
+            get: { prefs.smartQuality }, set: { prefs.smartQuality = $0 }
+        )).font(.system(size: 11))
+        if prefs.smartQuality {
+            settingsHelperText(String(localized: "Picks format or tier from each file’s bitrate when it helps. Your choices below are the manual fallback.", comment: "Sidebar Audio: smart quality on helper."))
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                    removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+                ))
+        } else {
+            QualityChipPicker(
+                options: AudioConversionQualityTier.allCases.map { ($0.displayName, $0.rawValue, "") },
+                selected: Binding(get: { prefs.audioQualityTierRaw }, set: { prefs.audioQualityTierRaw = $0 })
+            )
+            .transition(.asymmetric(
+                insertion: .move(edge: .top).combined(with: .opacity.animation(.easeInOut(duration: 0.15).delay(0.1))),
+                removal:   .move(edge: .top).combined(with: .opacity.animation(.easeIn(duration: 0.08)))
+            ))
         }
     }
 
@@ -1065,8 +1169,20 @@ struct SidebarView: View {
                 let resCap = preset.videoMaxResolutionEnabled
                     ? "\(preset.videoMaxResolutionLines)p"
                     : "source"
+                let fpsCap = preset.videoMaxFPSEnabled
+                    ? " · max \(VideoFPSCapPreset.normalizeStored(preset.videoMaxFPS)) fps"
+                    : ""
                 summaryRow("video",
-                           "\(vidCodec.chipLabel) · \(resCap)\(preset.videoRemoveAudio ? " · no audio" : "")")
+                           "\(vidCodec.chipLabel) · \(resCap)\(fpsCap)\(preset.videoRemoveAudio ? " · no audio" : "")")
+                let audioFmt = AudioConversionFormat(rawValue: preset.audioFormatRaw) ?? .aacM4A
+                let audioTier = AudioConversionQualityTier.resolve(preset.audioQualityTierRaw)
+                let audioSummary: String = {
+                    if preset.smartQuality {
+                        return "\(audioFmt.displayName) · Smart quality"
+                    }
+                    return "\(audioFmt.displayName) · \(audioTier.displayName)"
+                }()
+                summaryRow("waveform", audioSummary)
                 let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
                 if pdfMode == .flattenPages {
                     let pdfQ = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium

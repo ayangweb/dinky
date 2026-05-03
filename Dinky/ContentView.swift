@@ -421,7 +421,7 @@ final class ContentViewModel: ObservableObject {
                     switch mediaType {
                     case .video:
                         await videoSem.wait()
-                    case .image, .pdf:
+                    case .image, .pdf, .audio:
                         await mediaSem.wait()
                     }
                     group.addTask { [weak self] in
@@ -429,7 +429,7 @@ final class ContentViewModel: ObservableObject {
                             switch mediaType {
                             case .video:
                                 Task { await videoSem.signal() }
-                            case .image, .pdf:
+                            case .image, .pdf, .audio:
                                 Task { await mediaSem.signal() }
                             }
                         }
@@ -527,6 +527,7 @@ final class ContentViewModel: ObservableObject {
                         case .image: return (item.formatOverride ?? self.selectedFormat).displayName
                         case .pdf:   return "PDF"
                         case .video: return "Video"
+                        case .audio: return "Audio"
                         }
                     })).sorted()
                     let record = SessionRecord(
@@ -631,6 +632,8 @@ final class ContentViewModel: ObservableObject {
             await compressPDFItem(item)
         case .video:
             await compressVideoItem(item)
+        case .audio:
+            await compressAudioItem(item)
         }
     }
 
@@ -1165,10 +1168,12 @@ final class ContentViewModel: ObservableObject {
         let capEnabled = preset?.videoMaxResolutionEnabled ?? prefs.videoMaxResolutionEnabled
         let capLines = preset?.videoMaxResolutionLines ?? prefs.videoMaxResolutionLines
         let resolutionCap: Int? = capEnabled ? capLines : nil
+        let fpsCapOn = preset?.videoMaxFPSEnabled ?? prefs.videoMaxFPSEnabled
+        let fpsCapStored = VideoFPSCapPreset.normalizeStored(preset?.videoMaxFPS ?? prefs.videoMaxFPS)
         CompressionTiming.logReproContext(
             media: "video",
             smartQuality: smartQ,
-            extra: "cap=\(resolutionCap.map(String.init) ?? "off") codec=\(codec.rawValue)"
+            extra: "cap=\(resolutionCap.map(String.init) ?? "off") fpsCap=\(fpsCapOn ? String(fpsCapStored) : "off") codec=\(codec.rawValue)"
         )
 
         let collisionStyle = collisionNamingStyle(for: item)
@@ -1205,6 +1210,8 @@ final class ContentViewModel: ObservableObject {
                 codec: codec,
                 removeAudio: removeAudio,
                 maxResolutionLines: resolutionCap,
+                maxFPSEnabled: fpsCapOn,
+                storedMaxFPS: fpsCapStored,
                 outputURL: workURL,
                 videoContentType: smartContentType,
                 progressHandler: progressHandler
@@ -1284,6 +1291,160 @@ final class ContentViewModel: ObservableObject {
         } catch VideoCompressionError.alreadyOptimized {
             await MainActor.run {
                 item.status = .skipped(savedPercent: nil, threshold: self.prefs.minimumSavingsPercent)
+            }
+        } catch {
+            await MainActor.run { item.status = .failed(error) }
+        }
+    }
+
+    private func compressAudioItem(_ item: CompressionItem) async {
+        let wasForced = await MainActor.run { () -> Bool in
+            let f = item.forceCompress
+            item.forceCompress = false
+            return f
+        }
+        let preset = activePreset(for: item)
+        let urlDL = item.isURLDownloadSource
+        await MainActor.run {
+            item.status = .processing
+            item.compressionProgress = 0
+        }
+        defer { item.compressionProgress = nil }
+
+        let fallbackFormat = AudioConversionFormat(rawValue: preset?.audioFormatRaw ?? "") ?? prefs.audioConversionFormat
+        let fallbackTier = AudioConversionQualityTier.resolve(preset?.audioQualityTierRaw ?? prefs.audioQualityTierRaw)
+        let smartQ = preset?.smartQuality ?? prefs.smartQuality
+
+        let sourceURL = item.sourceURL
+        let asset = AudioCompressor.makeURLAsset(url: sourceURL)
+
+        var targetFormat = fallbackFormat
+        var qualityTier = fallbackTier
+        if smartQ {
+            let decision = await AudioSmartQuality.decide(asset: asset, userFormat: fallbackFormat, userTier: fallbackTier)
+            targetFormat = decision.format
+            qualityTier = decision.tier
+        }
+
+        var intendedOutput: URL = {
+            if let pr = preset {
+                return pr.outputURL(for: item.sourceURL, mediaType: .audio, globalPrefs: prefs, isFromURLDownload: urlDL)
+            }
+            return prefs.outputURL(for: item.sourceURL, mediaType: .audio, isFromURLDownload: urlDL)
+        }()
+        // Smart Quality may pick a different container than the preset’s stored `audioFormatRaw`.
+        let outDir = intendedOutput.deletingLastPathComponent()
+        let outStem = intendedOutput.deletingPathExtension().lastPathComponent
+        intendedOutput = outDir.appendingPathComponent(outStem).appendingPathExtension(targetFormat.fileExtension)
+
+        let collisionStyle = collisionNamingStyle(for: item)
+        let finalURL = OutputPathUniqueness.uniqueOutputURL(
+            desired: intendedOutput,
+            sourceURL: sourceURL,
+            style: collisionStyle,
+            customPattern: collisionCustomPattern(for: item)
+        )
+        let workURL: URL
+        if sourceURL.path == finalURL.path {
+            workURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("dinky_aud_\(UUID().uuidString)")
+                .appendingPathExtension(targetFormat.fileExtension)
+        } else {
+            workURL = finalURL
+        }
+
+        let replaceOrigin = (preset.map { FilenameHandling(rawValue: $0.filenameHandlingRaw) } ?? prefs.filenameHandling)
+            == .replaceOrigin
+        var preservedModDate: Date?
+        if workURL.path != finalURL.path, prefs.preserveTimestamps {
+            preservedModDate = (try? FileManager.default.attributesOfItem(atPath: sourceURL.path)[.modificationDate]) as? Date
+        }
+
+        let progressHandler: @Sendable (Float) -> Void = { p in
+            Task { @MainActor in
+                item.compressionProgress = Double(p)
+            }
+        }
+
+        do {
+            let result = try await CompressionService.shared.compressAudio(
+                source: item.sourceURL,
+                targetFormat: targetFormat,
+                qualityTier: qualityTier,
+                outputURL: workURL,
+                progressHandler: progressHandler
+            )
+            let producedURL: URL
+            var recoveryForUndo: URL?
+            if workURL.path != finalURL.path {
+                do {
+                    recoveryForUndo = try? OriginalsHandler.disposeSourceBeforeTempSwap(
+                        originalAt: sourceURL,
+                        action: prefs.originalsAction,
+                        backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
+                    )
+                    producedURL = try OutputPathUniqueness.moveTempItemToUniqueOutput(
+                        temp: workURL,
+                        desiredOutput: finalURL,
+                        sourceURL: sourceURL,
+                        style: collisionStyle,
+                        customPattern: collisionCustomPattern(for: item)
+                    )
+                } catch {
+                    try? FileManager.default.removeItem(at: workURL)
+                    await MainActor.run { item.status = .failed(error) }
+                    return
+                }
+            } else {
+                producedURL = result.outputURL
+                if replaceOrigin {
+                    if urlDL {
+                        try? FileManager.default.removeItem(at: item.sourceURL)
+                    } else {
+                        recoveryForUndo = try? OriginalsHandler.disposeForReplace(
+                            originalAt: sourceURL,
+                            outputURL: producedURL,
+                            action: prefs.originalsAction,
+                            backupFolder: prefs.originalsAction == .backup ? prefs.originalsBackupDestinationURL() : nil
+                        )
+                    }
+                }
+            }
+
+            let outSize = (try? producedURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map { Int64($0) }
+                ?? result.outputSize
+            let savings = result.originalSize > 0
+                ? Double(result.originalSize - outSize) / Double(result.originalSize) : 0
+            await MainActor.run {
+                if let d = result.audioDurationSeconds {
+                    item.videoDuration = d
+                }
+                if outSize >= result.originalSize {
+                    item.status = .zeroGain(attemptedSize: outSize)
+                    try? FileManager.default.removeItem(at: producedURL)
+                } else if self.prefs.minimumSavingsPercent > 0 && savings < Double(self.prefs.minimumSavingsPercent) / 100.0 && !wasForced {
+                    item.status = .skipped(savedPercent: savings * 100, threshold: self.prefs.minimumSavingsPercent)
+                    try? FileManager.default.removeItem(at: producedURL)
+                } else {
+                    item.status = .done(outputURL: producedURL,
+                                        originalSize: result.originalSize,
+                                        outputSize: outSize)
+                    if self.prefs.preserveTimestamps {
+                        if let d = preservedModDate {
+                            try? FileManager.default.setAttributes([.modificationDate: d], ofItemAtPath: producedURL.path)
+                        } else {
+                            self.copyTimestamp(from: sourceURL, to: producedURL)
+                        }
+                    }
+                    self.copyFinderCommentsIfSettingsAllow(from: sourceURL, to: producedURL)
+                    item.undoSnapshot = CompressionUndoSnapshot(
+                        sourceURL: sourceURL,
+                        outputURL: producedURL,
+                        originalRecoveryURL: recoveryForUndo,
+                        replaceOriginal: replaceOrigin,
+                        isURLDownloadSource: urlDL
+                    )
+                }
             }
         } catch {
             await MainActor.run { item.status = .failed(error) }

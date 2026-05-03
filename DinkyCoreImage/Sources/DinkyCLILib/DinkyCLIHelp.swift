@@ -45,6 +45,7 @@ public enum DinkyCLIHelp {
           --codec h264|hevc   (ProRes is not supported)
           --remove-audio  |  --keep-audio
           --max-height <px>
+          --max-fps 60|30|24|15  |  --no-fps-cap
           --smart-quality | --no-smart-quality
           -o, --output-dir <path>   --json
           --collision-style …   --collision-pattern …

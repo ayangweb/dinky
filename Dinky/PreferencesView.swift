@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UserNotifications
+import DinkyCoreShared
 
 // MARK: - In-window navigation (contextual links between preference tabs)
 
@@ -452,6 +453,10 @@ private struct AppearanceTab: View {
                     get: { prefs.showImagesSection },
                     set: { prefs.setScopedSidebarSection(.images, isOn: $0) }
                 ))
+                Toggle(String(localized: "Show Audio in sidebar", comment: "Settings UI."), isOn: Binding(
+                    get: { prefs.showAudioSection },
+                    set: { prefs.setScopedSidebarSection(.audio, isOn: $0) }
+                ))
                 Toggle(String(localized: "Show Videos in sidebar", comment: "Settings UI."), isOn: Binding(
                     get: { prefs.showVideosSection },
                     set: { prefs.setScopedSidebarSection(.videos, isOn: $0) }
@@ -623,23 +628,25 @@ private struct OutputTab: View {
 
 /// Which media type’s settings are shown when **Applies to** includes more than one type.
 private enum PresetMediaSettingsTab: String, CaseIterable, Identifiable, Hashable {
-    case image, video, pdf
+    case image, video, audio, pdf
     var id: String { rawValue }
 
     var mediaType: MediaType {
         switch self {
         case .image: return .image
         case .video: return .video
+        case .audio: return .audio
         case .pdf: return .pdf
         }
     }
 
-    static let canonicalDisplayOrder: [PresetMediaSettingsTab] = [.image, .video, .pdf]
+    static let canonicalDisplayOrder: [PresetMediaSettingsTab] = [.image, .video, .audio, .pdf]
 
     static func tab(for media: MediaType) -> PresetMediaSettingsTab {
         switch media {
         case .image: return .image
         case .video: return .video
+        case .audio: return .audio
         case .pdf: return .pdf
         }
     }
@@ -667,7 +674,7 @@ private struct PresetsTab: View {
         if included == all {
             parts.append(contentsOf: allMediaTypesPresetSummaryFragments(preset, imageFmt: imageFmt, vid: vid))
         } else {
-            let order: [MediaType] = [.image, .video, .pdf]
+            let order: [MediaType] = [.image, .video, .audio, .pdf]
             for m in order where included.contains(m) {
                 parts.append(contentsOf: singleMediaSummaryFragments(media: m, preset: preset, imageFmt: imageFmt, vid: vid))
             }
@@ -677,6 +684,8 @@ private struct PresetsTab: View {
 
     private func allMediaTypesPresetSummaryFragments(_ preset: CompressionPreset, imageFmt: String, vid: String) -> [String] {
         var parts: [String] = [imageFmt, vid]
+        let af = AudioConversionFormat(rawValue: preset.audioFormatRaw) ?? .aacM4A
+        parts.append(af.displayName)
         let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
         if pdfMode == .flattenPages {
             let q = PDFQuality(rawValue: preset.pdfQualityRaw) ?? .medium
@@ -710,10 +719,22 @@ private struct PresetsTab: View {
             } else {
                 parts.append(String(localized: "full res", comment: "Preset list: video no resolution cap."))
             }
+            if preset.videoMaxFPSEnabled {
+                parts.append(
+                    String.localizedStringWithFormat(
+                        String(localized: "max %lld fps", comment: "Preset list: video FPS cap."),
+                        Int64(VideoFPSCapPreset.normalizeStored(preset.videoMaxFPS))
+                    )
+                )
+            }
             if preset.videoRemoveAudio {
                 parts.append(String(localized: "no audio", comment: "Preset list: audio stripped."))
             }
             return parts
+        case .audio:
+            let af = AudioConversionFormat(rawValue: preset.audioFormatRaw) ?? .aacM4A
+            let tier = AudioConversionQualityTier.resolve(preset.audioQualityTierRaw)
+            return [af.displayName, tier.displayName]
         case .pdf:
             var parts: [String] = []
             let pdfMode = PDFOutputMode(rawValue: preset.pdfOutputModeRaw) ?? .flattenPages
@@ -809,7 +830,7 @@ private struct PresetsTab: View {
         let live = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
         LabeledContent(String(localized: "Applies to", comment: "Settings UI.")) {
             Menu {
-                ForEach([MediaType.image, .video, .pdf], id: \.self) { type in
+                ForEach([MediaType.image, .video, .audio, .pdf], id: \.self) { type in
                     Toggle(isOn: presetAppliesToBinding(type, snapshot: snapshot)) {
                         Text(type.presetAppliesToSegmentLabel)
                     }
@@ -899,6 +920,8 @@ private struct PresetsTab: View {
                     EmptyView()
                 case .video:
                     presetManualCompressionVideoControls(snapshot)
+                case .audio:
+                    presetManualCompressionAudioControls(snapshot)
                 case .pdf:
                     presetManualCompressionPDFControls(snapshot)
                 }
@@ -926,6 +949,8 @@ private struct PresetsTab: View {
                 presetImageControls(snapshot)
             case .video:
                 presetVideoControls(snapshot)
+            case .audio:
+                presetAudioControls(snapshot)
             case .pdf:
                 presetPDFControls(snapshot)
             }
@@ -1296,6 +1321,21 @@ private struct PresetsTab: View {
 
             SettingsSectionDivider()
 
+            settingsSubHeader(icon: "gauge.with.dots.needle.33percent", String(localized: "Frame rate", comment: "Settings UI: video FPS cap."))
+            Toggle(String(localized: "Cap frame rate", comment: "Settings UI: video FPS cap toggle."), isOn: binding(\.videoMaxFPSEnabled, snapshot: snapshot))
+            if liveVideo.videoMaxFPSEnabled {
+                settingsChipGrid(
+                    presets: settingsVideoFPSCapPresets,
+                    current: VideoFPSCapPreset.normalizeStored(liveVideo.videoMaxFPS),
+                    fixedColumnCount: 4
+                ) { set(\.videoMaxFPS, to: $0, for: snapshot) }
+                settingsHelperText(String(localized: "Lowers output FPS when the source runs faster than the cap (great for screen recordings). Source timing is unchanged when it is already at or below this rate.", comment: "Settings UI: video FPS cap helper."))
+            } else {
+                settingsHelperText(String(localized: "Off keeps the source frame rate.", comment: "Settings UI: FPS cap off."))
+            }
+
+            SettingsSectionDivider()
+
             settingsSubHeader(icon: "speaker.wave.2", String(localized: "Audio", comment: "Settings UI: Media video subsection."))
             Toggle(String(localized: "Strip audio track", comment: "Settings UI."), isOn: binding(\.videoRemoveAudio, snapshot: snapshot))
             if liveVideo.videoRemoveAudio {
@@ -1303,6 +1343,36 @@ private struct PresetsTab: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func presetAudioControls(_ snapshot: CompressionPreset) -> some View {
+        let liveAudio = prefs.savedPresets.first(where: { $0.id == snapshot.id }) ?? snapshot
+        VStack(alignment: .leading, spacing: 10) {
+            settingsSubHeader(icon: "waveform", String(localized: "Format", comment: "Settings UI: audio output."))
+            Picker(String(localized: "Output format", comment: "Settings UI."), selection: binding(\.audioFormatRaw, snapshot: snapshot)) {
+                ForEach(AudioConversionFormat.allCases, id: \.rawValue) { f in
+                    Text(f.displayName).tag(f.rawValue)
+                }
+            }
+            SettingsSectionDivider()
+            settingsSubHeader(icon: "slider.horizontal.3", String(localized: "Quality", comment: "Settings UI: audio tier."))
+            Picker(String(localized: "Encoding strength", comment: "Settings UI."), selection: binding(\.audioQualityTierRaw, snapshot: snapshot)) {
+                ForEach(AudioConversionQualityTier.allCases, id: \.rawValue) { t in
+                    Text(t.displayName).tag(t.rawValue)
+                }
+            }
+            if (AudioConversionFormat(rawValue: liveAudio.audioFormatRaw) ?? .aacM4A) == .mp3 {
+                settingsHelperText(String(localized: "MP3 encoding uses the bundled LAME encoder (LGPL). WAV/AIFF/AAC/M4A/FLAC use macOS audio tools.", comment: "Settings UI: audio mp3 legal note."))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func presetManualCompressionAudioControls(_ snapshot: CompressionPreset) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            presetAudioControls(snapshot)
+        }
     }
 
     private func addPreset() {

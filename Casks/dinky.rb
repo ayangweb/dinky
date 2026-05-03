@@ -4,7 +4,7 @@ cask "dinky" do
 
   url "https://github.com/heyderekj/dinky/releases/download/v#{version}/Dinky-#{version}.zip"
   name "Dinky"
-  desc "Image, video, and PDF compression utility"
+  desc "Image, video, audio, and PDF compression utility"
   homepage "https://github.com/heyderekj/dinky"
 
   depends_on macos: ">= :sequoia"

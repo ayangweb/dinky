@@ -42,6 +42,10 @@ let settingsVideoResolutionPresets: [(String, Int)] = [
     ("480p", 480), ("720p", 720), ("1080p", 1080), ("2160p", 2160)
 ]
 
+let settingsVideoFPSCapPresets: [(String, Int)] = [
+    ("60", 60), ("30", 30), ("24", 24), ("15", 15),
+]
+
 // MARK: - Section chrome (sidebar + Settings)
 
 /// Matches grouped settings subsection titles: icon + 13pt semibold.
