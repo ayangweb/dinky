@@ -86,6 +86,21 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://dinkyfiles.com/compare/xld/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dinkyfiles.com/compare/freac/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://dinkyfiles.com/compare/cloudconvert/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://dinkyfiles.com/llms.txt</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
