@@ -40,6 +40,7 @@ public enum DinkyCLIHelp {
           --json                   schema: \(dinkyImageCompressResultSchema)
 
         compress-video options:
+          Inputs include MP4/MOV/M4V/AVI/WebM (output is MP4).
           -q, --quality low|medium|high|lossless  (low→medium, lossless→high)
           --codec h264|hevc   (ProRes is not supported)
           --remove-audio  |  --keep-audio

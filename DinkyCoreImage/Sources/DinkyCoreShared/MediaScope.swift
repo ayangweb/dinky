@@ -82,7 +82,7 @@ public enum PresetMediaScope: String, CaseIterable, Identifiable, Sendable {
 /// Classify files by extension / UTI for dispatch (CLI single-queue or `preset run`).
 public enum MediaTypeDetector: Sendable {
     private static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "avif", "tiff", "bmp", "heic", "heif", "gif"]
-    private static let videoExtensions: Set<String> = ["mp4", "mov", "m4v", "avi"]
+    private static let videoExtensions: Set<String> = ["mp4", "mov", "m4v", "avi", "webm"]
 
     public static func detect(_ url: URL) -> MediaType? {
         let ext = url.pathExtension.lowercased()
@@ -90,7 +90,8 @@ public enum MediaTypeDetector: Sendable {
         if ext == "pdf" { return .pdf }
         if videoExtensions.contains(ext) { return .video }
         guard let uti = UTType(filenameExtension: ext) else { return nil }
-        // MP4/MOV family only — avoids classifying WebM/MKV/etc. as video when AVFoundation export often fails.
+        // MP4/MOV family only — avoids classifying unknown extensions as video when AVFoundation export often fails.
+        // `.webm` is listed explicitly above (same caveat as other exotic containers).
         if uti.conforms(to: .mpeg4Movie) || uti.conforms(to: .quickTimeMovie) { return .video }
         if uti.conforms(to: .pdf) { return .pdf }
         if uti.conforms(to: .image) { return .image }

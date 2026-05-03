@@ -755,7 +755,7 @@ private struct FileTypeIcon: View {
         case "tiff":              return Color(red: 0.18, green: 0.78, blue: 0.52) // green
         case "bmp":               return Color(red: 0.96, green: 0.30, blue: 0.54) // pink
         case "pdf":               return Color(red: 0.92, green: 0.18, blue: 0.18) // red
-        case "mp4", "mov", "m4v": return Color(red: 0.55, green: 0.28, blue: 0.95) // purple
+        case "mp4", "mov", "m4v", "avi", "webm": return Color(red: 0.55, green: 0.28, blue: 0.95) // purple
         case "webp", "avif":      return Color.secondary
         default:                  return Color.secondary
         }
