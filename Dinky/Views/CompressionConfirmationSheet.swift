@@ -247,7 +247,7 @@ struct CompressionConfirmationSheet: View {
         }
         var segments: [(icon: String, count: Int)] = []
         var phrases: [String] = []
-        for t in [MediaType.image, .pdf, .video, .audio] {
+        for t in [MediaType.image, .video, .audio, .pdf] {
             if let c = counts[t], c > 0 {
                 segments.append((iconForMedia(t), c))
                 phrases.append(mediaCountLabel(type: t, count: c))

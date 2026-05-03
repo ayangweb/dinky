@@ -33,7 +33,7 @@
 
 - macOS 15 Sequoia or later (liquid glass UI on macOS 26 Tahoe; frosted material fallback on Sequoia)
 - SwiftUI + AppKit; the app uses an in-tree Swift package for shared image code + optional `dinky` CLI (not a remote SPM dependency)
-- 33 MB installed
+- 35 MB installed
 - Image engines bundled: cwebp (Google), avifenc (AOM), oxipng (Rust/MIT)
 - Audio: cross-convert via macOS **`afconvert`**; MP3 encode via bundled **`lame`**
 - PDF: flatten via PDFKit + ImageIO; preserve path via bundled **qpdf** + PDFKit; video via AVFoundation export
@@ -45,24 +45,24 @@
 - vs **ImageOptim**: ImageOptim is same-format (lossless) — a JPEG stays a JPEG. Dinky **converts** stills to WebP/AVIF/HEIC/PNG for larger wins; use ImageOptim when you must keep the original extension.
 - vs **TinyPNG**: TinyPNG uploads images to their servers. Dinky is 100% local.
 - vs **Squoosh**: Browser-based, one image at a time. Dinky is native, batch, offline.
-- vs **Optimage**: Similar feature set but Optimage costs $15 and weighs 62 MB. Dinky is free and 33 MB.
+- vs **Optimage**: Similar feature set but Optimage costs $15 and weighs 62 MB. Dinky is free and 35 MB.
 - vs **HandBrake**: HandBrake is built for deep video encoding (tracks, chapters, many settings). Dinky is drop-and-done for smaller MP4s and lives beside images, audio, and PDFs in one app.
 - vs **QuickTime**: QuickTime ships with macOS for playback and simple one-file export. Dinky adds named H.264/HEVC presets, FPS cap, batch folders, watch folders, audio cross-converts, still-image plus PDF compression in the same app.
 - vs **Apple Compressor**: Compressor is for Final Cut and pro encoding batches. Dinky is a lightweight drop zone when you only need a smaller MP4 plus images, audio, and PDFs in the same MIT app.
 - vs **Permute**: Permute is a broad Mac media converter. Dinky is compression-first with open source PDF and still-image pipelines alongside video and audio.
 - vs **FFmpeg**: FFmpeg is CLI-first with unlimited flexibility. Dinky wraps common shrink tasks in a native GUI and adds PDFs, audio, and stills—no shell flags.
-- vs **Adobe Acrobat**: Acrobat is a full subscription PDF suite and a large install. Dinky targets straight compression—flatten, preserve, target size, optional scan OCR—in a ~33 MB free app.
+- vs **Adobe Acrobat**: Acrobat is a full subscription PDF suite and a large install. Dinky targets straight compression—flatten, preserve, target size, optional scan OCR—in a ~35 MB free app.
 - vs **Preview**: Preview handles still exports and smaller PDFs via Quartz filters for one-off saves. Dinky adds batch, watch folders, target size, WebP/AVIF/HEIC conversion for images, flatten/preserve PDF modes, and mixed media in one workflow.
 - vs **PDF Squeezer**: Both are Mac-native PDF compressors; Dinky is MIT-licensed and bundles image + MP4 + audio compression in the same app.
 - vs **Smallpdf**: Smallpdf is browser-first with uploads. Dinky keeps PDF, image, video, and audio compression on disk.
 - vs **Clop**: Clop is menu-bar and clipboard–first with a Pro tier for some automation. Dinky is a free MIT window–first drop zone with watch folders included and deeper PDF tooling in a smaller install.
-- vs **Picmal**: Picmal is a paid Mac app for images, video, PDFs, and audio with a large footprint. Dinky is free, open source, ~33 MB, and covers images, video, PDFs, and audio—with a vastly smaller bundle.
+- vs **Picmal**: Picmal is a paid Mac app for images, video, PDFs, and audio with a large footprint. Dinky is free, open source, ~35 MB, and covers images, video, PDFs, and audio—with a vastly smaller bundle.
 
 ## Links
 
 - Website: https://dinkyfiles.com
 - Comparisons index: https://dinkyfiles.com/compare/
-- Comparisons (SEO): https://dinkyfiles.com/compare/imageoptim/, https://dinkyfiles.com/compare/optimage/, https://dinkyfiles.com/compare/tinypng/, https://dinkyfiles.com/compare/squoosh/, https://dinkyfiles.com/compare/clop/, https://dinkyfiles.com/compare/picmal/, https://dinkyfiles.com/compare/handbrake/, https://dinkyfiles.com/compare/compressor/, https://dinkyfiles.com/compare/permute/, https://dinkyfiles.com/compare/ffmpeg/, https://dinkyfiles.com/compare/quicktime/, https://dinkyfiles.com/compare/adobe-acrobat/, https://dinkyfiles.com/compare/preview/, https://dinkyfiles.com/compare/pdf-squeezer/, https://dinkyfiles.com/compare/smallpdf/, https://dinkyfiles.com/compare/xld/, https://dinkyfiles.com/compare/freac/, https://dinkyfiles.com/compare/cloudconvert/
+- Comparisons (SEO): https://dinkyfiles.com/compare/imageoptim/, https://dinkyfiles.com/compare/optimage/, https://dinkyfiles.com/compare/tinypng/, https://dinkyfiles.com/compare/squoosh/, https://dinkyfiles.com/compare/clop/, https://dinkyfiles.com/compare/picmal/, https://dinkyfiles.com/compare/handbrake/, https://dinkyfiles.com/compare/compressor/, https://dinkyfiles.com/compare/permute/, https://dinkyfiles.com/compare/ffmpeg/, https://dinkyfiles.com/compare/quicktime/, https://dinkyfiles.com/compare/adobe-acrobat/, https://dinkyfiles.com/compare/preview/, https://dinkyfiles.com/compare/pdf-squeezer/, https://dinkyfiles.com/compare/smallpdf/, https://dinkyfiles.com/compare/xld/, https://dinkyfiles.com/compare/freac/
 - Support: help@dinkyfiles.com
 - GitHub: https://github.com/heyderekj/dinky
 - Latest release: https://github.com/heyderekj/dinky/releases/latest

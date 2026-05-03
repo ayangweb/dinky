@@ -7,7 +7,7 @@ A tiny macOS app that shrinks images, videos, audio, and PDFs. Drag, drop, get s
 - **Download:** [Dinky for macOS (DMG)](https://github.com/heyderekj/dinky/releases/download/v2.11.2/Dinky-2.11.2.dmg) — or install with [Homebrew](https://brew.sh): `brew tap heyderekj/dinky https://github.com/heyderekj/dinky` then `brew install --cask dinky`
 - **Source:** [GitHub — heyderekj/dinky](https://github.com/heyderekj/dinky)
 - **Support:** [help@dinkyfiles.com](mailto:help@dinkyfiles.com)
-- **Version:** 33 MB · v2.11.2 · Requires macOS 15 Sequoia or later
+- **Version:** 35 MB · v2.11.2 · Requires macOS 15 Sequoia or later
 - **Note:** 1.x (from 1.0) was images only; **2.0** added videos and PDFs. **2.10** added audio compression and an optional video FPS cap. Older 1.x downloads stay on GitHub for archival use.
 
 ## Highlights
@@ -52,7 +52,7 @@ xattr -dr com.apple.quarantine /Applications/Dinky.app
 
 Full marketing page with screenshots and comparison table: [dinkyfiles.com](https://dinkyfiles.com/)
 
-Comparison pages — Images: [ImageOptim](https://dinkyfiles.com/compare/imageoptim/), [Optimage](https://dinkyfiles.com/compare/optimage/), [TinyPNG](https://dinkyfiles.com/compare/tinypng/), [Squoosh](https://dinkyfiles.com/compare/squoosh/), [Preview](https://dinkyfiles.com/compare/preview/). Video: [HandBrake](https://dinkyfiles.com/compare/handbrake/), [Compressor](https://dinkyfiles.com/compare/compressor/), [Permute](https://dinkyfiles.com/compare/permute/), [FFmpeg](https://dinkyfiles.com/compare/ffmpeg/), [QuickTime](https://dinkyfiles.com/compare/quicktime/). Audio: [Clop](https://dinkyfiles.com/compare/clop/), [Picmal](https://dinkyfiles.com/compare/picmal/), [Permute](https://dinkyfiles.com/compare/permute/), [XLD](https://dinkyfiles.com/compare/xld/), [fre:ac](https://dinkyfiles.com/compare/freac/), [CloudConvert](https://dinkyfiles.com/compare/cloudconvert/). PDF: [Acrobat](https://dinkyfiles.com/compare/adobe-acrobat/), [Preview](https://dinkyfiles.com/compare/preview/), [PDF Squeezer](https://dinkyfiles.com/compare/pdf-squeezer/), [Smallpdf](https://dinkyfiles.com/compare/smallpdf/). All-in-one (images, video, audio & PDF): [Clop](https://dinkyfiles.com/compare/clop/), [Picmal](https://dinkyfiles.com/compare/picmal/).
+Comparison pages — Images: [ImageOptim](https://dinkyfiles.com/compare/imageoptim/), [Optimage](https://dinkyfiles.com/compare/optimage/), [TinyPNG](https://dinkyfiles.com/compare/tinypng/), [Squoosh](https://dinkyfiles.com/compare/squoosh/), [Preview](https://dinkyfiles.com/compare/preview/). Video: [HandBrake](https://dinkyfiles.com/compare/handbrake/), [Compressor](https://dinkyfiles.com/compare/compressor/), [Permute](https://dinkyfiles.com/compare/permute/), [FFmpeg](https://dinkyfiles.com/compare/ffmpeg/), [QuickTime](https://dinkyfiles.com/compare/quicktime/). Audio: [Clop](https://dinkyfiles.com/compare/clop/), [Picmal](https://dinkyfiles.com/compare/picmal/), [Permute](https://dinkyfiles.com/compare/permute/), [XLD](https://dinkyfiles.com/compare/xld/), [fre:ac](https://dinkyfiles.com/compare/freac/). PDF: [Acrobat](https://dinkyfiles.com/compare/adobe-acrobat/), [Preview](https://dinkyfiles.com/compare/preview/), [PDF Squeezer](https://dinkyfiles.com/compare/pdf-squeezer/), [Smallpdf](https://dinkyfiles.com/compare/smallpdf/). All-in-one (images, video, audio & PDF): [Clop](https://dinkyfiles.com/compare/clop/), [Picmal](https://dinkyfiles.com/compare/picmal/).
 
 Machine-readable site summary: [llms.txt](https://dinkyfiles.com/llms.txt)
 
